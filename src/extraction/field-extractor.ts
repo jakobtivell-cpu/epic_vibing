@@ -1,0 +1,990 @@
+// ---------------------------------------------------------------------------
+// Field extraction — parses revenue, EBIT, employees, CEO, and fiscal year
+// from raw PDF text using label dictionaries and heuristic number parsing.
+//
+// Design principle: return null when uncertain — never fabricate a value.
+// Every null is accompanied by an explanation in the returned notes array.
+// Every non-null carries provenance (matched label, raw snippet, context).
+// ---------------------------------------------------------------------------
+
+import { CompanyProfile, ExtractedData, CompanyType } from '../types';
+import { INDUSTRIAL_LABELS, BANK_LABELS, INVESTMENT_LABELS, LabelSet } from './labels';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('field-extract');
+
+// ---------------------------------------------------------------------------
+// Provenance and result types
+// ---------------------------------------------------------------------------
+
+export interface FieldProvenance {
+  matchedLabel: string;
+  rawSnippet: string;
+  lineIndex: number;
+  context:
+    | 'income-statement'
+    | 'highlights'
+    | 'general'
+    | 'segment-fallback'
+    | 'ceo-letter'
+    | 'management-section';
+}
+
+export interface FieldExtractionResult {
+  data: ExtractedData;
+  fiscalYear: number | null;
+  provenance: {
+    revenue: FieldProvenance | null;
+    ebit: FieldProvenance | null;
+    employees: FieldProvenance | null;
+    ceo: FieldProvenance | null;
+  };
+  notes: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Label selection
+// ---------------------------------------------------------------------------
+
+function getLabels(companyType: CompanyType): LabelSet {
+  switch (companyType) {
+    case 'bank':
+      return BANK_LABELS;
+    case 'investment_company':
+      return INVESTMENT_LABELS;
+    default:
+      return INDUSTRIAL_LABELS;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Number parsing — handles Swedish (space-separated) and English (comma-separated)
+// ---------------------------------------------------------------------------
+
+function parseNumber(raw: string): number | null {
+  let s = raw.trim();
+
+  s = s.replace(/^[^0-9(–−-]+/, '');
+  if (s.length === 0) return null;
+
+  const isAccountingNeg = s.startsWith('(') && s.includes(')');
+  if (isAccountingNeg) s = s.replace(/\(/, '').replace(/\)/, '');
+
+  const hasMinusPrefix = /^[-–−]/.test(s);
+  if (hasMinusPrefix) s = s.replace(/^[-–−]\s*/, '');
+
+  const commaMatch = s.match(/^\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?/);
+  if (commaMatch) {
+    s = commaMatch[0].replace(/,/g, '');
+  } else {
+    s = s.replace(/[^0-9.,]+$/, '');
+    if (s.length === 0) return null;
+
+    s = s.replace(/(?<=\d) (?=\d{3}(?!\d))/g, '');
+
+    const lastComma = s.lastIndexOf(',');
+    const lastDot = s.lastIndexOf('.');
+
+    if (lastComma > lastDot) {
+      const afterComma = s.substring(lastComma + 1);
+      if (afterComma.length <= 2) {
+        s = s.replace(/\./g, '').replace(',', '.');
+      } else {
+        s = s.replace(/,/g, '');
+      }
+    } else {
+      s = s.replace(/,/g, '');
+    }
+  }
+
+  if (!/^\d+(\.\d+)?$/.test(s)) return null;
+
+  const value = parseFloat(s);
+  if (isNaN(value) || !isFinite(value)) return null;
+
+  return isAccountingNeg || hasMinusPrefix ? -value : value;
+}
+
+// ---------------------------------------------------------------------------
+// Cell quality filters — reject footnotes, narrative chunks, percentages
+// ---------------------------------------------------------------------------
+
+function isFootnoteRef(cell: string): boolean {
+  return /^\s*\d{1,2}\s*[)*†*]?\s*$/.test(cell);
+}
+
+function isNarrativeCell(cell: string): boolean {
+  const digits = (cell.match(/\d/g) || []).length;
+  const letters = (cell.match(/[a-zA-ZåäöÅÄÖéÉüÜ]/g) || []).length;
+  return letters > digits;
+}
+
+function isNoteReference(cell: string): boolean {
+  return /^[A-Za-z]{1,2}\d{1,2}$/.test(cell.trim());
+}
+
+function isPercentage(cell: string): boolean {
+  return cell.includes('%');
+}
+
+function isSkippableCell(cell: string): boolean {
+  if (/^20[12]\d$/.test(cell.trim())) return true;
+  if (isFootnoteRef(cell)) return true;
+  if (isNoteReference(cell)) return true;
+  if (isNarrativeCell(cell)) return true;
+  if (isPercentage(cell)) return true;
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// Unit-context detection — many reports state "amounts in MSEK" once
+// ---------------------------------------------------------------------------
+
+type UnitContext = 'msek' | 'bsek' | 'ksek' | 'sek';
+
+function detectUnitContext(text: string): UnitContext | null {
+  const lower = text.toLowerCase();
+
+  if (
+    /amounts?\s+in\s+sek\s*m\b/.test(lower) ||
+    /belopp\s+i\s+msek\b/.test(lower) ||
+    /amounts?\s+in\s+msek\b/.test(lower) ||
+    /sek\s+millions?\b/.test(lower) ||
+    /\bmkr\b/.test(lower)
+  ) {
+    return 'msek';
+  }
+
+  if (
+    /amounts?\s+in\s+sek\s*bn\b/.test(lower) ||
+    /amounts?\s+in\s+bsek\b/.test(lower) ||
+    /\bmdkr\b/.test(lower)
+  ) {
+    return 'bsek';
+  }
+
+  if (
+    /amounts?\s+in\s+ksek\b/.test(lower) ||
+    /amounts?\s+in\s+sek\s*k\b/.test(lower) ||
+    /\btkr\b/.test(lower)
+  ) {
+    return 'ksek';
+  }
+
+  return null;
+}
+
+function normalizeToMsek(value: number, unit: UnitContext | null): number {
+  switch (unit) {
+    case 'bsek':
+      return value * 1_000;
+    case 'ksek':
+      return value / 1_000;
+    case 'sek':
+      return value / 1_000_000;
+    case 'msek':
+    default:
+      return value;
+  }
+}
+
+/**
+ * Detect unit context within a specific line range (e.g., an income
+ * statement section). Falls back to the global context if no local
+ * indicator is found. This prevents a global "BSEK" indicator from
+ * being applied to a section that declares "Amounts in SEK m".
+ */
+function detectSectionUnitContext(
+  lines: string[],
+  start: number,
+  end: number,
+  globalUnit: UnitContext | null,
+): UnitContext | null {
+  const window = Math.min(start + 5, end);
+  for (let i = Math.max(0, start - 3); i < window; i++) {
+    const lineUnit = detectUnitContext(lines[i]);
+    if (lineUnit) {
+      if (lineUnit !== globalUnit) {
+        log.debug(
+          `Section-level unit override: ${lineUnit} (global was ${globalUnit}) at line ${i}`,
+        );
+      }
+      return lineUnit;
+    }
+  }
+  return globalUnit;
+}
+
+// ---------------------------------------------------------------------------
+// EBIT exclusion guards — reject EBITDA, adjusted variants, PBT, margin
+// ---------------------------------------------------------------------------
+
+const EBIT_EXCLUSIONS: RegExp[] = [
+  /\bebitda\b/i,
+  /\badjusted\s+(operating\s+)?(profit|income|ebit|result)/i,
+  /\bcomparable\s+operating\s+(profit|income|result)/i,
+  /\bunderlying\s+operating\s+(profit|income|result)/i,
+  /\bresultat\s+före\s+skatt\b/i,
+  /\bprofit\s+before\s+tax\b/i,
+  /\boperating\s+margin\b/i,
+  /\brörelsemarginal\b/i,
+  /\bjusterad\b/i,
+  /\bjämförelsestörande\b/i,
+  /\bitems\s+affecting\s+comparability\b/i,
+  /\bexkl\.\s/i,
+  /\bexcluding\s/i,
+];
+
+// ---------------------------------------------------------------------------
+// Labeled-number finder — section-aware with consolidated statement priority
+// ---------------------------------------------------------------------------
+
+interface NumberSearchOpts {
+  minValue?: number;
+  maxValue?: number;
+  exclusions?: RegExp[];
+}
+
+/** Internal match record with provenance data. */
+interface NumberMatch {
+  value: number;
+  lineIndex: number;
+  label: string;
+  rawCell: string;
+  context: string;
+  /** Line range of the section this match came from (for unit detection). */
+  sectionRange?: { start: number; end: number };
+}
+
+/** Patterns that identify the start of a consolidated income statement section. */
+const INCOME_STATEMENT_PATTERNS: RegExp[] = [
+  /consolidated\s+(?:statement\s+of\s+)?(?:income|profit|loss)/i,
+  /consolidated\s+income\s+statement/i,
+  /(?:income|profit\s+(?:and|&)\s+loss)\s+statement/i,
+  /koncernens\s+resultaträkning/i,
+  /resultaträkning/i,
+  /statement\s+of\s+(?:profit|income|loss)/i,
+];
+
+/** Patterns that indicate a section boundary (end of income statement section). */
+const SECTION_BOUNDARY_PATTERNS: RegExp[] = [
+  /consolidated\s+(?:statement\s+of\s+)?(?:financial\s+position|balance\s+sheet|comprehensive\s+income|cash\s+flow|changes\s+in\s+equity)/i,
+  /balance\s+sheet/i,
+  /koncernens\s+balansräkning/i,
+  /balansräkning/i,
+  /kassaflödesanalys/i,
+  /statement\s+of\s+(?:cash\s+flows?|financial\s+position|changes\s+in\s+equity)/i,
+  /notes\s+to\s+the\s+(?:consolidated\s+)?financial\s+statements/i,
+];
+
+/** Patterns for segment breakdown sections — results here should be deprioritized. */
+const SEGMENT_PATTERNS: RegExp[] = [
+  /segment\s+(?:information|reporting|overview|results?)/i,
+  /(?:operating|business|reportable)\s+segments?/i,
+  /segmentöversikt/i,
+  /segmentinformation/i,
+  /business\s+areas?\s+(?:overview|results?|performance)/i,
+];
+
+/** Patterns for highlights / key figures sections near the front of the report. */
+const HIGHLIGHTS_PATTERNS: RegExp[] = [
+  /\bat\s+a\s+glance\b/i,
+  /\bhighlights\b/i,
+  /\bi\s+korthet\b/i,
+  /\bnyckeltal\b/i,
+  /\bkey\s+figures?\b/i,
+  /\bfinancial\s+summary\b/i,
+  /\bfinansöversikt\b/i,
+];
+
+function findIncomeStatementSections(lines: string[]): Array<{ start: number; end: number }> {
+  const sections: Array<{ start: number; end: number }> = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].length > 120) continue;
+    const isHeading = INCOME_STATEMENT_PATTERNS.some((p) => {
+      const m = lines[i].match(p);
+      if (!m || (m.index ?? 0) >= 15) return false;
+      const afterMatch = lines[i].substring((m.index ?? 0) + m[0].length).trim();
+      return afterMatch.length < 10 || /^\d{1,3}$/.test(afterMatch);
+    });
+    if (!isHeading) continue;
+
+    let end = Math.min(i + 80, lines.length);
+    for (let j = i + 3; j < end; j++) {
+      if (lines[j].length > 120) continue;
+      const isBoundary = SECTION_BOUNDARY_PATTERNS.some((p) => p.test(lines[j]));
+      if (isBoundary) {
+        end = j;
+        break;
+      }
+    }
+
+    if (end - i >= 5) {
+      sections.push({ start: i, end });
+    }
+  }
+
+  return sections;
+}
+
+/**
+ * Find sections of text that look like highlights / key-figures pages.
+ * Returns line ranges [start, start+30) for each detected heading.
+ */
+function findHighlightsSections(lines: string[]): Array<{ start: number; end: number }> {
+  const sections: Array<{ start: number; end: number }> = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].length > 80) continue;
+    if (!HIGHLIGHTS_PATTERNS.some((p) => p.test(lines[i]))) continue;
+
+    const end = Math.min(i + 30, lines.length);
+    sections.push({ start: i, end });
+  }
+
+  return sections;
+}
+
+function isInSegmentSection(lineIndex: number, lines: string[]): boolean {
+  for (let i = lineIndex; i >= Math.max(0, lineIndex - 40); i--) {
+    if (lines[i].length > 120) continue;
+    if (SEGMENT_PATTERNS.some((p) => p.test(lines[i]))) return true;
+    if (INCOME_STATEMENT_PATTERNS.some((p) => p.test(lines[i]))) return false;
+  }
+  return false;
+}
+
+/**
+ * Find a labeled number within a set of lines. Two-pass: strict table-like rows
+ * first, then any reasonable line.
+ */
+function findLabeledNumber(
+  lines: string[],
+  labels: string[],
+  opts: NumberSearchOpts = {},
+): NumberMatch | null {
+  const tableResult = scanForNumber(lines, labels, opts, {
+    maxLineLen: 150,
+    maxLabelOffset: 60,
+  });
+  if (tableResult !== null) return tableResult;
+
+  return scanForNumber(lines, labels, opts, {
+    maxLineLen: 500,
+    maxLabelOffset: 200,
+  });
+}
+
+/**
+ * Section-aware number finder with provenance tracking.
+ * Search order: income statement → highlights → general (skip segments) → segment fallback.
+ */
+function findFinancialNumber(
+  lines: string[],
+  labels: string[],
+  opts: NumberSearchOpts = {},
+): NumberMatch | null {
+  const isSections = findIncomeStatementSections(lines);
+
+  // Priority pass 1: income statement sections
+  if (isSections.length > 0) {
+    for (const section of isSections) {
+      const sectionLines = lines.slice(section.start, section.end);
+      const result = findLabeledNumber(sectionLines, labels, opts);
+      if (result !== null) {
+        result.lineIndex += section.start;
+        result.context = 'income-statement';
+        result.sectionRange = section;
+        log.debug(
+          `Found value ${result.value} within income statement section (lines ${section.start}-${section.end})`,
+        );
+        return result;
+      }
+    }
+  }
+
+  // Priority pass 2: highlights / key figures sections
+  const highlightSections = findHighlightsSections(lines);
+  if (highlightSections.length > 0) {
+    for (const section of highlightSections) {
+      const sectionLines = lines.slice(section.start, section.end);
+      const result = findLabeledNumber(sectionLines, labels, opts);
+      if (result !== null) {
+        result.lineIndex += section.start;
+        result.context = 'highlights';
+        result.sectionRange = section;
+        log.debug(
+          `Found value ${result.value} in highlights section (lines ${section.start}-${section.end})`,
+        );
+        return result;
+      }
+    }
+  }
+
+  // Fallback: general search, but skip matches inside segment sections
+  const allMatches = findAllLabeledNumbers(lines, labels, opts);
+  const nonSegmentMatch = allMatches.find((m) => !isInSegmentSection(m.lineIndex, lines));
+  if (nonSegmentMatch) {
+    nonSegmentMatch.context = 'general';
+    log.debug(
+      `Found value ${nonSegmentMatch.value} outside segment section (line ${nonSegmentMatch.lineIndex})`,
+    );
+    return nonSegmentMatch;
+  }
+
+  // Last resort: return any match (even from segment sections)
+  if (allMatches.length > 0) {
+    allMatches[0].context = 'segment-fallback';
+    log.debug(
+      `Using segment-section value ${allMatches[0].value} as last resort (line ${allMatches[0].lineIndex})`,
+    );
+    return allMatches[0];
+  }
+
+  return null;
+}
+
+/**
+ * Find ALL occurrences of labeled numbers (not just the first).
+ * Used by findFinancialNumber to filter by section context.
+ */
+function findAllLabeledNumbers(
+  lines: string[],
+  labels: string[],
+  opts: NumberSearchOpts = {},
+): NumberMatch[] {
+  const results: NumberMatch[] = [];
+  const { minValue = -Infinity, maxValue = Infinity, exclusions } = opts;
+
+  for (const label of labels) {
+    const labelLower = label.toLowerCase();
+
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].length > 150) continue;
+      const lineLower = lines[i].toLowerCase();
+      const labelIdx = lineLower.indexOf(labelLower);
+      if (labelIdx < 0 || labelIdx > 60) continue;
+
+      if (labelIdx >= 6) {
+        const before = lineLower.substring(Math.max(0, labelIdx - 6), labelIdx).trim();
+        if (/\bother$/.test(before)) continue;
+      }
+
+      if (exclusions && exclusions.some((ex) => ex.test(lineLower))) continue;
+
+      let afterLabel = lines[i].substring(labelIdx + label.length);
+      afterLabel = afterLabel.replace(/^[)}\]]+/, '');
+      const noteRefFused2 = afterLabel.match(
+        /^([A-Z]{1,2}\d)(\d{1,2}(?:,\d{3})+)/,
+      );
+      if (noteRefFused2) {
+        afterLabel = afterLabel.substring(noteRefFused2[1].length);
+      } else {
+        afterLabel = afterLabel.replace(
+          /^(?:[A-Z]{1,2}\d{1,2}(?:,\s*[A-Z]{1,2}\d{1,2})*\s+)/,
+          '',
+        );
+      }
+
+      const searchText =
+        afterLabel + (i + 1 < lines.length ? '  ' + lines[i + 1] : '');
+
+      const cells = searchText
+        .split(/\s{2,}|\t+/)
+        .map((c) => c.trim())
+        .filter(Boolean);
+
+      for (const cell of cells) {
+        if (isSkippableCell(cell)) continue;
+        if (/\d%/.test(cell)) continue;
+
+        const value = parseNumber(cell);
+        if (value === null) continue;
+        if (value < minValue || value > maxValue) continue;
+
+        results.push({ value, lineIndex: i, label, rawCell: cell, context: 'general' });
+        break;
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Extract individual number tokens from text that may lack proper whitespace.
+ */
+function extractNumberTokens(text: string): string[] {
+  const tokens: string[] = [];
+  const numberRe = /[-–−]?\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|[-–−]?\d{4,}(?:\.\d{1,2})?/g;
+  let m;
+  while ((m = numberRe.exec(text)) !== null) {
+    tokens.push(m[0]);
+  }
+  return tokens;
+}
+
+function scanForNumber(
+  lines: string[],
+  labels: string[],
+  opts: NumberSearchOpts,
+  constraints: { maxLineLen: number; maxLabelOffset: number },
+): NumberMatch | null {
+  const { minValue = -Infinity, maxValue = Infinity, exclusions } = opts;
+
+  for (const label of labels) {
+    const labelLower = label.toLowerCase();
+
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].length > constraints.maxLineLen) continue;
+
+      const lineLower = lines[i].toLowerCase();
+      const labelIdx = lineLower.indexOf(labelLower);
+      if (labelIdx < 0) continue;
+      if (labelIdx > constraints.maxLabelOffset) continue;
+
+      if (labelIdx >= 6) {
+        const before = lineLower.substring(Math.max(0, labelIdx - 6), labelIdx).trim();
+        if (/\bother$/.test(before)) continue;
+      }
+
+      if (exclusions && exclusions.some((ex) => ex.test(lineLower))) continue;
+
+      let afterLabel = lines[i].substring(labelIdx + label.length);
+      afterLabel = afterLabel.replace(/^[)}\]]+/, '');
+      const noteRefFused = afterLabel.match(
+        /^([A-Z]{1,2}\d)(\d{1,2}(?:,\d{3})+)/,
+      );
+      if (noteRefFused) {
+        afterLabel = afterLabel.substring(noteRefFused[1].length);
+      } else {
+        afterLabel = afterLabel.replace(
+          /^(?:[A-Z]{1,2}\d{1,2}(?:,\s*[A-Z]{1,2}\d{1,2})*\s+)/,
+          '',
+        );
+      }
+
+      const searchText =
+        afterLabel + (i + 1 < lines.length ? '  ' + lines[i + 1] : '');
+
+      const cells = searchText
+        .split(/\s{2,}|\t+/)
+        .map((c) => c.trim())
+        .filter(Boolean);
+
+      for (const cell of cells) {
+        if (isSkippableCell(cell)) continue;
+        if (/\d%/.test(cell)) continue;
+
+        const value = parseNumber(cell);
+        if (value === null) continue;
+        if (value < minValue || value > maxValue) continue;
+
+        log.debug(`Found "${label}": ${value} (raw: "${cell}")`);
+        return { value, lineIndex: i, label, rawCell: cell, context: 'general' };
+      }
+
+      const directTokens = extractNumberTokens(afterLabel);
+      for (const token of directTokens) {
+        if (/^20[12]\d$/.test(token)) continue;
+        const value = parseNumber(token);
+        if (value === null) continue;
+        if (value < minValue || value > maxValue) continue;
+
+        log.debug(`Found "${label}": ${value} (direct-extract: "${token}")`);
+        return { value, lineIndex: i, label, rawCell: token, context: 'general' };
+      }
+    }
+  }
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// CEO name extraction — checks before, on, and after the label line
+// ---------------------------------------------------------------------------
+
+const NON_NAME_PATTERNS = [
+  'top management',
+  'group management',
+  'management team',
+  'board of directors',
+  'executive team',
+  'executive committee',
+  'senior leadership',
+  'group functions',
+  'corporate governance',
+  'annual report',
+  'sustainability report',
+  'financial statements',
+  'income statement',
+  'table of contents',
+  'chairman',
+  'the board',
+  'supervisory board',
+  'ordförande',
+  'chief financial officer',
+  'cfo',
+  'auditor',
+  'revisor',
+  'board member',
+  'styrelseledamot',
+];
+
+const CORPORATE_WORDS = /\b(?:group|board|committee|team|communications|holding|capital|partners|investment|management|report|statement|corporate|governance|foundation|business|area|president|director|officer|vice|senior|division|segment|unit)\b/i;
+
+const TITLE_ONLY_RE = /^the\s+\w+$/i;
+
+// Two-letter words that are never first or last names
+const NON_NAME_WORDS = /^(?:we|do|an|if|or|so|at|by|in|on|to|up|is|it|no)$/i;
+const COMMON_NON_NAMES = /\b(?:things|about|with|from|that|this|what|where|which|their|these|those|have|been|will|would|could|should|does)\b/i;
+
+function isKnownNonName(text: string): boolean {
+  const lower = text.toLowerCase();
+  if (NON_NAME_PATTERNS.some((p) => lower === p || lower.startsWith(p))) return true;
+  if (CORPORATE_WORDS.test(text)) return true;
+  if (TITLE_ONLY_RE.test(text.trim())) return true;
+  if (COMMON_NON_NAMES.test(text)) return true;
+  const words = text.trim().split(/\s+/);
+  if (words.some((w) => NON_NAME_WORDS.test(w))) return true;
+  return false;
+}
+
+/** Also reject lines that contain a role title suggesting someone other than the CEO. */
+function lineContainsNonCeoRole(line: string): boolean {
+  const lower = line.toLowerCase();
+  return (
+    /\bchairman\b/i.test(lower) ||
+    /\bordförande\b/i.test(lower) ||
+    /\bchief\s+financial\s+officer\b/i.test(lower) ||
+    /\b(?:^|[^a-z])cfo(?:[^a-z]|$)/i.test(lower) ||
+    /\bauditor\b/i.test(lower) ||
+    /\brevisor\b/i.test(lower)
+  );
+}
+
+const NAME_RE =
+  /([A-ZÅÄÖÉÜ][a-zåäöéü]+(?:[\s-]+(?:von\s+|af\s+|de\s+)?[A-ZÅÄÖÉÜ][a-zåäöéü]+){1,3})/;
+
+/** Internal result from CEO search with provenance. */
+interface CeoMatch {
+  name: string;
+  label: string;
+  lineIndex: number;
+  pattern: string;
+  context: 'ceo-letter' | 'management-section' | 'general';
+}
+
+/**
+ * Search for CEO name with a priority window. First scans the CEO letter
+ * (first ~120 lines), then the full document.
+ */
+function findCeoWithProvenance(lines: string[], labels: string[]): CeoMatch | null {
+  // Pass 1: CEO letter window (first ~120 lines, approximating first 5 pages)
+  const ceoLetterEnd = Math.min(120, lines.length);
+  const letterResult = scanForCeo(lines, labels, 0, ceoLetterEnd);
+  if (letterResult) {
+    letterResult.context = 'ceo-letter';
+    return letterResult;
+  }
+
+  // Pass 2: Management / board section (look for section headings)
+  const mgmtSections = findManagementSections(lines);
+  for (const section of mgmtSections) {
+    const result = scanForCeo(lines, labels, section.start, section.end);
+    if (result) {
+      result.context = 'management-section';
+      return result;
+    }
+  }
+
+  // No full-document scan — too many false positives.
+  // Prefer null over a wrong guess.
+  return null;
+}
+
+const MANAGEMENT_SECTION_PATTERNS: RegExp[] = [
+  /\b(?:group\s+)?management\b/i,
+  /\bkoncernledning\b/i,
+  /\bstyrelse\b/i,
+  /\bboard\s+of\s+directors\b/i,
+  /\bleadership\b/i,
+];
+
+function findManagementSections(lines: string[]): Array<{ start: number; end: number }> {
+  const sections: Array<{ start: number; end: number }> = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].length > 80) continue;
+    if (!MANAGEMENT_SECTION_PATTERNS.some((p) => p.test(lines[i]))) continue;
+    sections.push({ start: Math.max(0, i - 2), end: Math.min(i + 40, lines.length) });
+  }
+  return sections;
+}
+
+function scanForCeo(
+  lines: string[],
+  labels: string[],
+  startLine: number,
+  endLine: number,
+): CeoMatch | null {
+  for (const label of labels) {
+    const labelLower = label.toLowerCase();
+
+    for (let i = startLine; i < endLine; i++) {
+      const lineLower = lines[i].toLowerCase();
+      const idx = lineLower.indexOf(labelLower);
+      if (idx < 0) continue;
+
+      // Skip lines that clearly refer to a non-CEO role
+      if (lineContainsNonCeoRole(lines[i]) && !/\bceo\b/i.test(lines[i]) && !/\bvd\b/i.test(lines[i])) {
+        continue;
+      }
+
+      // Pattern A: name on the PREVIOUS line (signature-style)
+      if (i > startLine) {
+        const prevLine = lines[i - 1].trim();
+        const prevMatch = prevLine.match(
+          /^([A-ZÅÄÖÉÜ][a-zåäöéü]+(?:[\s-]+(?:von\s+|af\s+|de\s+)?[A-ZÅÄÖÉÜ][a-zåäöéü]+){1,3})$/,
+        );
+        if (prevMatch && !isKnownNonName(prevMatch[1])) {
+          log.debug(`Found CEO (prev line): "${prevMatch[1]}" via "${label}"`);
+          return { name: prevMatch[1], label, lineIndex: i - 1, pattern: 'prev-line', context: 'general' };
+        }
+      }
+
+      // Pattern B: name AFTER the label on the same line
+      const afterLabel = lines[i]
+        .substring(idx + label.length)
+        .replace(/^[:\s–—,.-]+/, '')
+        .trim();
+
+      const afterMatch = afterLabel.match(NAME_RE);
+      if (afterMatch && !isKnownNonName(afterMatch[1])) {
+        log.debug(`Found CEO (same line): "${afterMatch[1]}" via "${label}"`);
+        return { name: afterMatch[1], label, lineIndex: i, pattern: 'same-line-after', context: 'general' };
+      }
+
+      // Pattern C: name BEFORE the label on the same line
+      const beforeLabel = lines[i].substring(0, idx).replace(/[,:\s–—.-]+$/, '').trim();
+      const beforeMatch = beforeLabel.match(NAME_RE);
+      if (beforeMatch && !isKnownNonName(beforeMatch[1])) {
+        log.debug(`Found CEO (before label): "${beforeMatch[1]}" via "${label}"`);
+        return { name: beforeMatch[1], label, lineIndex: i, pattern: 'same-line-before', context: 'general' };
+      }
+
+      // Pattern D: name on the NEXT line
+      if (i + 1 < endLine) {
+        const nextLine = lines[i + 1].trim();
+        const nextMatch = nextLine.match(NAME_RE);
+        if (nextMatch && !isKnownNonName(nextMatch[1])) {
+          log.debug(`Found CEO (next line): "${nextMatch[1]}" via "${label}"`);
+          return { name: nextMatch[1], label, lineIndex: i + 1, pattern: 'next-line', context: 'general' };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Fiscal year extraction
+// ---------------------------------------------------------------------------
+
+function findFiscalYear(
+  text: string,
+  fallbackYear: number | null,
+): number | null {
+  const patterns = [
+    /annual\s+report\s+(\d{4})/i,
+    /årsredovisning\s+(\d{4})/i,
+    /fiscal\s+year\s+(\d{4})/i,
+    /räkenskapsår(?:et)?\s+(\d{4})/i,
+    /financial\s+year\s+(\d{4})/i,
+    /for\s+the\s+year\s+ended.*?(\d{4})/i,
+    /january\s*[-–]\s*december\s+(\d{4})/i,
+    /januari\s*[-–]\s*december\s+(\d{4})/i,
+  ];
+
+  // Restrict to first ~3000 chars (title page / report header) to avoid
+  // matching forward-looking statements like "Financial year 2027 targets".
+  const frontMatter = text.substring(0, 3_000);
+
+  for (const pattern of patterns) {
+    const match = frontMatter.match(pattern);
+    if (match) {
+      const year = parseInt(match[1], 10);
+      if (year >= 2020 && year <= 2030) {
+        log.debug(`Fiscal year from text (front matter): ${year} (${pattern.source})`);
+        return year;
+      }
+    }
+  }
+
+  // Broaden to first ~15000 chars (approximately first 10 pages) if front
+  // matter didn't have it — some reports bury the year deeper.
+  const earlyText = text.substring(0, 15_000);
+  for (const pattern of patterns) {
+    const match = earlyText.match(pattern);
+    if (match) {
+      const year = parseInt(match[1], 10);
+      if (year >= 2020 && year <= 2030) {
+        log.debug(`Fiscal year from text (early pages): ${year} (${pattern.source})`);
+        return year;
+      }
+    }
+  }
+
+  if (fallbackYear !== null) {
+    log.debug(`Using fallback fiscal year from discovery: ${fallbackYear}`);
+    return fallbackYear;
+  }
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Provenance builder helper
+// ---------------------------------------------------------------------------
+
+function numMatchToProvenance(m: NumberMatch): FieldProvenance {
+  return {
+    matchedLabel: m.label,
+    rawSnippet: m.rawCell,
+    lineIndex: m.lineIndex,
+    context: m.context as FieldProvenance['context'],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Main entry point
+// ---------------------------------------------------------------------------
+
+export function extractFields(
+  text: string,
+  company: CompanyProfile,
+  fallbackFiscalYear: number | null,
+): FieldExtractionResult {
+  const labels = getLabels(company.companyType);
+  const lines = text
+    .split(/\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+  const notes: string[] = [];
+
+  log.info(
+    `Extracting fields for ${company.name} (${company.companyType}) — ${lines.length} text lines`,
+  );
+
+  const unitContext = detectUnitContext(text);
+  if (unitContext) {
+    log.debug(`Unit context detected: ${unitContext}`);
+  }
+
+  // Provenance tracking
+  let revProvenance: FieldProvenance | null = null;
+  let ebitProvenance: FieldProvenance | null = null;
+  let empProvenance: FieldProvenance | null = null;
+  let ceoProvenance: FieldProvenance | null = null;
+
+  // --- Revenue ---
+  let revenue: number | null = null;
+
+  if (company.companyType === 'investment_company') {
+    notes.push('Investment company — standard revenue/EBIT not applicable');
+  } else {
+    if (company.companyType === 'bank') {
+      notes.push('Bank — mapped from banking income statement terms');
+    }
+
+    const revMatch = findFinancialNumber(lines, labels.revenue, { minValue: 100 });
+    if (revMatch !== null) {
+      const revUnit = revMatch.sectionRange
+        ? detectSectionUnitContext(lines, revMatch.sectionRange.start, revMatch.sectionRange.end, unitContext)
+        : unitContext;
+      revenue = Math.round(normalizeToMsek(revMatch.value, revUnit));
+      revProvenance = numMatchToProvenance(revMatch);
+      log.info(`Revenue: ${revenue} MSEK`);
+    } else {
+      notes.push(`Revenue not found for ${company.name}`);
+      log.warn(`Revenue not found for ${company.name}`);
+    }
+  }
+
+  // --- EBIT ---
+  let ebit: number | null = null;
+
+  if (company.companyType !== 'investment_company') {
+    const ebitMatch = findFinancialNumber(lines, labels.ebit, {
+      minValue: -500_000,
+      maxValue: 500_000,
+      exclusions: EBIT_EXCLUSIONS,
+    });
+    if (ebitMatch !== null) {
+      const ebitUnit = ebitMatch.sectionRange
+        ? detectSectionUnitContext(lines, ebitMatch.sectionRange.start, ebitMatch.sectionRange.end, unitContext)
+        : unitContext;
+      ebit = Math.round(normalizeToMsek(ebitMatch.value, ebitUnit));
+      ebitProvenance = numMatchToProvenance(ebitMatch);
+      log.info(`EBIT: ${ebit} MSEK`);
+    } else {
+      notes.push(`EBIT not found for ${company.name}`);
+      log.warn(`EBIT not found for ${company.name}`);
+    }
+  }
+
+  // --- Employees ---
+  const empMatch = findLabeledNumber(lines, labels.employees, {
+    minValue: 100,
+    maxValue: 1_000_000,
+  });
+  let employees: number | null = null;
+  if (empMatch !== null) {
+    employees = Math.round(empMatch.value);
+    empProvenance = numMatchToProvenance(empMatch);
+    log.info(`Employees: ${employees}`);
+  } else {
+    notes.push(`Employee count not found for ${company.name}`);
+    log.warn(`Employees not found for ${company.name}`);
+  }
+
+  // --- CEO ---
+  let ceo: string | null = null;
+  const ceoMatch = findCeoWithProvenance(lines, labels.ceo);
+  if (ceoMatch !== null) {
+    ceo = ceoMatch.name;
+    ceoProvenance = {
+      matchedLabel: ceoMatch.label,
+      rawSnippet: `${ceoMatch.name} [${ceoMatch.pattern}]`,
+      lineIndex: ceoMatch.lineIndex,
+      context: ceoMatch.context,
+    };
+  } else {
+    notes.push(`CEO not found for ${company.name}`);
+    log.warn(`CEO not found for ${company.name}`);
+  }
+
+  // --- Fiscal year ---
+  const fiscalYear = findFiscalYear(text, fallbackFiscalYear);
+  if (fiscalYear === null) {
+    notes.push('Fiscal year not found in PDF text or report URL');
+  }
+
+  return {
+    data: {
+      revenue_msek: revenue,
+      ebit_msek: ebit,
+      employees,
+      ceo,
+    },
+    fiscalYear,
+    provenance: {
+      revenue: revProvenance,
+      ebit: ebitProvenance,
+      employees: empProvenance,
+      ceo: ceoProvenance,
+    },
+    notes,
+  };
+}

@@ -3,27 +3,31 @@
 // Every module imports from here — no circular deps.
 // ---------------------------------------------------------------------------
 
-/** Classification used to select extraction heuristics (banks report differently). */
+/**
+ * Classification used to select extraction heuristics (banks report differently).
+ * Auto-detected from document content at runtime — never preconfigured.
+ */
 export type CompanyType = 'industrial' | 'bank' | 'investment_company';
 
 /**
- * A runtime description of one company to scrape.
- * The pipeline is fully company-agnostic — all company-specific knowledge
- * lives in this profile object.
+ * Minimal runtime description of one company to scrape.
+ * Only `name` is required — everything else is discovered at runtime.
  */
 export interface CompanyProfile {
   name: string;
-  ticker: string;
-  website: string;
-  /** Path fragments to try when discovering the IR page (e.g. "/en/investors"). */
-  irHints: string[];
-  companyType: CompanyType;
-  /** Alternative names the company may appear as in reports or page titles. */
-  knownAliases: string[];
-  /** Human-readable warnings about common confusion or fragile assumptions. */
-  entityWarnings: string[];
-  /** Swedish org number (e.g. "556012-5790"). Used for allabolag.se data fallback. */
+  /** Discovered or provided — the company's main website URL. */
+  website?: string;
+  /** Stock ticker, if known (e.g. "SEB-A.ST"). */
+  ticker?: string;
+  /**
+   * Canonical legal entity name resolved from data/ticker.json.
+   * Used as the primary search term and for allabolag disambiguation.
+   */
+  legalName?: string;
+  /** Swedish org number (e.g. "502032-9081"). Used for direct allabolag lookup. */
   orgNumber?: string;
+  /** Multiple candidate domains to try for IR discovery (populated at runtime). */
+  candidateDomains?: string[];
 }
 
 /** The 4 core financial fields the assignment requires. */
@@ -59,14 +63,17 @@ export interface StageResult<T> {
   durationMs?: number;
 }
 
-export type DataSource = 'pdf' | 'allabolag' | 'playwright+pdf';
+export type DataSource = 'pdf' | 'allabolag' | 'playwright+pdf' | 'search+pdf' | 'ir-html';
 export type ResultStatus = 'complete' | 'partial' | 'failed';
+
+/** Which fallback step produced the final result. */
+export type FallbackStep = 'search' | 'cheerio' | 'playwright' | 'direct-pdf-search' | 'ir-html' | 'allabolag' | 'cached' | 'none';
 
 /** One row in the final results.json — one per company, always present even on failure. */
 export interface PipelineResult {
   company: string;
-  ticker: string;
-  website: string;
+  ticker: string | null;
+  website: string | null;
   irPage: string | null;
   annualReportUrl: string | null;
   annualReportDownloaded: string | null;
@@ -76,6 +83,10 @@ export interface PipelineResult {
   dataSource: DataSource | null;
   confidence: number | null;
   status: ResultStatus;
+  fallbackStepReached: FallbackStep;
+  detectedCompanyType: CompanyType | null;
+  cached: boolean;
+  cachedAt?: string;
   extractionNotes: string[];
   /** Internal stage tracking — excluded from output JSON. */
   stages: {
@@ -86,6 +97,15 @@ export interface PipelineResult {
     validation: StageResult<ExtractedData>;
   };
 }
+
+/**
+ * `ReportCandidate.source` when the PDF URL came from Playwright (DOM or network).
+ * Must match checks in pipeline dataSource assignment.
+ */
+export const SOURCE_PLAYWRIGHT_FALLBACK = 'fallback-playwright';
+
+/** Source tag for search-engine-discovered PDFs. */
+export const SOURCE_SEARCH_DISCOVERY = 'search-discovery';
 
 /** A scored PDF candidate from report discovery. */
 export interface ReportCandidate {
@@ -112,6 +132,6 @@ export interface ReportDiscoveryResult {
 export interface RunConfig {
   companies: CompanyProfile[];
   force: boolean;
-  failedOnly: boolean;
-  ticker?: string;
+  /** When true, sets base delay to 8s for all domains. */
+  slow: boolean;
 }

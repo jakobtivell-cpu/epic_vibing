@@ -1,6 +1,7 @@
 // ---------------------------------------------------------------------------
 // Validation — sanity-checks extracted data and assigns a confidence score.
 // Values that fail hard constraints are nulled out (never returned unchecked).
+// Company type is auto-detected and passed in — no preconfigured types.
 // ---------------------------------------------------------------------------
 
 import { ExtractedData, CompanyType } from '../types';
@@ -14,16 +15,15 @@ export interface ValidationResult {
   warnings: string[];
 }
 
-const CURRENT_YEAR = new Date().getFullYear();
-
 export function validateExtractedData(
   data: ExtractedData,
-  companyType: CompanyType,
+  detectedCompanyType?: CompanyType,
   pipelineNotes?: string[],
 ): ValidationResult {
   const warnings: string[] = [];
   let score = 100;
   const cleaned: ExtractedData = { ...data };
+  const companyType = detectedCompanyType ?? 'industrial';
 
   // --- Revenue ---
   if (cleaned.revenue_msek === null) {
@@ -37,11 +37,10 @@ export function validateExtractedData(
     warnings.push(`Revenue implausibly high (${cleaned.revenue_msek} MSEK) — discarded`);
     cleaned.revenue_msek = null;
     score -= 15;
-  } else if (cleaned.revenue_msek < 10_000 && companyType === 'industrial') {
-    warnings.push(
-      `Revenue ${cleaned.revenue_msek} MSEK is below 10,000 MSEK — unusually low for Large Cap industrial`,
-    );
-    score -= 10;
+  } else if (cleaned.revenue_msek < 1_000 && companyType === 'industrial') {
+    warnings.push(`Revenue ${cleaned.revenue_msek} MSEK below 1,000 — implausible for Large Cap`);
+    cleaned.revenue_msek = null;
+    score -= 15;
   }
 
   // --- EBIT ---
@@ -54,7 +53,6 @@ export function validateExtractedData(
     score -= 15;
   }
 
-  // EBIT must not exceed revenue (basic accounting constraint)
   if (
     cleaned.revenue_msek !== null &&
     cleaned.ebit_msek !== null &&

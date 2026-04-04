@@ -1,22 +1,14 @@
 // ---------------------------------------------------------------------------
 // Annual report PDF discovery — scored candidate ranking from IR pages.
 //
-// For each link on the IR page (and one level of sub-pages), assigns a
-// composite score based on text, URL, context, recency, and negative signals.
-// Returns the best-scoring PDF candidate with confidence assessment.
-//
-// KEY DESIGN DECISIONS:
-//   - The final winner MUST be a .pdf link (or very strong non-PDF, score > 25).
-//   - Non-PDF links that score well as "annual report" pages are treated as
-//     sub-pages to follow, not final candidates.
-//   - Sub-page following always happens for high-scoring report links, not
-//     only when the IR page has few PDFs.
+// Pure Cheerio-based scanner: IR page + sub-pages + deep crawl + direct
+// URL construction + sitemap. No Playwright or external fallbacks — those
+// are orchestrated at the pipeline level.
 // ---------------------------------------------------------------------------
 
 import * as cheerio from 'cheerio';
 import { Element } from 'domhandler';
 import {
-  CompanyProfile,
   StageResult,
   ReportDiscoveryResult,
   ReportCandidate,
@@ -25,8 +17,6 @@ import {
 import { fetchPage, headCheck } from '../utils/http-client';
 import { resolveUrl, getPath } from '../utils/url-helpers';
 import { createLogger } from '../utils/logger';
-import { externalSourceDiscovery } from './external-fallbacks';
-import { tryPlaywrightFallback } from './playwright-fallback';
 
 const log = createLogger('report-ranker');
 
@@ -73,9 +63,16 @@ const TEXT_NEGATIVE: { pattern: RegExp; points: number }[] = [
   { pattern: /\bnews\b/i, points: -8 },
   { pattern: /\bgeneral\s*meeting\b/i, points: -8 },
   { pattern: /\bagm\b/i, points: -8 },
-  { pattern: /\bproxy\b/i, points: -5 },
+  { pattern: /\bproxy\b/i, points: -8 },
+  { pattern: /\bvoting\b/i, points: -15 },
+  { pattern: /\bpostal[\s-]*voting\b/i, points: -15 },
+  { pattern: /\bkallelse\b/i, points: -15 },
+  { pattern: /\bstämma\b/i, points: -10 },
+  { pattern: /\bbolagsstämma\b/i, points: -15 },
   { pattern: /\bsummary\b/i, points: -3 },
   { pattern: /\bsammandrag\b/i, points: -3 },
+  { pattern: /\besef\b/i, points: -3 },
+  { pattern: /\bcopy[\s-]+of[\s-]+the[\s-]+official\b/i, points: -5 },
 ];
 
 function sustainabilityPenalty(text: string): number {
@@ -93,6 +90,12 @@ function urlScore(href: string): number {
 
   if (/\.pdf(\?|$)/i.test(href)) score += 5;
   if (/annual|arsredovisning|årsredovisning/i.test(lower)) score += 4;
+  if (/annual-and-sustainability|annual.report|arsredovisning|års-och-hållbarhets/i.test(lower)) {
+    score += 3;
+  }
+  if (/press|\/pr-|\/news\/|pressrelease|_pr_/i.test(lower)) score -= 10;
+  if (/interim|quarterly|q[1-4]\b/i.test(lower)) score -= 8;
+  if (/voting|kallelse|proxy|bolagsstamma|stamma/i.test(lower)) score -= 15;
 
   const urlYear = extractYear(href);
   if (urlYear !== null) {
@@ -335,10 +338,6 @@ function inferFiscalYear(candidate: ReportCandidate): number | null {
 
 // ---- Fallback: deep sub-page crawl ----
 
-/**
- * Common report sub-page path suffixes to try appending to the IR page base.
- * These are the most frequent one-click-deeper paths on Swedish corporate sites.
- */
 const REPORT_SUBPAGE_SUFFIXES = [
   'financial-reports',
   'annual-reports',
@@ -351,20 +350,13 @@ const REPORT_SUBPAGE_SUFFIXES = [
   'rapporter',
 ];
 
-/**
- * Build a list of guessed report sub-page URLs from the company website
- * and IR page URL. Tries both the IR page "directory" and common site paths.
- */
 function buildSubPageGuesses(
-  company: CompanyProfile,
+  website: string,
   irPageUrl: string,
 ): string[] {
   const urls: string[] = [];
-  const base = company.website.replace(/\/$/, '');
+  const base = website.replace(/\/$/, '');
 
-  // Compute the IR page "directory" for relative sub-pages.
-  // e.g. "https://x.com/en/investors.html" → "https://x.com/en/investors/"
-  //      "https://x.com/en/investors/"     → "https://x.com/en/investors/"
   let irDir: string;
   try {
     const parsed = new URL(irPageUrl);
@@ -374,13 +366,11 @@ function buildSubPageGuesses(
     irDir = irPageUrl.replace(/\.html?$/, '/').replace(/\/$/, '') + '/';
   }
 
-  // Sub-pages relative to the IR page directory
   for (const suffix of REPORT_SUBPAGE_SUFFIXES) {
     urls.push(`${irDir}${suffix}`);
     urls.push(`${irDir}${suffix}.html`);
   }
 
-  // Common site-level report paths (outside the IR section)
   const sitePaths = [
     '/en/reports',
     '/en/news-and-media/reports',
@@ -396,15 +386,9 @@ function buildSubPageGuesses(
   return urls;
 }
 
-/**
- * Fallback (a): deeper sub-page crawl.
- *
- * When the primary IR scan + its sub-pages yield 0 PDFs, this generates
- * candidate sub-page URLs from the IR page structure, fetches them, and
- * scans for PDF links. Generic — not company-specific.
- */
 async function fallbackDeepSubPageCrawl(
-  company: CompanyProfile,
+  companyName: string,
+  website: string,
   irPageUrl: string,
   irPageHtml: string,
   irBaseUrl: string,
@@ -412,8 +396,6 @@ async function fallbackDeepSubPageCrawl(
 ): Promise<ReportCandidate[]> {
   const candidates: ReportCandidate[] = [];
 
-  // Source 1: scan the IR page HTML for links whose URL PATH contains
-  // report-related segments, regardless of link text.
   const $ir = cheerio.load(irPageHtml);
   const pathBasedSubPages: string[] = [];
 
@@ -430,10 +412,8 @@ async function fallbackDeepSubPageCrawl(
     }
   });
 
-  // Source 2: guessed sub-page URLs from IR page structure
-  const guessedUrls = buildSubPageGuesses(company, irPageUrl);
+  const guessedUrls = buildSubPageGuesses(website, irPageUrl);
 
-  // Merge both sources, deduplicate, skip already visited
   const allSubPages = [...pathBasedSubPages, ...guessedUrls];
   const seen = new Set<string>(visitedPages);
   const toFetch: string[] = [];
@@ -446,18 +426,16 @@ async function fallbackDeepSubPageCrawl(
   }
 
   if (toFetch.length === 0) {
-    log.info(`[${company.name}] Fallback deep crawl: no new sub-pages to try`);
+    log.info(`[${companyName}] Fallback deep crawl: no new sub-pages to try`);
     return [];
   }
 
-  log.info(
-    `[${company.name}] Fallback deep crawl: scanning ${toFetch.length} candidate sub-pages`,
-  );
+  log.info(`[${companyName}] Fallback deep crawl: scanning ${toFetch.length} candidate sub-pages`);
 
   for (const subUrl of toFetch) {
     const result = await fetchPage(subUrl, 10_000);
     if (!result.ok) {
-      log.debug(`[${company.name}]   ${subUrl} → ${result.error.status ?? result.error.message}`);
+      log.debug(`[${companyName}]   ${subUrl} → ${result.error.status ?? result.error.message}`);
       continue;
     }
 
@@ -472,19 +450,14 @@ async function fallbackDeepSubPageCrawl(
 
     const pdfHits = subCandidates.filter((c) => isPdfUrl(c.url));
     if (pdfHits.length > 0) {
-      log.info(
-        `[${company.name}]   ${subUrl} → ${pdfHits.length} PDF candidates found`,
-      );
+      log.info(`[${companyName}]   ${subUrl} → ${pdfHits.length} PDF candidates found`);
       candidates.push(...pdfHits);
     } else {
-      log.debug(`[${company.name}]   ${subUrl} → 0 PDFs`);
+      log.debug(`[${companyName}]   ${subUrl} → 0 PDFs`);
     }
   }
 
-  log.info(
-    `[${company.name}] Fallback deep crawl: ${candidates.length} total PDF candidates`,
-  );
-
+  log.info(`[${companyName}] Fallback deep crawl: ${candidates.length} total PDF candidates`);
   return candidates;
 }
 
@@ -498,13 +471,9 @@ function companySlug(name: string): string {
     .replace(/(^-|-$)/g, '');
 }
 
-/**
- * Build a list of common annual report URL patterns for a company.
- * These cover the most frequent static-file layouts across Swedish corporate sites.
- */
-function buildCandidateUrls(company: CompanyProfile): string[] {
-  const base = company.website.replace(/\/$/, '');
-  const slug = companySlug(company.name);
+export function buildCandidateUrls(companyName: string, website: string): string[] {
+  const base = website.replace(/\/$/, '');
+  const slug = companySlug(companyName);
   const years = [MOST_RECENT_FISCAL_YEAR, CURRENT_YEAR];
 
   const templates = [
@@ -530,17 +499,12 @@ function buildCandidateUrls(company: CompanyProfile): string[] {
   return urls;
 }
 
-/**
- * Fallback (b): HEAD-check a set of constructed URLs against the company domain.
- * Returns the first one that responds with 200 + application/pdf content type.
- */
 async function fallbackDirectUrls(
-  company: CompanyProfile,
+  companyName: string,
+  website: string,
 ): Promise<ReportCandidate | null> {
-  const urls = buildCandidateUrls(company);
-  log.info(
-    `[${company.name}] Fallback: trying ${urls.length} direct URL patterns`,
-  );
+  const urls = buildCandidateUrls(companyName, website);
+  log.info(`[${companyName}] Fallback: trying ${urls.length} direct URL patterns`);
 
   for (const url of urls) {
     const result = await headCheck(url, 8_000);
@@ -548,13 +512,10 @@ async function fallbackDirectUrls(
       const ct = result.contentType ?? '';
       const finalUrl = result.finalUrl ?? url;
 
-      // Reject if server redirected away from a PDF to an HTML page
       const redirectedToHtml =
         ct.includes('text/html') || (!isPdfUrl(finalUrl) && !ct.includes('application/pdf'));
       if (redirectedToHtml) {
-        log.debug(
-          `[${company.name}] Fallback: ${url} → redirected to HTML (${finalUrl}) — skipping`,
-        );
+        log.debug(`[${companyName}] Fallback: ${url} → redirected to HTML (${finalUrl}) — skipping`);
         continue;
       }
 
@@ -564,7 +525,7 @@ async function fallbackDirectUrls(
 
       if (confirmedPdf) {
         const year = extractYear(url);
-        log.info(`[${company.name}] Fallback hit: ${finalUrl}`);
+        log.info(`[${companyName}] Fallback hit: ${finalUrl}`);
         return {
           url: finalUrl,
           score: 10 + yearScore(year),
@@ -575,34 +536,29 @@ async function fallbackDirectUrls(
     }
   }
 
-  log.info(`[${company.name}] Fallback: no direct URL patterns matched`);
+  log.info(`[${companyName}] Fallback: no direct URL patterns matched`);
   return null;
 }
 
 // ---- Fallback: sitemap.xml ----
 
-/**
- * Fallback (c): Fetch sitemap.xml (and sitemap index) from the company domain,
- * look for URLs containing annual-report/arsredovisning + a recent year.
- */
 async function fallbackSitemap(
-  company: CompanyProfile,
+  companyName: string,
+  website: string,
 ): Promise<ReportCandidate | null> {
-  const base = company.website.replace(/\/$/, '');
+  const base = website.replace(/\/$/, '');
   const sitemapUrls = [
     `${base}/sitemap.xml`,
     `${base}/sitemap_index.xml`,
   ];
 
-  log.info(`[${company.name}] Fallback: checking sitemap.xml`);
+  log.info(`[${companyName}] Fallback: checking sitemap.xml`);
 
   for (const smUrl of sitemapUrls) {
     const result = await fetchPage(smUrl, 10_000);
     if (!result.ok) continue;
 
     const xml = result.response.data;
-
-    // If this is a sitemap index, extract child sitemap URLs and fetch them
     const childSitemaps = extractSitemapIndexUrls(xml);
     const allXmls = [xml];
 
@@ -613,14 +569,13 @@ async function fallbackSitemap(
       }
     }
 
-    // Search all sitemap XML for annual report PDFs
     for (const sitemapXml of allXmls) {
-      const candidate = searchSitemapForReport(sitemapXml, company.name);
+      const candidate = searchSitemapForReport(sitemapXml, companyName);
       if (candidate) return candidate;
     }
   }
 
-  log.info(`[${company.name}] Fallback: no annual report found in sitemaps`);
+  log.info(`[${companyName}] Fallback: no annual report found in sitemaps`);
   return null;
 }
 
@@ -631,7 +586,7 @@ function extractSitemapIndexUrls(xml: string): string[] {
     const loc = $(el).text().trim();
     if (loc) urls.push(loc);
   });
-  return urls.slice(0, 10); // don't fetch too many child sitemaps
+  return urls.slice(0, 10);
 }
 
 function searchSitemapForReport(
@@ -656,7 +611,7 @@ function searchSitemapForReport(
 
     let score = isPdf ? 5 : 2;
     score += yearScore(year);
-    score += 4; // "annual" in path
+    score += 4;
 
     candidates.push({
       url: loc,
@@ -669,9 +624,7 @@ function searchSitemapForReport(
   candidates.sort((a, b) => b.score - a.score);
 
   if (candidates.length > 0) {
-    log.info(
-      `[${companyName}] Fallback sitemap hit: ${candidates[0].url} (score ${candidates[0].score})`,
-    );
+    log.info(`[${companyName}] Fallback sitemap hit: ${candidates[0].url} (score ${candidates[0].score})`);
     return candidates[0];
   }
 
@@ -680,17 +633,22 @@ function searchSitemapForReport(
 
 // ---- Main entry point ----
 
+/**
+ * Discover annual report PDF candidates from an IR page using Cheerio.
+ * Pure scanner — no Playwright, no external fallbacks. Those are
+ * orchestrated at the pipeline level.
+ */
 export async function discoverAnnualReport(
-  company: CompanyProfile,
+  companyName: string,
+  website: string,
   irPageUrl: string,
 ): Promise<StageResult<ReportDiscoveryResult>> {
   const startTime = Date.now();
   const visitedPages = new Set<string>();
   visitedPages.add(irPageUrl);
 
-  log.info(`[${company.name}] Scanning IR page for report candidates: ${irPageUrl}`);
+  log.info(`[${companyName}] Scanning IR page for report candidates: ${irPageUrl}`);
 
-  // Fetch and scan the IR page
   const irResult = await fetchPage(irPageUrl, 10_000);
   if (!irResult.ok) {
     return {
@@ -706,14 +664,11 @@ export async function discoverAnnualReport(
   visitedPages.add(irBaseUrl);
 
   let allCandidates = scanPageForCandidates(irHtml, irBaseUrl, 'ir-page');
-  log.info(`[${company.name}] Found ${allCandidates.length} link candidates on IR page`);
+  log.info(`[${companyName}] Found ${allCandidates.length} link candidates on IR page`);
 
   // --- Collect sub-pages to follow ---
-  // Two sources: (a) generic sub-page detection and (b) high-scoring non-PDF
-  // report links from the candidate list itself.
   const subPagesToFollow: string[] = [];
 
-  // (a) Generic sub-page links from the IR page HTML
   const $ir = cheerio.load(irHtml);
   const genericSubPages = findSubPageLinks($ir, irBaseUrl, visitedPages);
   for (const url of genericSubPages) {
@@ -723,7 +678,6 @@ export async function discoverAnnualReport(
     }
   }
 
-  // (b) Non-PDF candidates that look like "annual reports" archive pages
   for (const c of allCandidates) {
     if (!visitedPages.has(c.url) && isReportSubPageLink(c)) {
       subPagesToFollow.push(c.url);
@@ -731,34 +685,27 @@ export async function discoverAnnualReport(
     }
   }
 
-  // Follow sub-pages (one level deep)
   if (subPagesToFollow.length > 0) {
-    log.info(
-      `[${company.name}] Following ${subPagesToFollow.length} report sub-pages`,
-    );
+    log.info(`[${companyName}] Following ${subPagesToFollow.length} report sub-pages`);
   }
 
   for (const subUrl of subPagesToFollow) {
-    log.info(`[${company.name}]   → ${subUrl}`);
+    log.info(`[${companyName}]   → ${subUrl}`);
     const subResult = await fetchPage(subUrl, 10_000);
     if (!subResult.ok) {
-      log.debug(`[${company.name}]   Failed: ${subResult.error.message}`);
+      log.debug(`[${companyName}]   Failed: ${subResult.error.message}`);
       continue;
     }
     const subCandidates = scanPageForCandidates(
       subResult.response.data,
       subResult.response.finalUrl,
-      `sub-page`,
+      'sub-page',
     );
     allCandidates = allCandidates.concat(subCandidates);
-    log.debug(
-      `[${company.name}]   Found ${subCandidates.length} candidates on sub-page`,
-    );
+    log.debug(`[${companyName}]   Found ${subCandidates.length} candidates on sub-page`);
   }
 
   // --- Build final candidate list ---
-  // Separate PDFs from non-PDFs. Only PDFs qualify as final candidates
-  // unless a non-PDF has an exceptionally high score (> 25).
   const dedupMap = new Map<string, ReportCandidate>();
   for (const c of allCandidates) {
     const existing = dedupMap.get(c.url);
@@ -767,13 +714,10 @@ export async function discoverAnnualReport(
     }
   }
 
-  // Detect standalone sustainability report candidate (before PDF-only filter)
   const allDeduped = Array.from(dedupMap.values());
   const sustainCandidate = findBestSustainabilityCandidate(allDeduped);
   if (sustainCandidate) {
-    log.info(
-      `[${company.name}] Sustainability report found: "${sustainCandidate.text}" — ${sustainCandidate.url}`,
-    );
+    log.info(`[${companyName}] Sustainability report found: "${sustainCandidate.text}" — ${sustainCandidate.url}`);
   }
 
   const finalCandidates = Array.from(dedupMap.values()).filter((c) => {
@@ -783,81 +727,40 @@ export async function discoverAnnualReport(
   });
 
   finalCandidates.sort((a, b) => {
-    // Primary: score descending
     if (b.score !== a.score) return b.score - a.score;
-    // Tiebreaker: prefer PDF links
     const aPdf = isPdfUrl(a.url) ? 1 : 0;
     const bPdf = isPdfUrl(b.url) ? 1 : 0;
     return bPdf - aPdf;
   });
 
-  // Log primary results
-  log.info(
-    `[${company.name}] IR page scan: ${finalCandidates.length} PDF candidates found`,
-  );
+  log.info(`[${companyName}] IR page scan: ${finalCandidates.length} PDF candidates found`);
   for (const c of finalCandidates.slice(0, 5)) {
-    log.info(
-      `[${company.name}]   ${c.score}pts — "${c.text}" — ${c.url}`,
-    );
+    log.info(`[${companyName}]   ${c.score}pts — "${c.text}" — ${c.url}`);
   }
 
-  // --- Fallback ladder (only when primary path found zero PDFs) ---
+  // --- Internal fallback ladder (only when primary path found zero PDFs) ---
   let fallbackWinner: ReportCandidate | null = null;
 
   if (finalCandidates.length === 0) {
-    log.info(
-      `[${company.name}] Primary scan found no PDFs — starting fallback ladder`,
-    );
+    log.info(`[${companyName}] Primary scan found no PDFs — starting fallback ladder`);
 
-    // Fallback (a): deep sub-page crawl — try additional report pages
-    // that weren't linked from the IR page or whose links were in JS.
     const deepCrawlCandidates = await fallbackDeepSubPageCrawl(
-      company,
-      irPageUrl,
-      irHtml,
-      irBaseUrl,
-      visitedPages,
+      companyName, website, irPageUrl, irHtml, irBaseUrl, visitedPages,
     );
-
     if (deepCrawlCandidates.length > 0) {
       deepCrawlCandidates.sort((a, b) => b.score - a.score);
       fallbackWinner = deepCrawlCandidates[0];
-      for (const c of deepCrawlCandidates) {
-        finalCandidates.push(c);
-      }
+      for (const c of deepCrawlCandidates) finalCandidates.push(c);
     }
 
-    // Fallback (b): direct URL construction
     if (!fallbackWinner) {
-      fallbackWinner = await fallbackDirectUrls(company);
+      fallbackWinner = await fallbackDirectUrls(companyName, website);
       if (fallbackWinner) finalCandidates.push(fallbackWinner);
     }
 
-    // Fallback (c): sitemap.xml
     if (!fallbackWinner) {
-      fallbackWinner = await fallbackSitemap(company);
+      fallbackWinner = await fallbackSitemap(companyName, website);
       if (fallbackWinner) finalCandidates.push(fallbackWinner);
-    }
-
-    // Playwright fallback — optional, for JS-rendered pages (e.g. Volvo)
-    if (!fallbackWinner) {
-      const playwrightCandidates = await tryPlaywrightFallback(company, irPageUrl);
-      if (playwrightCandidates.length > 0) {
-        playwrightCandidates.sort((a, b) => b.score - a.score);
-        fallbackWinner = playwrightCandidates[0];
-        for (const c of playwrightCandidates) {
-          finalCandidates.push(c);
-        }
-      }
-    }
-
-    // External source fallbacks (Avanza, AEM CDN) — ONLY when all on-site methods fail
-    if (!fallbackWinner) {
-      const externalResult = await externalSourceDiscovery(company);
-      if (externalResult) {
-        fallbackWinner = externalResult;
-        finalCandidates.push(fallbackWinner);
-      }
     }
 
     if (finalCandidates.length > 0) {
@@ -869,9 +772,7 @@ export async function discoverAnnualReport(
       });
       fallbackWinner = finalCandidates[0];
     } else {
-      log.warn(
-        `[${company.name}] All fallbacks exhausted — status: failed (likely JS-rendered PDF links)`,
-      );
+      log.warn(`[${companyName}] All Cheerio-based fallbacks exhausted — no PDFs found`);
     }
   }
 
@@ -880,20 +781,15 @@ export async function discoverAnnualReport(
 
   const winner = finalCandidates.length > 0 ? finalCandidates[0] : null;
 
-  // Cap confidence at "medium" for fallback-sourced results
   if (winner && fallbackWinner && winner.url === fallbackWinner.url) {
-    if (confidence === 'high') {
-      confidence = 'medium';
-    }
+    if (confidence === 'high') confidence = 'medium';
     explanation = `Found via fallback (${fallbackWinner.source}): ${explanation}`;
   }
 
   if (winner) {
-    log.info(
-      `[${company.name}] Selected: "${winner.text}" (${winner.score}pts, ${confidence} confidence)`,
-    );
+    log.info(`[${companyName}] Selected: "${winner.text}" (${winner.score}pts, ${confidence} confidence)`);
   } else {
-    log.error(`[${company.name}] No annual report PDF found`);
+    log.error(`[${companyName}] No annual report PDF found`);
   }
 
   const discoveryResult: ReportDiscoveryResult = {
@@ -910,7 +806,7 @@ export async function discoverAnnualReport(
     return {
       status: 'failed',
       value: discoveryResult,
-      error: 'No annual report PDF candidates found after all fallbacks',
+      error: 'No annual report PDF candidates found after all Cheerio fallbacks',
       durationMs: Date.now() - startTime,
     };
   }

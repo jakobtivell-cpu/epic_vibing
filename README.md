@@ -130,9 +130,27 @@ The file must be a JSON array of `CompanyProfile` objects (see [Company Profiles
 npx ts-node scrape.ts --verbose
 ```
 
+### Limit discovery (optional)
+
+Skip headless browser PDF discovery (Cheerio and HTTP fallbacks only):
+
+```bash
+npx ts-node scrape.ts --no-playwright
+```
+
+Skip Avanza and AEM CDN pattern fallbacks after on-site discovery exhausts:
+
+```bash
+npx ts-node scrape.ts --skip-external
+```
+
+Flags compose with others (e.g. `npx ts-node scrape.ts --ticker "VOLV B" --no-playwright`).
+
 ## Output Format
 
 Results are written to `output/results.json` (atomic write via temp file + rename). A run summary is written to `output/run_summary.json`.
+
+`run_summary.json` includes `failureBuckets` (counts by coarse class: `complete`, `partial_pdf`, `allabolag_partial`, `no_ir`, `no_pdf`, `download_failed`, `extraction_failed`, etc.) and per-company `failureClass` for batch triage.
 
 ### results.json schema
 
@@ -261,6 +279,14 @@ The pipeline also attempts to extract Scope 1 and Scope 2 CO2 emissions:
 - The validator discards implausible values rather than passing them through
 - All decisions are logged with timestamps and the originating module name
 
+## Tests
+
+```bash
+npm test
+```
+
+Golden-style checks cover `parseNumber` and URL-pattern builders used in report discovery.
+
 ## Rate Limiting
 
 - **Per-domain delay**: 1 second minimum between requests to the same domain
@@ -271,11 +297,15 @@ The pipeline also attempts to extract Scope 1 and Scope 2 CO2 emissions:
 
 ## Known Limitations
 
-- **JS-rendered content**: Cheerio parses static HTML only. Companies with JS-rendered IR pages (e.g., Volvo) require the Playwright fallback, which is slower and optional.
+- **“100%” means best-effort, not a guarantee**: The goal is to maximize complete rows with honest provenance (`status`, `failureClass`, `extractionNotes`, `dataSource`). Sites change, definitions differ (group vs parent), and scrapers cannot promise correct five fields for every issuer every year.
+- **Parent vs group figures**: Data from **allabolag.se** reflects statutory filings for the **legal entity** (often the parent company), not necessarily **group consolidated** numbers in the annual report. Prefer PDF discovery when group totals are required.
+- **Banks and investment companies**: `companyType` selects label dictionaries; “revenue” and “EBIT” are not always meaningful or extractable to the same schema as industrials.
+- **Broker / exchange pages as SPAs**: Avanza-style pages in the external tier are fetched as static HTML; when the link graph is empty in server HTML, Cheerio finds nothing. Fixing that would require a browser or API, not more HTML parsing. Nasdaq and similar sites are the same class of problem.
+- **JS-rendered content**: Cheerio parses static HTML only. Companies with JS-rendered IR pages (e.g., Volvo) rely on the Playwright fallback (DOM links plus PDF `response` URLs). Install Chromium when needed (`npx playwright install chromium`).
 - **Image-based PDFs**: `pdf-parse` extracts text from text-layer PDFs. Scanned/image-based reports yield very little text. The system detects this (`suspiciouslyShort` flag) but cannot OCR.
 - **IR page changes**: Corporate websites are redesigned regularly. The `irHints` in company profiles may go stale. When they do, the system falls back to homepage scanning and brute-force paths, but some manual hint updates may be needed.
 - **Non-standard financial schemas**: Banks report "Total operating income" instead of revenue; investment companies don't have meaningful revenue/EBIT. The `companyType` field handles this with separate label dictionaries, but edge cases exist.
-- **Table column ordering**: PDF text extraction does not preserve table structure. In side-by-side tables (current year | prior year), the system takes the first number after the label, which is usually — but not always — the current year.
+- **Table column ordering**: PDF text does not preserve table layout. The extractor prefers a fiscal-year column when a two-year header is visible above the row, otherwise the **last** plausible numeric cell (common for current-year-right layouts), uses raw revenue to filter implausible EBIT picks, and returns **null** when multiple columns disagree wildly (ratio guard) instead of guessing.
 - **CEO name accuracy**: The CEO extraction uses name-pattern matching near CEO labels. It can pick up wrong names when a non-CEO name (e.g., a company name that looks like a person's name) appears near a label match.
 
 ## Challenges Encountered

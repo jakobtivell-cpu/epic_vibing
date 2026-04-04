@@ -7,9 +7,10 @@
 // Every non-null carries provenance (matched label, raw snippet, context).
 // ---------------------------------------------------------------------------
 
-import { CompanyProfile, ExtractedData, CompanyType } from '../types';
+import { ExtractedData, CompanyType } from '../types';
 import { INDUSTRIAL_LABELS, BANK_LABELS, INVESTMENT_LABELS, LabelSet } from './labels';
 import { createLogger } from '../utils/logger';
+import { parseNumber } from './number-parse';
 
 const log = createLogger('field-extract');
 
@@ -33,6 +34,7 @@ export interface FieldProvenance {
 export interface FieldExtractionResult {
   data: ExtractedData;
   fiscalYear: number | null;
+  detectedCompanyType: CompanyType;
   provenance: {
     revenue: FieldProvenance | null;
     ebit: FieldProvenance | null;
@@ -58,51 +60,139 @@ function getLabels(companyType: CompanyType): LabelSet {
 }
 
 // ---------------------------------------------------------------------------
-// Number parsing — handles Swedish (space-separated) and English (comma-separated)
+// Auto-detect company type from document content
 // ---------------------------------------------------------------------------
 
-function parseNumber(raw: string): number | null {
-  let s = raw.trim();
+const BANK_SIGNALS = [
+  /\bnet\s+interest\s+income\b/i,
+  /\bcredit\s+loss/i,
+  /\bräntenetto\b/i,
+  /\btotal\s+operating\s+income\b/i,
+  /\blending\b/i,
+  /\bdeposits?\s+from\s+(the\s+)?public\b/i,
+  /\bcapital\s+adequacy\b/i,
+  /\bcommon\s+equity\s+tier\b/i,
+  /\bCET1\b/,
+];
 
-  s = s.replace(/^[^0-9(–−-]+/, '');
-  if (s.length === 0) return null;
+const INVESTMENT_SIGNALS = [
+  /\bnet\s+asset\s+value\b/i,
+  /\bNAV\b/,
+  /\bportfolio\s+value\b/i,
+  /\btotal\s+return\b/i,
+  /\bholding\s+compan/i,
+  /\binvestmentbolag\b/i,
+  /\bsubstansvärde\b/i,
+];
 
-  const isAccountingNeg = s.startsWith('(') && s.includes(')');
-  if (isAccountingNeg) s = s.replace(/\(/, '').replace(/\)/, '');
+export function detectCompanyType(text: string): CompanyType {
+  const sample = text.substring(0, 30_000).toLowerCase();
 
-  const hasMinusPrefix = /^[-–−]/.test(s);
-  if (hasMinusPrefix) s = s.replace(/^[-–−]\s*/, '');
+  let bankScore = 0;
+  for (const p of BANK_SIGNALS) {
+    if (p.test(sample)) bankScore++;
+  }
 
-  const commaMatch = s.match(/^\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?/);
-  if (commaMatch) {
-    s = commaMatch[0].replace(/,/g, '');
-  } else {
-    s = s.replace(/[^0-9.,]+$/, '');
-    if (s.length === 0) return null;
+  let investScore = 0;
+  for (const p of INVESTMENT_SIGNALS) {
+    if (p.test(sample)) investScore++;
+  }
 
-    s = s.replace(/(?<=\d) (?=\d{3}(?!\d))/g, '');
+  if (investScore >= 3) return 'investment_company';
+  if (bankScore >= 3) return 'bank';
 
-    const lastComma = s.lastIndexOf(',');
-    const lastDot = s.lastIndexOf('.');
+  return 'industrial';
+}
 
-    if (lastComma > lastDot) {
-      const afterComma = s.substring(lastComma + 1);
-      if (afterComma.length <= 2) {
-        s = s.replace(/\./g, '').replace(',', '.');
-      } else {
-        s = s.replace(/,/g, '');
-      }
-    } else {
-      s = s.replace(/,/g, '');
+// ---------------------------------------------------------------------------
+// Multi-column table pick — prefer fiscal year column, then last column, EBIT vs revenue
+// ---------------------------------------------------------------------------
+
+export interface NumberPickContext {
+  preferredFiscalYear: number | null;
+  /** Raw PDF-table revenue (same units as EBIT line) for plausibility when picking EBIT among columns. */
+  revenueRawHintForEbit: number | null;
+}
+
+function parseYearSequenceFromHeaderLine(line: string): number[] {
+  const t = line.trim();
+  if (t.length > 220) return [];
+  const parts = t.split(/\s{2,}|\t+/).map((p) => p.trim()).filter(Boolean);
+  const years: number[] = [];
+  for (const p of parts) {
+    const m = p.match(/\b(20[12]\d)\b/);
+    if (m) years.push(parseInt(m[1], 10));
+  }
+  return years.length >= 2 ? years : [];
+}
+
+function yearHeaderLinesAbove(lines: string[], lineIndex: number): string[] {
+  const out: string[] = [];
+  for (let j = lineIndex - 1; j >= Math.max(0, lineIndex - 3); j--) {
+    if (lines[j].length < 300) out.push(lines[j]);
+  }
+  return out;
+}
+
+function selectBestNumericFromCells(
+  cells: string[],
+  lines: string[],
+  lineIndex: number,
+  opts: NumberSearchOpts,
+  pick: NumberPickContext | undefined,
+): { cell: string; value: number } | null {
+  const { minValue = -Infinity, maxValue = Infinity } = opts;
+  const candidates: { cell: string; value: number; idx: number }[] = [];
+
+  for (let idx = 0; idx < cells.length; idx++) {
+    const cell = cells[idx];
+    if (isSkippableCell(cell)) continue;
+    if (/\d%/.test(cell)) continue;
+    const value = parseNumber(cell);
+    if (value === null) continue;
+    if (value < minValue || value > maxValue) continue;
+    candidates.push({ cell, value, idx });
+  }
+
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0];
+
+  const absVals = candidates.map((c) => Math.abs(c.value));
+  const maxAbs = Math.max(...absVals);
+  const minAbs = Math.min(...absVals);
+  if (maxAbs / Math.max(minAbs, 1e-6) > 500) {
+    return null;
+  }
+
+  const lineLower = lines[lineIndex].toLowerCase();
+  const groupRow = /\b(group|koncern|consolidated|total(\s+group)?)\b/i.test(lineLower);
+
+  for (const hdr of yearHeaderLinesAbove(lines, lineIndex)) {
+    const seq = parseYearSequenceFromHeaderLine(hdr);
+    if (seq.length < 2 || !pick?.preferredFiscalYear) continue;
+    const yIdx = seq.lastIndexOf(pick.preferredFiscalYear);
+    if (yIdx < 0) continue;
+    const dataIdx = Math.min(yIdx, candidates.length - 1);
+    const chosen = candidates.find((c) => c.idx === dataIdx);
+    if (chosen) return chosen;
+  }
+
+  if (pick?.revenueRawHintForEbit != null && Math.abs(pick.revenueRawHintForEbit) > 0) {
+    const rev = Math.abs(pick.revenueRawHintForEbit);
+    const plausible = candidates.filter((c) => Math.abs(c.value) <= rev * 1.5 + 1);
+    if (plausible.length === 1) return plausible[0];
+    if (plausible.length > 0) {
+      return plausible[plausible.length - 1];
     }
   }
 
-  if (!/^\d+(\.\d+)?$/.test(s)) return null;
+  if (groupRow) {
+    const maxVal = Math.max(...candidates.map((c) => c.value));
+    const tops = candidates.filter((c) => c.value === maxVal);
+    return tops[tops.length - 1];
+  }
 
-  const value = parseFloat(s);
-  if (isNaN(value) || !isFinite(value)) return null;
-
-  return isAccountingNeg || hasMinusPrefix ? -value : value;
+  return candidates[candidates.length - 1];
 }
 
 // ---------------------------------------------------------------------------
@@ -171,6 +261,39 @@ function detectUnitContext(text: string): UnitContext | null {
     return 'ksek';
   }
 
+  return null;
+}
+
+/**
+ * Scan narrative text for BSEK revenue mentions like "revenues of BSEK 168"
+ * or "revenue was SEK 168 billion". Returns value in MSEK.
+ */
+function findBsekNarrativeRevenue(text: string): number | null {
+  // Only match patterns that clearly state annual/total revenue in BSEK,
+  // not cumulative "since YYYY" or partial figures.
+  const patterns: RegExp[] = [
+    /(?:group|total|the group)\s+had\s+revenues?\s+of\s+BSEK\s*(\d[\d.,]*)/gi,
+    /revenues?\s+(?:amounted|totaled|totalled)\s+to\s+BSEK\s*(\d[\d.,]*)/gi,
+    /revenues?\s+of\s+BSEK\s*(\d[\d.,]*)/gi,
+    /revenues?\s+of\s+SEK\s*(\d[\d.,]*)\s*billion/gi,
+    /had\s+revenues?\s+of\s+BSEK\s*(\d[\d.,]*)/gi,
+  ];
+
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      // Reject if context suggests a cumulative or partial figure
+      const contextStart = Math.max(0, match.index - 80);
+      const context = text.substring(contextStart, match.index + match[0].length + 40);
+      if (/since\s+\d{4}|by\s+20\d{2}|over\s+the\s+(past|last)|cumulative|divested|spun\s+off|acquired|combined|target|ambition|goal|increase\b.*\bto\b/i.test(context)) continue;
+
+      const raw = match[1].replace(/,/g, '');
+      const val = parseFloat(raw);
+      if (!isNaN(val) && val >= 10 && val <= 2_000) {
+        return Math.round(val * 1_000);
+      }
+    }
+  }
   return null;
 }
 
@@ -363,17 +486,18 @@ function findLabeledNumber(
   lines: string[],
   labels: string[],
   opts: NumberSearchOpts = {},
+  pickContext?: NumberPickContext,
 ): NumberMatch | null {
   const tableResult = scanForNumber(lines, labels, opts, {
     maxLineLen: 150,
     maxLabelOffset: 60,
-  });
+  }, pickContext);
   if (tableResult !== null) return tableResult;
 
   return scanForNumber(lines, labels, opts, {
     maxLineLen: 500,
     maxLabelOffset: 200,
-  });
+  }, pickContext);
 }
 
 /**
@@ -384,6 +508,7 @@ function findFinancialNumber(
   lines: string[],
   labels: string[],
   opts: NumberSearchOpts = {},
+  pick?: NumberPickContext,
 ): NumberMatch | null {
   const isSections = findIncomeStatementSections(lines);
 
@@ -391,7 +516,7 @@ function findFinancialNumber(
   if (isSections.length > 0) {
     for (const section of isSections) {
       const sectionLines = lines.slice(section.start, section.end);
-      const result = findLabeledNumber(sectionLines, labels, opts);
+      const result = findLabeledNumber(sectionLines, labels, opts, pick);
       if (result !== null) {
         result.lineIndex += section.start;
         result.context = 'income-statement';
@@ -409,7 +534,7 @@ function findFinancialNumber(
   if (highlightSections.length > 0) {
     for (const section of highlightSections) {
       const sectionLines = lines.slice(section.start, section.end);
-      const result = findLabeledNumber(sectionLines, labels, opts);
+      const result = findLabeledNumber(sectionLines, labels, opts, pick);
       if (result !== null) {
         result.lineIndex += section.start;
         result.context = 'highlights';
@@ -423,7 +548,7 @@ function findFinancialNumber(
   }
 
   // Fallback: general search, but skip matches inside segment sections
-  const allMatches = findAllLabeledNumbers(lines, labels, opts);
+  const allMatches = findAllLabeledNumbers(lines, labels, opts, pick);
   const nonSegmentMatch = allMatches.find((m) => !isInSegmentSection(m.lineIndex, lines));
   if (nonSegmentMatch) {
     nonSegmentMatch.context = 'general';
@@ -446,6 +571,71 @@ function findFinancialNumber(
 }
 
 /**
+ * Strip note references fused to the start of afterLabel text.
+ * Handles both alphanumeric (e.g. "C31") and pure numeric (e.g. "31") note refs
+ * when they are fused directly to subsequent number tokens.
+ */
+function stripLeadingNoteRef(text: string): string {
+  // Pattern 1: alpha-prefixed note refs with space separator (safe, unambiguous)
+  // e.g. "C31 168,343" or "G2, G3 122,878"
+  const alphaSpaced = text.match(/^(?:[A-Z]{1,2}\d{1,2}(?:,\s*[A-Z]{1,2}\d{1,2})*\s+)/);
+  if (alphaSpaced) {
+    return text.substring(alphaSpaced[0].length);
+  }
+
+  // Pattern 2: single alpha note ref fused with comma-grouped number
+  // e.g. "C31168,343" → strip "C31" to get "168,343"
+  const alphaFused = text.match(/^([A-Z]{1,2}\d)(\d{1,3}(?:,\d{3})+)/);
+  if (alphaFused) {
+    return text.substring(alphaFused[1].length);
+  }
+
+  // Pattern 3: multi alpha note refs fused with comma-grouped number
+  // e.g. "G2, G3122,878120,680" → strip "G2, G3" to get "122,878120,680"
+  const multiAlpha = text.match(/^([A-Z]{1,2}\d{1,2}(?:,\s*[A-Z]{1,2}\d{1,2})*,\s*[A-Z]{1,2})(\d)(\d{1,3}(?:,\d{3})+)/);
+  if (multiAlpha) {
+    const noteLen = multiAlpha[1].length + multiAlpha[2].length;
+    return text.substring(noteLen);
+  }
+
+  return text;
+}
+
+/**
+ * Split text into table cells. Handles both multi-space separated and
+ * ESEF-style columns where spaces serve as thousand separators.
+ *
+ * For ESEF PDFs, "168 343176 771" should produce ["168 343", "176 771"]
+ * by reassembling space-separated digit groups into thousand-grouped numbers.
+ */
+function splitIntoCells(text: string): string[] {
+  const stdCells = text.split(/\s{2,}|\t+/).map((c) => c.trim()).filter(Boolean);
+  if (stdCells.length >= 2) return stdCells;
+
+  // Attempt ESEF-style reassembly: greedily combine digit groups
+  // that form valid thousand-separated numbers (e.g. "168 343" → 168343).
+  const tokens = text.trim().split(/\s+/);
+  if (tokens.length < 2 || !tokens.every((t) => /^[-–−]?\d+$/.test(t))) {
+    return stdCells;
+  }
+
+  const result: string[] = [];
+  let current = tokens[0];
+
+  for (let i = 1; i < tokens.length; i++) {
+    const tok = tokens[i];
+    if (tok.length === 3 && /^\d{3}$/.test(tok)) {
+      current += ' ' + tok;
+    } else {
+      result.push(current);
+      current = tok;
+    }
+  }
+  result.push(current);
+  return result.length >= 2 ? result : stdCells;
+}
+
+/**
  * Find ALL occurrences of labeled numbers (not just the first).
  * Used by findFinancialNumber to filter by section context.
  */
@@ -453,6 +643,7 @@ function findAllLabeledNumbers(
   lines: string[],
   labels: string[],
   opts: NumberSearchOpts = {},
+  pickContext?: NumberPickContext,
 ): NumberMatch[] {
   const results: NumberMatch[] = [];
   const { minValue = -Infinity, maxValue = Infinity, exclusions } = opts;
@@ -475,36 +666,22 @@ function findAllLabeledNumbers(
 
       let afterLabel = lines[i].substring(labelIdx + label.length);
       afterLabel = afterLabel.replace(/^[)}\]]+/, '');
-      const noteRefFused2 = afterLabel.match(
-        /^([A-Z]{1,2}\d)(\d{1,2}(?:,\d{3})+)/,
-      );
-      if (noteRefFused2) {
-        afterLabel = afterLabel.substring(noteRefFused2[1].length);
-      } else {
-        afterLabel = afterLabel.replace(
-          /^(?:[A-Z]{1,2}\d{1,2}(?:,\s*[A-Z]{1,2}\d{1,2})*\s+)/,
-          '',
-        );
-      }
+      afterLabel = stripLeadingNoteRef(afterLabel);
 
       const searchText =
         afterLabel + (i + 1 < lines.length ? '  ' + lines[i + 1] : '');
 
-      const cells = searchText
-        .split(/\s{2,}|\t+/)
-        .map((c) => c.trim())
-        .filter(Boolean);
+      const cells = splitIntoCells(searchText);
 
-      for (const cell of cells) {
-        if (isSkippableCell(cell)) continue;
-        if (/\d%/.test(cell)) continue;
-
-        const value = parseNumber(cell);
-        if (value === null) continue;
-        if (value < minValue || value > maxValue) continue;
-
-        results.push({ value, lineIndex: i, label, rawCell: cell, context: 'general' });
-        break;
+      const chosen = selectBestNumericFromCells(cells, lines, i, opts, pickContext);
+      if (chosen !== null) {
+        results.push({
+          value: chosen.value,
+          lineIndex: i,
+          label,
+          rawCell: chosen.cell,
+          context: 'general',
+        });
       }
     }
   }
@@ -530,6 +707,7 @@ function scanForNumber(
   labels: string[],
   opts: NumberSearchOpts,
   constraints: { maxLineLen: number; maxLabelOffset: number },
+  pickContext?: NumberPickContext,
 ): NumberMatch | null {
   const { minValue = -Infinity, maxValue = Infinity, exclusions } = opts;
 
@@ -553,36 +731,23 @@ function scanForNumber(
 
       let afterLabel = lines[i].substring(labelIdx + label.length);
       afterLabel = afterLabel.replace(/^[)}\]]+/, '');
-      const noteRefFused = afterLabel.match(
-        /^([A-Z]{1,2}\d)(\d{1,2}(?:,\d{3})+)/,
-      );
-      if (noteRefFused) {
-        afterLabel = afterLabel.substring(noteRefFused[1].length);
-      } else {
-        afterLabel = afterLabel.replace(
-          /^(?:[A-Z]{1,2}\d{1,2}(?:,\s*[A-Z]{1,2}\d{1,2})*\s+)/,
-          '',
-        );
-      }
+      afterLabel = stripLeadingNoteRef(afterLabel);
 
       const searchText =
         afterLabel + (i + 1 < lines.length ? '  ' + lines[i + 1] : '');
 
-      const cells = searchText
-        .split(/\s{2,}|\t+/)
-        .map((c) => c.trim())
-        .filter(Boolean);
+      const cells = splitIntoCells(searchText);
 
-      for (const cell of cells) {
-        if (isSkippableCell(cell)) continue;
-        if (/\d%/.test(cell)) continue;
-
-        const value = parseNumber(cell);
-        if (value === null) continue;
-        if (value < minValue || value > maxValue) continue;
-
-        log.debug(`Found "${label}": ${value} (raw: "${cell}")`);
-        return { value, lineIndex: i, label, rawCell: cell, context: 'general' };
+      const chosen = selectBestNumericFromCells(cells, lines, i, opts, pickContext);
+      if (chosen !== null) {
+        log.debug(`Found "${label}": ${chosen.value} (raw: "${chosen.cell}")`);
+        return {
+          value: chosen.value,
+          lineIndex: i,
+          label,
+          rawCell: chosen.cell,
+          context: 'general',
+        };
       }
 
       const directTokens = extractNumberTokens(afterLabel);
@@ -632,7 +797,7 @@ const NON_NAME_PATTERNS = [
   'styrelseledamot',
 ];
 
-const CORPORATE_WORDS = /\b(?:group|board|committee|team|communications|holding|capital|partners|investment|management|report|statement|corporate|governance|foundation|business|area|president|director|officer|vice|senior|division|segment|unit)\b/i;
+const CORPORATE_WORDS = /\b(?:group|board|committee|team|communications|holding|capital|partners|investment|management|report|statement|corporate|governance|foundation|business|area|president|director|officer|vice|senior|division|segment|unit|meeting|annual|general)\b/i;
 
 const TITLE_ONLY_RE = /^the\s+\w+$/i;
 
@@ -681,8 +846,9 @@ interface CeoMatch {
  * (first ~120 lines), then the full document.
  */
 function findCeoWithProvenance(lines: string[], labels: string[]): CeoMatch | null {
-  // Pass 1: CEO letter window (first ~120 lines, approximating first 5 pages)
-  const ceoLetterEnd = Math.min(120, lines.length);
+  // Pass 1: CEO letter window — scan first ~800 lines to cover the
+  // CEO letter section which may appear on pages 5-20 in large reports.
+  const ceoLetterEnd = Math.min(800, lines.length);
   const letterResult = scanForCeo(lines, labels, 0, ceoLetterEnd);
   if (letterResult) {
     letterResult.context = 'ceo-letter';
@@ -722,6 +888,25 @@ function findManagementSections(lines: string[]): Array<{ start: number; end: nu
   return sections;
 }
 
+function lineDescribesFormerOrOtherCeo(line: string, labelIdx: number): boolean {
+  const before = line.substring(0, labelIdx).toLowerCase();
+  if (/\bformer\b/.test(before)) return true;
+  if (/\btidigare\b/.test(before)) return true;
+  if (/\bex[\s-]/.test(before)) return true;
+  if (/\bfd\.?\b/.test(before)) return true;
+  if (/\bwhich\b/.test(before)) return true;
+
+  const after = line.substring(labelIdx).toLowerCase();
+  if (/\bceo\s+(?:of|at|för)\s+/i.test(after)) return true;
+  if (/\bvd\s+(?:of|at|för|på)\s+/i.test(after)) return true;
+
+  const full = line.toLowerCase();
+  if (/company\s+of\s+which\b.*\bceo\b/.test(full)) return true;
+  if (/shareholder.*\bceo\b/.test(full)) return true;
+
+  return false;
+}
+
 function scanForCeo(
   lines: string[],
   labels: string[],
@@ -736,8 +921,12 @@ function scanForCeo(
       const idx = lineLower.indexOf(labelLower);
       if (idx < 0) continue;
 
-      // Skip lines that clearly refer to a non-CEO role
       if (lineContainsNonCeoRole(lines[i]) && !/\bceo\b/i.test(lines[i]) && !/\bvd\b/i.test(lines[i])) {
+        continue;
+      }
+
+      if (lineDescribesFormerOrOtherCeo(lines[i], idx)) {
+        log.debug(`Skipping former/other-company CEO line: "${lines[i].trim().substring(0, 100)}"`);
         continue;
       }
 
@@ -863,10 +1052,11 @@ function numMatchToProvenance(m: NumberMatch): FieldProvenance {
 
 export function extractFields(
   text: string,
-  company: CompanyProfile,
+  companyName: string,
   fallbackFiscalYear: number | null,
 ): FieldExtractionResult {
-  const labels = getLabels(company.companyType);
+  const detectedType = detectCompanyType(text);
+  const labels = getLabels(detectedType);
   const lines = text
     .split(/\n/)
     .map((l) => l.trim())
@@ -874,7 +1064,7 @@ export function extractFields(
   const notes: string[] = [];
 
   log.info(
-    `Extracting fields for ${company.name} (${company.companyType}) — ${lines.length} text lines`,
+    `Extracting fields for ${companyName} (auto-detected: ${detectedType}) — ${lines.length} text lines`,
   );
 
   const unitContext = detectUnitContext(text);
@@ -888,17 +1078,23 @@ export function extractFields(
   let empProvenance: FieldProvenance | null = null;
   let ceoProvenance: FieldProvenance | null = null;
 
+  const tablePickBase: NumberPickContext = {
+    preferredFiscalYear: fallbackFiscalYear,
+    revenueRawHintForEbit: null,
+  };
+
   // --- Revenue ---
   let revenue: number | null = null;
+  let revMatch: NumberMatch | null = null;
 
-  if (company.companyType === 'investment_company') {
+  if (detectedType === 'investment_company') {
     notes.push('Investment company — standard revenue/EBIT not applicable');
   } else {
-    if (company.companyType === 'bank') {
+    if (detectedType === 'bank') {
       notes.push('Bank — mapped from banking income statement terms');
     }
 
-    const revMatch = findFinancialNumber(lines, labels.revenue, { minValue: 100 });
+    revMatch = findFinancialNumber(lines, labels.revenue, { minValue: 100 }, tablePickBase);
     if (revMatch !== null) {
       const revUnit = revMatch.sectionRange
         ? detectSectionUnitContext(lines, revMatch.sectionRange.start, revMatch.sectionRange.end, unitContext)
@@ -906,21 +1102,52 @@ export function extractFields(
       revenue = Math.round(normalizeToMsek(revMatch.value, revUnit));
       revProvenance = numMatchToProvenance(revMatch);
       log.info(`Revenue: ${revenue} MSEK`);
-    } else {
-      notes.push(`Revenue not found for ${company.name}`);
-      log.warn(`Revenue not found for ${company.name}`);
+    }
+
+    // Cross-check: BSEK narrative mention provides an anchor when table extraction is dubious
+    {
+      const narrativeRev = findBsekNarrativeRevenue(text);
+      if (narrativeRev !== null) {
+        if (revenue === null) {
+          log.info(`Revenue from BSEK narrative: ${narrativeRev} MSEK`);
+          revenue = narrativeRev;
+        } else if (revenue < 10_000) {
+          // Table-extracted value is suspiciously low — narrative is likely more reliable
+          if (narrativeRev > revenue * 3) {
+            log.warn(
+              `Revenue ${revenue} MSEK implausibly low — BSEK narrative gives ${narrativeRev} MSEK, using that`,
+            );
+            notes.push(`Revenue corrected from ${revenue} to ${narrativeRev} MSEK via BSEK narrative cross-check`);
+            revenue = narrativeRev;
+          }
+        }
+      }
+    }
+
+    if (revenue === null) {
+      notes.push(`Revenue not found for ${companyName}`);
+      log.warn(`Revenue not found for ${companyName}`);
     }
   }
 
   // --- EBIT ---
   let ebit: number | null = null;
 
-  if (company.companyType !== 'investment_company') {
-    const ebitMatch = findFinancialNumber(lines, labels.ebit, {
-      minValue: -500_000,
-      maxValue: 500_000,
-      exclusions: EBIT_EXCLUSIONS,
-    });
+  if (detectedType !== 'investment_company') {
+    const ebitPick: NumberPickContext = {
+      preferredFiscalYear: fallbackFiscalYear,
+      revenueRawHintForEbit: revMatch !== null ? revMatch.value : null,
+    };
+    const ebitMatch = findFinancialNumber(
+      lines,
+      labels.ebit,
+      {
+        minValue: -500_000,
+        maxValue: 500_000,
+        exclusions: EBIT_EXCLUSIONS,
+      },
+      ebitPick,
+    );
     if (ebitMatch !== null) {
       const ebitUnit = ebitMatch.sectionRange
         ? detectSectionUnitContext(lines, ebitMatch.sectionRange.start, ebitMatch.sectionRange.end, unitContext)
@@ -929,24 +1156,35 @@ export function extractFields(
       ebitProvenance = numMatchToProvenance(ebitMatch);
       log.info(`EBIT: ${ebit} MSEK`);
     } else {
-      notes.push(`EBIT not found for ${company.name}`);
-      log.warn(`EBIT not found for ${company.name}`);
+      notes.push(`EBIT not found for ${companyName}`);
+      log.warn(`EBIT not found for ${companyName}`);
     }
   }
 
   // --- Employees ---
-  const empMatch = findLabeledNumber(lines, labels.employees, {
-    minValue: 100,
-    maxValue: 1_000_000,
-  });
+  const empMatch = findLabeledNumber(
+    lines,
+    labels.employees,
+    {
+      minValue: 100,
+      maxValue: 1_000_000,
+    },
+    tablePickBase,
+  );
   let employees: number | null = null;
   if (empMatch !== null) {
     employees = Math.round(empMatch.value);
     empProvenance = numMatchToProvenance(empMatch);
     log.info(`Employees: ${employees}`);
+
+    // Plausibility: at least 1 employee per 10 MSEK of revenue
+    if (revenue !== null && employees > 0 && employees < revenue / 10) {
+      notes.push(`SUSPECT_LOW: ${employees} employees vs ${revenue} MSEK revenue (< 1 per 10 MSEK)`);
+      log.warn(`Employee count ${employees} suspiciously low relative to revenue ${revenue} MSEK`);
+    }
   } else {
-    notes.push(`Employee count not found for ${company.name}`);
-    log.warn(`Employees not found for ${company.name}`);
+    notes.push(`Employee count not found for ${companyName}`);
+    log.warn(`Employees not found for ${companyName}`);
   }
 
   // --- CEO ---
@@ -961,14 +1199,25 @@ export function extractFields(
       context: ceoMatch.context,
     };
   } else {
-    notes.push(`CEO not found for ${company.name}`);
-    log.warn(`CEO not found for ${company.name}`);
+    notes.push(`CEO not found for ${companyName}`);
+    log.warn(`CEO not found for ${companyName}`);
   }
 
   // --- Fiscal year ---
   const fiscalYear = findFiscalYear(text, fallbackFiscalYear);
   if (fiscalYear === null) {
     notes.push('Fiscal year not found in PDF text or report URL');
+  }
+
+  // Fused text detection: discard numeric fields containing repeated year patterns
+  const fusedYearRe = /(20\d{2}){2,}/;
+  if (revenue !== null && fusedYearRe.test(String(revenue))) {
+    notes.push(`Revenue ${revenue} discarded — fused year pattern detected`);
+    revenue = null;
+  }
+  if (ebit !== null && fusedYearRe.test(String(ebit))) {
+    notes.push(`EBIT ${ebit} discarded — fused year pattern detected`);
+    ebit = null;
   }
 
   return {
@@ -979,6 +1228,7 @@ export function extractFields(
       ceo,
     },
     fiscalYear,
+    detectedCompanyType: detectedType,
     provenance: {
       revenue: revProvenance,
       ebit: ebitProvenance,

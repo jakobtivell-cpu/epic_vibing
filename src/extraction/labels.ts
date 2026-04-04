@@ -17,6 +17,7 @@ export const INDUSTRIAL_LABELS: LabelSet = {
     'total revenue',
     'total income',
     'sales revenue',
+    'revenues',
     'revenue',
     'sales',
     'nettoomsättning',

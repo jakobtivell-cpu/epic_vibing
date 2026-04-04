@@ -1,0 +1,561 @@
+// ---------------------------------------------------------------------------
+// Search-engine-based discovery — Step 1 in the generic fallback chain.
+//
+// Three-pronged approach:
+//   A) Derive short names from ticker/legal name and construct likely domains.
+//   B) Query search engines with filetype:pdf for direct PDF hits.
+//   C) Construct direct PDF URLs on discovered/candidate domains.
+//
+// Also provides `directPdfSearch()` for a standalone reverse-discovery step
+// that runs after multi-domain cycling fails (Step 4 in the new ladder).
+// ---------------------------------------------------------------------------
+
+import * as cheerio from 'cheerio';
+import { ReportCandidate, SOURCE_SEARCH_DISCOVERY } from '../types';
+import { fetchPage, headCheck } from '../utils/http-client';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('search-discovery');
+
+const CURRENT_YEAR = new Date().getFullYear();
+const RECENT_FISCAL_YEAR = CURRENT_YEAR - 1;
+
+export interface SearchDiscoveryResult {
+  pdfCandidates: ReportCandidate[];
+  discoveredWebsite: string | null;
+  /** All candidate domains discovered (for multi-domain cycling). */
+  allDiscoveredDomains: string[];
+  irPageCandidates: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Smart name derivation — extract usable short names from ticker + legal name
+// ---------------------------------------------------------------------------
+
+const LEGAL_SUFFIXES = /\s*\b(ab|publ|ltd|plc|oyj|asa|inc|se|corporation|group|gruppen)\b\.?\s*/gi;
+const PAREN_SUFFIX = /\s*\([^)]*\)\s*/g;
+
+/**
+ * Produce a list of search-friendly short names from a company name and ticker.
+ * Used for domain inference, search queries, and URL construction.
+ */
+export function deriveShortNames(companyName: string, ticker?: string): string[] {
+  const names = new Set<string>();
+
+  // From ticker: strip .ST and share-class suffix → "SEB", "VOLV", "SAND"
+  if (ticker) {
+    const base = ticker.replace(/\.ST$/i, '').replace(/-[A-Z]$/i, '');
+    if (base.length >= 2) names.add(base);
+  }
+
+  // From legal name: strip AB, (publ), common suffixes
+  const stripped = companyName
+    .replace(PAREN_SUFFIX, ' ')
+    .replace(LEGAL_SUFFIXES, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (stripped.length >= 2) {
+    names.add(stripped);
+  }
+
+  // Also try just the first distinctive word (for multi-word names)
+  const words = stripped.split(/\s+/).filter((w) => w.length >= 2);
+  if (words.length > 1) {
+    // Skip leading "AB", "Telefonaktiebolaget" etc.
+    const skip = new Set(['ab', 'telefonaktiebolaget', 'aktiebolaget', 'svenska', 'the']);
+    const first = words.find((w) => !skip.has(w.toLowerCase()));
+    if (first && first.length >= 2) names.add(first);
+  }
+
+  // Always include the original name
+  names.add(companyName);
+
+  return [...names];
+}
+
+// ---------------------------------------------------------------------------
+// Company domain inference — construct likely website URLs from short names
+// ---------------------------------------------------------------------------
+
+function companySlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/&/g, '')
+    .replace(/[^a-z0-9]+/g, '')
+    .replace(/(^-|-$)/g, '');
+}
+
+function companySlugHyphen(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/&/g, '-and-')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
+function buildLikelyDomains(shortNames: string[]): string[] {
+  const candidates = new Set<string>();
+
+  for (const name of shortNames) {
+    const slug = companySlug(name);
+    const slugHyphen = companySlugHyphen(name);
+
+    if (slug.length < 2) continue;
+
+    candidates.add(`https://www.${slug}.com`);
+    candidates.add(`https://www.${slug}.se`);
+    candidates.add(`https://${slug}.com`);
+    candidates.add(`https://${slug}.se`);
+    candidates.add(`https://www.${slug}group.com`);
+    candidates.add(`https://www.${slug}group.se`);
+
+    if (slugHyphen !== slug) {
+      candidates.add(`https://www.${slugHyphen}.com`);
+      candidates.add(`https://www.${slugHyphen}.se`);
+    }
+  }
+
+  return [...candidates];
+}
+
+interface DomainCheckResult {
+  primaryWebsite: string | null;
+  allResolvedDomains: string[];
+}
+
+async function discoverWebsites(shortNames: string[], companyName: string): Promise<DomainCheckResult> {
+  const domains = buildLikelyDomains(shortNames);
+  log.info(`[${companyName}] Trying ${domains.length} likely domains`);
+
+  let primaryWebsite: string | null = null;
+  const allResolved: string[] = [];
+
+  // Check all domains (not just first hit) so we collect all candidates
+  const results = await Promise.allSettled(
+    domains.map(async (domain) => {
+      try {
+        const result = await headCheck(domain, 8_000);
+        if (result.exists) {
+          const finalUrl = result.finalUrl ?? domain;
+          return finalUrl;
+        }
+      } catch { /* ignore */ }
+      return null;
+    }),
+  );
+
+  for (const r of results) {
+    if (r.status === 'fulfilled' && r.value) {
+      const url = r.value;
+      // Deduplicate by hostname
+      try {
+        const hostname = new URL(url).hostname.replace(/^www\./, '');
+        if (!allResolved.some((u) => new URL(u).hostname.replace(/^www\./, '') === hostname)) {
+          allResolved.push(url);
+          if (!primaryWebsite) primaryWebsite = url;
+        }
+      } catch {
+        allResolved.push(url);
+        if (!primaryWebsite) primaryWebsite = url;
+      }
+    }
+  }
+
+  if (primaryWebsite) {
+    log.info(`[${companyName}] Found website(s): ${allResolved.join(', ')}`);
+  } else {
+    log.info(`[${companyName}] No website found via domain inference`);
+  }
+
+  return { primaryWebsite, allResolvedDomains: allResolved };
+}
+
+// ---------------------------------------------------------------------------
+// Search engine querying — try multiple engines
+// ---------------------------------------------------------------------------
+
+interface SearchResult {
+  url: string;
+  title: string;
+  snippet: string;
+}
+
+const PORTAL_DOMAINS = /bing|google|duckduckgo|wikipedia|youtube|facebook|twitter|linkedin/i;
+
+async function querySearchEngine(query: string): Promise<SearchResult[]> {
+  const ddgResults = await queryDuckDuckGo(query);
+  if (ddgResults.length > 0) return ddgResults;
+  return queryBing(query);
+}
+
+async function queryDuckDuckGo(query: string): Promise<SearchResult[]> {
+  const encoded = encodeURIComponent(query);
+  const searchUrl = `https://html.duckduckgo.com/html/?q=${encoded}`;
+
+  log.debug(`DuckDuckGo search: "${query}"`);
+
+  try {
+    const result = await fetchPage(searchUrl, 15_000);
+    if (!result.ok) return [];
+
+    const $ = cheerio.load(result.response.data);
+    const results: SearchResult[] = [];
+
+    $('a[href*="uddg="]').each((_, el) => {
+      let href = $(el).attr('href') ?? '';
+      const uddgMatch = href.match(/[?&]uddg=([^&]+)/);
+      if (uddgMatch) {
+        try { href = decodeURIComponent(uddgMatch[1]); } catch { return; }
+      }
+      if (!href.startsWith('http') || /duckduckgo\.com/i.test(href)) return;
+      const title = $(el).text().trim();
+      if (title && !results.some((r) => r.url === href)) {
+        results.push({ url: href, title, snippet: '' });
+      }
+    });
+
+    if (results.length > 0) {
+      log.info(`DuckDuckGo returned ${results.length} results`);
+    }
+    return results;
+  } catch {
+    return [];
+  }
+}
+
+async function queryBing(query: string): Promise<SearchResult[]> {
+  const encoded = encodeURIComponent(query);
+  const searchUrl = `https://www.bing.com/search?q=${encoded}`;
+
+  log.debug(`Bing search: "${query}"`);
+
+  try {
+    const result = await fetchPage(searchUrl, 15_000);
+    if (!result.ok) return [];
+
+    const $ = cheerio.load(result.response.data);
+    const results: SearchResult[] = [];
+
+    $('li.b_algo h2 a, .b_algo h2 a').each((_, el) => {
+      const href = $(el).attr('href') ?? '';
+      if (!href.startsWith('http')) return;
+      const title = $(el).text().trim();
+      const snippet = $(el).closest('.b_algo, li').find('.b_caption p, .b_paractl').text().trim();
+      if (title && !results.some((r) => r.url === href)) {
+        results.push({ url: href, title, snippet });
+      }
+    });
+
+    if (results.length > 0) {
+      log.info(`Bing returned ${results.length} results`);
+    }
+    return results;
+  } catch {
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// URL scoring for search results
+// ---------------------------------------------------------------------------
+
+const TRUSTED_IR_PLATFORMS = /cision\.com|mfn\.se|newsweb\.com|globenewswire\.com|publish\.ne\.cision/i;
+
+function scorePdfCandidate(
+  url: string,
+  title: string,
+  snippet: string,
+  shortNames: string[],
+): number {
+  if (!/\.pdf(\?|$)/i.test(url)) return -999;
+
+  let score = 5;
+  const combined = `${title} ${snippet}`.toLowerCase();
+  const urlLower = url.toLowerCase();
+
+  if (/annual\s*(?:and\s*sustainability\s*)?\s*report/i.test(combined)) score += 10;
+  if (/årsredovisning/i.test(combined)) score += 10;
+  if (/annual.report|arsredovisning|årsredovisning/i.test(urlLower)) score += 6;
+
+  if (/press|pressrelease|\/news\//i.test(urlLower)) score -= 10;
+  if (/interim|quarterly|q[1-4]/i.test(combined)) score -= 10;
+  if (/governance|remuneration/i.test(combined)) score -= 8;
+  if (/voting|postal[\s-]*voting|kallelse|bolagsstämma|stämma/i.test(combined)) score -= 15;
+  if (/\bagm\b|\bproxy\b/i.test(combined)) score -= 8;
+  if (/summary|sammandrag/i.test(combined)) score -= 3;
+
+  const yearMatch = url.match(/\b(20[12]\d)\b/) ?? title.match(/\b(20[12]\d)\b/);
+  if (yearMatch) {
+    const year = parseInt(yearMatch[1], 10);
+    if (year === RECENT_FISCAL_YEAR || year === CURRENT_YEAR) score += 5;
+    else if (year === RECENT_FISCAL_YEAR - 1) score += 2;
+    else if (year < RECENT_FISCAL_YEAR - 2) score -= 5 * (RECENT_FISCAL_YEAR - year - 2);
+  }
+
+  // Domain trust: bonus if URL domain contains one of the short names
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    for (const sn of shortNames) {
+      if (hostname.includes(sn.toLowerCase())) {
+        score += 4;
+        break;
+      }
+    }
+    if (TRUSTED_IR_PLATFORMS.test(hostname)) {
+      score += 3;
+    }
+  } catch { /* skip */ }
+
+  return score;
+}
+
+function isIrPage(url: string, title: string): boolean {
+  const combined = `${url} ${title}`.toLowerCase();
+  return (
+    /investor.?relations/i.test(combined) ||
+    /\/investors?\b/i.test(url) ||
+    /investerare/i.test(combined) ||
+    (/annual.report/i.test(combined) && !/\.pdf/i.test(url))
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Direct PDF URL construction — try common annual report URL patterns
+// ---------------------------------------------------------------------------
+
+function buildDirectPdfUrls(shortNames: string[], websites: string[]): ReportCandidate[] {
+  const candidates: ReportCandidate[] = [];
+  const seen = new Set<string>();
+  const years = [RECENT_FISCAL_YEAR, CURRENT_YEAR];
+
+  for (const website of websites) {
+    const base = website.replace(/\/$/, '');
+
+    for (const name of shortNames) {
+      const slug = companySlugHyphen(name);
+      const slugCompact = companySlug(name);
+      if (slug.length < 2) continue;
+
+      const patterns = [
+        `${base}/${slug}-annual-report-{year}.pdf`,
+        `${base}/${slug}-annual-and-sustainability-report-{year}.pdf`,
+        `${base}/investors/annual-report-{year}.pdf`,
+        `${base}/globalassets/${slug}-annual-report-{year}.pdf`,
+        `${base}/assets/annual-report-{year}.pdf`,
+        `${base}/annual-report-{year}.pdf`,
+        // Swedish IR infrastructure patterns
+        `${base}/siteassets/investor_relations/${slugCompact}_annual_report_{year}.pdf`,
+        `${base}/siteassets/about_${slugCompact}/annual_reports/${slugCompact}_annual_report_{year}.pdf`,
+        `${base}/siteassets/${slug}-annual-report-{year}.pdf`,
+        // AEM-style CMS
+        `${base}/content/dam/${slug}/annual-report-{year}.pdf`,
+        `${base}/content/dam/${slugCompact}/investors/annual-report-{year}.pdf`,
+      ];
+
+      for (const year of years) {
+        for (const pattern of patterns) {
+          const url = pattern.replace(/\{year\}/g, String(year));
+          if (seen.has(url)) continue;
+          seen.add(url);
+          candidates.push({
+            url,
+            score: 8 + (year === RECENT_FISCAL_YEAR ? 3 : 0),
+            text: `[direct-url] ${slug}-annual-report-${year}`,
+            source: SOURCE_SEARCH_DISCOVERY,
+          });
+        }
+      }
+    }
+  }
+
+  return candidates;
+}
+
+// ---------------------------------------------------------------------------
+// Main entry point — Step 1 discovery
+// ---------------------------------------------------------------------------
+
+/**
+ * @param companyName  Primary search term (legal name or user-supplied name)
+ * @param ticker       Optional raw ticker symbol (e.g. "SEB-A.ST")
+ */
+export async function searchDiscovery(
+  companyName: string,
+  ticker?: string,
+): Promise<SearchDiscoveryResult> {
+  log.info(`[${companyName}] Starting search-engine-based discovery${ticker ? ` (ticker: ${ticker})` : ''}`);
+
+  const shortNames = deriveShortNames(companyName, ticker);
+  log.info(`[${companyName}] Derived short names: ${shortNames.join(', ')}`);
+
+  const pdfCandidates: ReportCandidate[] = [];
+  const irPageCandidates: string[] = [];
+  const seenUrls = new Set<string>();
+  const allDiscoveredDomains: string[] = [];
+
+  // Phase A: Discover websites via domain inference using ALL short names
+  const domainResult = await discoverWebsites(shortNames, companyName);
+  let discoveredWebsite = domainResult.primaryWebsite;
+  allDiscoveredDomains.push(...domainResult.allResolvedDomains);
+
+  // Phase B: Search engine queries with filetype:pdf and short-name variants
+  const queries: string[] = [];
+  for (const sn of shortNames.slice(0, 3)) {
+    queries.push(`${sn} annual report ${RECENT_FISCAL_YEAR} filetype:pdf`);
+    queries.push(`${sn} årsredovisning ${RECENT_FISCAL_YEAR} filetype:pdf`);
+    queries.push(`${sn} investor relations annual report`);
+  }
+
+  for (const query of queries) {
+    const results = await querySearchEngine(query);
+
+    for (const r of results) {
+      if (seenUrls.has(r.url)) continue;
+      seenUrls.add(r.url);
+
+      // Collect all non-portal domains for multi-domain cycling
+      if (!r.url.endsWith('.pdf')) {
+        try {
+          const u = new URL(r.url);
+          const hostname = u.hostname.replace(/^www\./, '');
+          if (!PORTAL_DOMAINS.test(hostname) && !/allabolag|avanza|nasdaq|bloomberg/i.test(hostname)) {
+            const domainUrl = `https://www.${hostname}`;
+            if (!allDiscoveredDomains.some((d) => {
+              try { return new URL(d).hostname.replace(/^www\./, '') === hostname; } catch { return false; }
+            })) {
+              allDiscoveredDomains.push(domainUrl);
+            }
+            if (!discoveredWebsite) {
+              discoveredWebsite = domainUrl;
+              log.info(`[${companyName}] Discovered website from search: ${discoveredWebsite}`);
+            }
+          }
+        } catch { /* skip */ }
+      }
+
+      const pdfScore = scorePdfCandidate(r.url, r.title, r.snippet, shortNames);
+      if (pdfScore > 0) {
+        pdfCandidates.push({
+          url: r.url,
+          score: pdfScore,
+          text: `[search] ${r.title.substring(0, 100)}`,
+          source: SOURCE_SEARCH_DISCOVERY,
+        });
+      }
+
+      if (isIrPage(r.url, r.title)) {
+        irPageCandidates.push(r.url);
+      }
+    }
+  }
+
+  // Phase C: Direct PDF URL construction using all discovered domains
+  if (allDiscoveredDomains.length > 0) {
+    const directCandidates = buildDirectPdfUrls(shortNames, allDiscoveredDomains);
+    for (const c of directCandidates) {
+      if (!seenUrls.has(c.url)) {
+        seenUrls.add(c.url);
+        pdfCandidates.push(c);
+      }
+    }
+  }
+
+  pdfCandidates.sort((a, b) => b.score - a.score);
+
+  log.info(`[${companyName}] Search discovery: ${pdfCandidates.length} PDF candidates, ${irPageCandidates.length} IR pages, website: ${discoveredWebsite ?? 'unknown'}, domains: ${allDiscoveredDomains.length}`);
+
+  for (const c of pdfCandidates.slice(0, 5)) {
+    log.info(`[${companyName}]   ${c.score}pts — "${c.text}" — ${c.url}`);
+  }
+
+  return { pdfCandidates, discoveredWebsite, allDiscoveredDomains, irPageCandidates };
+}
+
+// ---------------------------------------------------------------------------
+// Direct PDF search — Step 4 "reverse discovery" (no website required)
+// ---------------------------------------------------------------------------
+
+/**
+ * Standalone reverse-discovery step: queries Bing with explicit filetype:pdf
+ * and constructs direct PDF URLs on known/candidate domains, then HEAD-checks
+ * the most promising ones. Runs independently of website resolution.
+ */
+export async function directPdfSearch(
+  companyName: string,
+  ticker?: string,
+  candidateDomains?: string[],
+): Promise<ReportCandidate[]> {
+  log.info(`[${companyName}] === Direct PDF search (reverse discovery) ===`);
+
+  const shortNames = deriveShortNames(companyName, ticker);
+  const pdfCandidates: ReportCandidate[] = [];
+  const seenUrls = new Set<string>();
+
+  // Bing searches with filetype:pdf
+  const queries: string[] = [];
+  for (const sn of shortNames.slice(0, 3)) {
+    queries.push(`"${sn}" annual report ${RECENT_FISCAL_YEAR} filetype:pdf`);
+    queries.push(`"${sn}" årsredovisning ${RECENT_FISCAL_YEAR} filetype:pdf`);
+  }
+  if (ticker) {
+    const base = ticker.replace(/\.ST$/i, '').replace(/-[A-Z]$/i, '');
+    queries.push(`"${base}" annual report ${RECENT_FISCAL_YEAR} filetype:pdf`);
+  }
+
+  for (const query of queries) {
+    const results = await querySearchEngine(query);
+    for (const r of results) {
+      if (seenUrls.has(r.url)) continue;
+      seenUrls.add(r.url);
+      const score = scorePdfCandidate(r.url, r.title, r.snippet, shortNames);
+      if (score > 0) {
+        pdfCandidates.push({
+          url: r.url,
+          score,
+          text: `[direct-search] ${r.title.substring(0, 100)}`,
+          source: SOURCE_SEARCH_DISCOVERY,
+        });
+      }
+    }
+  }
+
+  // Construct and HEAD-check direct URLs on candidate domains
+  if (candidateDomains && candidateDomains.length > 0) {
+    const directCandidates = buildDirectPdfUrls(shortNames, candidateDomains);
+    const toCheck = directCandidates
+      .filter((c) => !seenUrls.has(c.url))
+      .slice(0, 20);
+
+    log.info(`[${companyName}] HEAD-checking ${toCheck.length} direct PDF URLs`);
+
+    const headResults = await Promise.allSettled(
+      toCheck.map(async (c) => {
+        try {
+          const result = await headCheck(c.url, 10_000);
+          if (result.exists && /pdf/i.test(result.contentType ?? '')) {
+            return c;
+          }
+        } catch { /* ignore */ }
+        return null;
+      }),
+    );
+
+    for (const r of headResults) {
+      if (r.status === 'fulfilled' && r.value) {
+        r.value.score += 10; // Confirmed to exist
+        pdfCandidates.push(r.value);
+        seenUrls.add(r.value.url);
+      }
+    }
+  }
+
+  pdfCandidates.sort((a, b) => b.score - a.score);
+
+  log.info(`[${companyName}] Direct PDF search: ${pdfCandidates.length} candidates found`);
+  for (const c of pdfCandidates.slice(0, 5)) {
+    log.info(`[${companyName}]   ${c.score}pts — "${c.text}" — ${c.url}`);
+  }
+
+  return pdfCandidates;
+}

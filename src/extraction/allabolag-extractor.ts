@@ -1,16 +1,13 @@
 // ---------------------------------------------------------------------------
-// Allabolag.se data extractor — scrapes statutory filing data as a LAST RESORT
-// when no annual report PDF can be found via any discovery method.
+// Allabolag.se data extractor — Step 4 (last resort) in the generic fallback chain.
 //
-// This provides partial financial data (revenue, operating result, employees)
-// from public Swedish company registry filings. The data is less detailed than
-// a full annual report but prevents blank result rows.
-//
+// Searches allabolag.se by company NAME (no org number required), then
+// scrapes statutory filing data from the company's profile page.
 // Confidence is always "low" — these are secondary-source figures.
 // ---------------------------------------------------------------------------
 
 import * as cheerio from 'cheerio';
-import { CompanyProfile, ExtractedData } from '../types';
+import { ExtractedData } from '../types';
 import { fetchPage } from '../utils/http-client';
 import { createLogger } from '../utils/logger';
 
@@ -29,10 +26,6 @@ export interface AllabolagResult {
 
 const CURRENT_YEAR = new Date().getFullYear();
 
-/**
- * Parse a Swedish number string from allabolag.
- * Allabolag typically shows amounts in KSEK (tkr).
- */
 function parseSwedishNumber(raw: string): { value: number; unit: string } | null {
   let s = raw.trim();
 
@@ -68,20 +61,144 @@ function toMsek(value: number, unit: string): number {
 }
 
 /**
- * Scrape allabolag.se for a company's basic financial data.
+ * Search allabolag.se for a company by name and find the company profile URL.
+ * @param legalName   Canonical legal entity name from data/ticker.json.
+ * @param orgNumber   Swedish org number (e.g. "502032-9081") for direct lookup.
+ * @param shortNames  Additional short name variants to try if the primary name fails.
  */
-export async function extractFromAllabolag(
-  company: CompanyProfile,
-): Promise<AllabolagResult | null> {
-  if (!company.orgNumber) {
-    log.warn(`[${company.name}] No org number — cannot use allabolag fallback`);
-    return null;
+async function findCompanyUrl(
+  companyName: string,
+  legalName?: string,
+  orgNumber?: string,
+  shortNames?: string[],
+): Promise<string | null> {
+  // Priority 1: Direct org number lookup (always works if org number is correct)
+  if (orgNumber) {
+    const stripped = orgNumber.replace(/[-\s]/g, '');
+    const directUrl = `https://www.allabolag.se/${stripped}`;
+    log.info(`[${companyName}] Trying allabolag direct org number: ${directUrl}`);
+
+    try {
+      const result = await fetchPage(directUrl, 15_000);
+      if (result.ok) {
+        const baseUrl = directUrl.split('?')[0].replace(/\/$/, '');
+        log.info(`[${companyName}] Allabolag org number lookup succeeded: ${baseUrl}`);
+        return baseUrl;
+      }
+    } catch {
+      log.debug(`[${companyName}] Allabolag org number lookup failed`);
+    }
   }
 
-  const orgClean = company.orgNumber.replace(/-/g, '');
-  const baseUrl = `https://www.allabolag.se/${orgClean}`;
+  // Priority 2: Build search variants — short names first, then legal name, then full name
+  const searchTerms: string[] = [];
+  if (shortNames) {
+    for (const sn of shortNames) {
+      if (sn.length >= 2 && sn !== companyName && sn !== legalName) {
+        searchTerms.push(sn);
+      }
+    }
+  }
+  if (legalName && legalName !== companyName) searchTerms.push(legalName);
+  searchTerms.push(companyName);
+  if (!/\bAB\b/i.test(companyName)) {
+    searchTerms.push(companyName + ' AB');
+  }
 
-  // Fetch multiple allabolag pages — financials may be on sub-pages
+  // Deduplicate
+  const uniqueTerms = [...new Set(searchTerms)];
+
+  const searchVariants = uniqueTerms.map(
+    (term) => `https://www.allabolag.se/what/${encodeURIComponent(term)}`,
+  );
+
+  const legalLower = legalName?.toLowerCase();
+
+  for (const searchUrl of searchVariants) {
+    log.info(`[${companyName}] Searching allabolag: ${searchUrl}`);
+
+    const result = await fetchPage(searchUrl, 15_000);
+    if (!result.ok) {
+      log.debug(`[${companyName}] Allabolag search failed: ${result.error.message}`);
+      continue;
+    }
+
+    // Check if the page redirected to a company page directly
+    const finalUrl = result.response.finalUrl;
+    if (/allabolag\.se\/\d/.test(finalUrl)) {
+      const baseUrl = finalUrl.split('?')[0].replace(/\/$/, '');
+      log.info(`[${companyName}] Allabolag redirected to company page: ${baseUrl}`);
+      return baseUrl;
+    }
+
+    const $ = cheerio.load(result.response.data);
+    const nameLower = companyName.toLowerCase();
+    const candidates: { url: string; score: number }[] = [];
+
+    $('a[href]').each((_, el) => {
+      const href = $(el).attr('href') ?? '';
+      const text = $(el).text().trim().toLowerCase();
+
+      if (!/allabolag\.se\/\d/.test(href) && !/^\/\d/.test(href)) return;
+
+      let score = 0;
+
+      // Legal name match — strongest disambiguation signal
+      if (legalLower && text.includes(legalLower)) score += 20;
+      if (legalLower && text === legalLower) score += 10;
+
+      if (text.includes(nameLower)) score += 10;
+      if (text.startsWith(nameLower)) score += 5;
+      const words = nameLower.split(/\s+/);
+      for (const w of words) {
+        if (w.length > 2 && text.includes(w)) score += 2;
+      }
+      if (text.includes('ab ' + nameLower) || text.includes(nameLower + ' ab')) score += 8;
+
+      // Also score against short names
+      if (shortNames) {
+        for (const sn of shortNames) {
+          const snLower = sn.toLowerCase();
+          if (snLower.length >= 2 && text.includes(snLower)) score += 8;
+        }
+      }
+
+      if (score > 0) {
+        const fullUrl = href.startsWith('http') ? href : `https://www.allabolag.se${href.startsWith('/') ? '' : '/'}${href}`;
+        candidates.push({ url: fullUrl, score });
+      }
+    });
+
+    candidates.sort((a, b) => b.score - a.score);
+
+    if (candidates.length > 0) {
+      let url = candidates[0].url.split('?')[0].replace(/\/$/, '');
+      url = url.replace(/\/(bokslut|befattningshavare|koncern)$/, '');
+      log.info(`[${companyName}] Found allabolag company page: ${url} (score: ${candidates[0].score})`);
+      return url;
+    }
+  }
+
+  log.warn(`[${companyName}] No matching company found on allabolag.se`);
+  return null;
+}
+
+/**
+ * Scrape allabolag.se for a company's basic financial data.
+ * Searches by company name — no org number required.
+ * @param legalName   Optional canonical legal entity name for disambiguation.
+ * @param orgNumber   Optional Swedish org number for direct lookup.
+ * @param shortNames  Optional short name variants derived from ticker.
+ */
+export async function extractFromAllabolag(
+  companyName: string,
+  legalName?: string,
+  orgNumber?: string,
+  shortNames?: string[],
+): Promise<AllabolagResult | null> {
+  const baseUrl = await findCompanyUrl(companyName, legalName, orgNumber, shortNames);
+  if (!baseUrl) return null;
+
   const pagesToTry = [
     baseUrl,
     `${baseUrl}/bokslut`,
@@ -89,26 +206,24 @@ export async function extractFromAllabolag(
   ];
 
   let combinedHtml = '';
-  const url = baseUrl;
 
   for (const pageUrl of pagesToTry) {
-    log.info(`[${company.name}] Fetching allabolag: ${pageUrl}`);
+    log.info(`[${companyName}] Fetching allabolag: ${pageUrl}`);
     const result = await fetchPage(pageUrl, 15_000);
     if (result.ok) {
       combinedHtml += '\n' + result.response.data;
     } else {
-      log.debug(`[${company.name}] Allabolag page failed: ${pageUrl} → ${result.error.message}`);
+      log.debug(`[${companyName}] Allabolag page failed: ${pageUrl} → ${result.error.message}`);
     }
     await sleep(1_000);
   }
 
   if (combinedHtml.length === 0) {
-    log.warn(`[${company.name}] All allabolag pages failed`);
+    log.warn(`[${companyName}] All allabolag pages failed`);
     return null;
   }
 
-  const html = combinedHtml;
-  const $ = cheerio.load(html);
+  const $ = cheerio.load(combinedHtml);
 
   let revenue: number | null = null;
   let ebit: number | null = null;
@@ -127,24 +242,23 @@ export async function extractFromAllabolag(
             : json.numberOfEmployees;
           if (typeof empVal === 'number' && empVal >= 100) {
             employees = empVal;
-            log.debug(`[${company.name}] allabolag employees (JSON-LD): ${employees}`);
+            log.debug(`[${companyName}] allabolag employees (JSON-LD): ${employees}`);
           }
         }
       }
     } catch { /* ignore malformed JSON-LD */ }
   });
 
-  // --- Strategy 0b: inline JavaScript data (window.__DATA__, etc.) ---
+  // --- Strategy 0b: inline JavaScript data ---
   $('script:not([src])').each((_, el) => {
     const scriptText = $(el).html() || '';
-    // Look for revenue/omsättning values embedded in JS
     const revenueMatch = scriptText.match(/"omsattning"\s*:\s*(\d+)/i) ||
       scriptText.match(/"revenue"\s*:\s*(\d+)/i);
     if (revenueMatch && revenue === null) {
       const val = parseInt(revenueMatch[1], 10);
       if (val >= 1_000) {
         revenue = toMsek(val, 'ksek');
-        log.debug(`[${company.name}] allabolag revenue (inline JS): ${revenue} MSEK`);
+        log.debug(`[${companyName}] allabolag revenue (inline JS): ${revenue} MSEK`);
       }
     }
 
@@ -153,7 +267,7 @@ export async function extractFromAllabolag(
     if (ebitMatch && ebit === null) {
       const val = parseInt(ebitMatch[1], 10);
       ebit = toMsek(val, 'ksek');
-      log.debug(`[${company.name}] allabolag EBIT (inline JS): ${ebit} MSEK`);
+      log.debug(`[${companyName}] allabolag EBIT (inline JS): ${ebit} MSEK`);
     }
 
     const empMatch = scriptText.match(/"antalAnstallda"\s*:\s*(\d+)/i) ||
@@ -162,54 +276,50 @@ export async function extractFromAllabolag(
       const val = parseInt(empMatch[1], 10);
       if (val >= 100 && val < 1_000_000) {
         employees = val;
-        log.debug(`[${company.name}] allabolag employees (inline JS): ${employees}`);
+        log.debug(`[${companyName}] allabolag employees (inline JS): ${employees}`);
       }
     }
   });
 
   // --- Strategy 1: table-based extraction ---
-  // Allabolag often renders financial data in tables or definition lists
   $('table tr, dl').each((_, el) => {
     const rowText = $(el).text().trim();
     const lower = rowText.toLowerCase();
 
-    // Find the numeric value in the element (look for cells/values)
     const cells = $(el).find('td, dd, span, strong').toArray();
     for (const cell of cells) {
       const cellText = $(cell).text().trim();
-      if (!/\d{3,}/.test(cellText)) continue; // need at least 3 digits for financial data
+      if (!/\d{3,}/.test(cellText)) continue;
 
       if (revenue === null && /\bomsättning\b|\bnettoomsättning\b/i.test(lower)) {
         const parsed = parseSwedishNumber(cellText);
         if (parsed && Math.abs(parsed.value) >= 100) {
           revenue = toMsek(parsed.value, parsed.unit);
-          log.debug(`[${company.name}] allabolag revenue (table): ${revenue} MSEK`);
+          log.debug(`[${companyName}] allabolag revenue (table): ${revenue} MSEK`);
         }
       }
       if (ebit === null && /\brörelseresultat\b/i.test(lower)) {
         const parsed = parseSwedishNumber(cellText);
         if (parsed && Math.abs(parsed.value) >= 10) {
           ebit = toMsek(parsed.value, parsed.unit);
-          log.debug(`[${company.name}] allabolag EBIT (table): ${ebit} MSEK`);
+          log.debug(`[${companyName}] allabolag EBIT (table): ${ebit} MSEK`);
         }
       }
     }
 
-    // Employees — typically a smaller number, no unit suffix
     if (employees === null && /\banställda\b/i.test(lower)) {
       const empMatch = rowText.match(/(\d[\d\s]*\d|\d+)\s*(?:st|personer|anställda)?/i);
       if (empMatch) {
         const empValue = parseInt(empMatch[1].replace(/\s/g, ''), 10);
         if (empValue >= 100 && empValue < 1_000_000) {
           employees = empValue;
-          log.debug(`[${company.name}] allabolag employees (table): ${employees}`);
+          log.debug(`[${companyName}] allabolag employees (table): ${employees}`);
         }
       }
     }
   });
 
   // --- Strategy 2: structured div/span extraction ---
-  // Look for labeled key figures in card-like UI elements
   $('[class*="financial"], [class*="key"], [class*="figure"], [class*="bokslut"], [class*="summary"]').each((_, el) => {
     const text = $(el).text().trim();
     const lower = text.toLowerCase();
@@ -220,14 +330,13 @@ export async function extractFromAllabolag(
         const parsed = parseSwedishNumber(numMatch[1]);
         if (parsed && Math.abs(parsed.value) >= 100) {
           revenue = toMsek(parsed.value, parsed.unit);
-          log.debug(`[${company.name}] allabolag revenue (structured): ${revenue} MSEK`);
+          log.debug(`[${companyName}] allabolag revenue (structured): ${revenue} MSEK`);
         }
       }
     }
   });
 
   // --- Strategy 3: text-based extraction (last resort) ---
-  // Parse body text line by line, requiring substantial numbers (4+ digits)
   if (revenue === null || ebit === null || employees === null) {
     const bodyText = $('body').text();
     const lines = bodyText.split(/\n/).map((l) => l.trim()).filter((l) => l.length > 0 && l.length < 300);
@@ -240,7 +349,7 @@ export async function extractFromAllabolag(
         const num = findSubstantialNumber(lines, i, 1_000);
         if (num !== null) {
           revenue = num.msek;
-          log.debug(`[${company.name}] allabolag revenue (text): ${revenue} MSEK`);
+          log.debug(`[${companyName}] allabolag revenue (text): ${revenue} MSEK`);
         }
       }
 
@@ -248,7 +357,7 @@ export async function extractFromAllabolag(
         const num = findSubstantialNumber(lines, i, 10);
         if (num !== null) {
           ebit = num.msek;
-          log.debug(`[${company.name}] allabolag EBIT (text): ${ebit} MSEK`);
+          log.debug(`[${companyName}] allabolag EBIT (text): ${ebit} MSEK`);
         }
       }
 
@@ -258,7 +367,7 @@ export async function extractFromAllabolag(
           const val = parseInt(empMatch[1].replace(/\s/g, ''), 10);
           if (val >= 100 && val < 1_000_000) {
             employees = val;
-            log.debug(`[${company.name}] allabolag employees (text): ${employees}`);
+            log.debug(`[${companyName}] allabolag employees (text): ${employees}`);
           }
         }
       }
@@ -266,8 +375,6 @@ export async function extractFromAllabolag(
   }
 
   // --- CEO extraction ---
-  // Look for VD/Verkställande direktör with a two-step approach:
-  // first find the label (case-insensitive), then extract the name (case-sensitive)
   const bodyText = $('body').text();
   const vdPatterns = [
     /verkställande\s+direktör[:\s]+/gi,
@@ -279,13 +386,12 @@ export async function extractFromAllabolag(
     let match;
     while ((match = pattern.exec(bodyText)) !== null) {
       const afterLabel = bodyText.substring(match.index + match[0].length);
-      // Case-SENSITIVE name match — prevents "LundstedtTelefon" concatenation
       const nameMatch = afterLabel.match(
         /^([A-ZÅÄÖÉÜ][a-zåäöéü]+(?:\s+(?:von\s+|af\s+|de\s+)?[A-ZÅÄÖÉÜ][a-zåäöéü]+){1,3})/,
       );
       if (nameMatch) {
         ceo = nameMatch[1].trim();
-        log.debug(`[${company.name}] allabolag CEO: ${ceo}`);
+        log.debug(`[${companyName}] allabolag CEO: ${ceo}`);
         break;
       }
     }
@@ -297,7 +403,7 @@ export async function extractFromAllabolag(
     const year = parseInt(bokslutsMatch[1], 10);
     if (year >= 2020 && year <= CURRENT_YEAR) {
       fiscalYear = year;
-      log.debug(`[${company.name}] allabolag fiscal year: ${fiscalYear}`);
+      log.debug(`[${companyName}] allabolag fiscal year: ${fiscalYear}`);
     }
   }
 
@@ -308,18 +414,18 @@ export async function extractFromAllabolag(
         .filter((y) => y >= 2020 && y <= CURRENT_YEAR);
       if (years.length > 0) {
         fiscalYear = Math.max(...years);
-        log.debug(`[${company.name}] allabolag fiscal year (inferred): ${fiscalYear}`);
+        log.debug(`[${companyName}] allabolag fiscal year (inferred): ${fiscalYear}`);
       }
     }
   }
 
   const fieldsFound = [revenue, ebit, employees, ceo, fiscalYear].filter((f) => f !== null).length;
   if (fieldsFound === 0) {
-    log.warn(`[${company.name}] Allabolag page parsed but no usable financial data found`);
+    log.warn(`[${companyName}] Allabolag page parsed but no usable financial data found`);
     return null;
   }
 
-  log.info(`[${company.name}] Allabolag extraction: ${fieldsFound}/5 fields found`);
+  log.info(`[${companyName}] Allabolag extraction: ${fieldsFound}/5 fields found`);
 
   return {
     data: {
@@ -329,15 +435,11 @@ export async function extractFromAllabolag(
       ceo,
     },
     fiscalYear,
-    sourceUrl: url,
-    explanation: `PDF not available — data sourced from allabolag.se statutory filings (${url})`,
+    sourceUrl: baseUrl,
+    explanation: `PDF not available — data sourced from allabolag.se statutory filings (${baseUrl})`,
   };
 }
 
-/**
- * Find a substantial number (with at least 4 raw digits) near a label line.
- * Returns the value converted to MSEK, or null.
- */
 function findSubstantialNumber(
   lines: string[],
   index: number,
@@ -345,12 +447,11 @@ function findSubstantialNumber(
 ): { msek: number } | null {
   for (let offset = 0; offset <= 1 && index + offset < lines.length; offset++) {
     const line = lines[index + offset];
-    // Match number sequences with at least 4 digits (ignoring separators)
     const matches = line.match(/[-–−]?\d[\d\s,.]{2,}\d(?:\s*(?:tkr|mkr|mdr|kr))?/gi) ?? [];
 
     for (const raw of matches) {
       const digits = (raw.match(/\d/g) || []).length;
-      if (digits < 4) continue; // Skip tiny numbers — they're not financial data
+      if (digits < 4) continue;
 
       const parsed = parseSwedishNumber(raw);
       if (parsed === null) continue;

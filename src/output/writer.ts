@@ -31,6 +31,10 @@ function toOutputRow(r: PipelineResult): Record<string, unknown> {
     dataSource: r.dataSource,
     confidence: r.confidence,
     status: r.status,
+    fallbackStepReached: r.fallbackStepReached,
+    detectedCompanyType: r.detectedCompanyType,
+    cached: r.cached,
+    cachedAt: r.cachedAt,
     extractionNotes: r.extractionNotes,
   };
 }
@@ -92,21 +96,21 @@ export function mergeResults(newResults: PipelineResult[]): void {
 
   const newRowMap = new Map<string, Record<string, unknown>>();
   for (const r of newResults) {
-    newRowMap.set(r.ticker.toUpperCase(), toOutputRow(r));
+    newRowMap.set(r.company.toLowerCase(), toOutputRow(r));
   }
 
   const merged: Record<string, unknown>[] = existingRows.map((row) => {
-    const ticker = String((row as { ticker?: string }).ticker ?? '').toUpperCase();
-    return newRowMap.get(ticker) ?? row;
+    const company = String((row as { company?: string }).company ?? '').toLowerCase();
+    return newRowMap.get(company) ?? row;
   });
 
-  const existingTickers = new Set(
+  const existingCompanies = new Set(
     existingRows.map((row) =>
-      String((row as { ticker?: string }).ticker ?? '').toUpperCase(),
+      String((row as { company?: string }).company ?? '').toLowerCase(),
     ),
   );
-  for (const [ticker, row] of newRowMap) {
-    if (!existingTickers.has(ticker)) {
+  for (const [company, row] of newRowMap) {
+    if (!existingCompanies.has(company)) {
       merged.push(row);
     }
   }
@@ -122,6 +126,61 @@ export function mergeResults(newResults: PipelineResult[]): void {
 }
 
 // ---------------------------------------------------------------------------
+// Run outcome classification (batch dashboards, no-PDF vs bad extraction)
+// ---------------------------------------------------------------------------
+
+export type FailureClass =
+  | 'complete'
+  | 'partial_pdf'
+  | 'allabolag_partial'
+  | 'no_ir'
+  | 'no_pdf'
+  | 'download_failed'
+  | 'extraction_failed'
+  | 'validation_failed'
+  | 'failed_other';
+
+export function classifyFailureClass(r: PipelineResult): FailureClass {
+  if (r.status === 'complete') return 'complete';
+
+  if (r.stages) {
+    if (r.stages.irDiscovery?.status === 'failed') return 'no_ir';
+    if (r.stages.reportDiscovery?.status === 'failed') return 'no_pdf';
+    if (r.stages.download?.status === 'failed') return 'download_failed';
+    if (r.stages.extraction?.status === 'failed') return 'extraction_failed';
+    if (r.stages.validation?.status === 'failed') return 'validation_failed';
+  }
+
+  if (r.dataSource === 'allabolag') return 'allabolag_partial';
+  if (r.dataSource === 'ir-html') return 'partial_pdf';
+  if (r.status === 'partial') return 'partial_pdf';
+
+  return 'failed_other';
+}
+
+function tallyFailureBuckets(
+  results: PipelineResult[],
+): Record<FailureClass, number> {
+  const keys: FailureClass[] = [
+    'complete',
+    'partial_pdf',
+    'allabolag_partial',
+    'no_ir',
+    'no_pdf',
+    'download_failed',
+    'extraction_failed',
+    'validation_failed',
+    'failed_other',
+  ];
+  const init = {} as Record<FailureClass, number>;
+  for (const k of keys) init[k] = 0;
+  for (const r of results) {
+    init[classifyFailureClass(r)]++;
+  }
+  return init;
+}
+
+// ---------------------------------------------------------------------------
 // run_summary.json
 // ---------------------------------------------------------------------------
 
@@ -129,11 +188,12 @@ export function writeRunSummary(results: PipelineResult[]): void {
   const complete = results.filter((r) => r.status === 'complete').length;
   const partial = results.filter((r) => r.status === 'partial').length;
   const failed = results.filter((r) => r.status === 'failed').length;
+  const failureBuckets = tallyFailureBuckets(results);
 
   const perCompany = results.map((r) => {
-    const failedStage = Object.entries(r.stages).find(
-      ([, s]) => s.status === 'failed',
-    );
+    const failedStage = r.stages
+      ? Object.entries(r.stages).find(([, s]) => s?.status === 'failed')
+      : undefined;
     return {
       company: r.company,
       ticker: r.ticker,
@@ -141,6 +201,7 @@ export function writeRunSummary(results: PipelineResult[]): void {
       confidence: r.confidence,
       dataSource: r.dataSource,
       fieldsExtracted: countFields(r),
+      failureClass: classifyFailureClass(r),
       failedAtStage: failedStage ? failedStage[0] : null,
       errorSummary: failedStage?.[1].error ?? null,
     };
@@ -152,6 +213,7 @@ export function writeRunSummary(results: PipelineResult[]): void {
     complete,
     partial,
     failed,
+    failureBuckets,
     companies: perCompany,
   };
 
@@ -188,29 +250,26 @@ function statusDetail(r: PipelineResult): string {
   const fields = countFields(r);
   const parts: string[] = [`${fields}/5 fields`];
 
+  if (r.status !== 'complete') {
+    parts.push(`class=${classifyFailureClass(r)}`);
+  }
+  if (r.fallbackStepReached) parts.push(`step=${r.fallbackStepReached}`);
   if (r.dataSource === 'allabolag') parts.push('allabolag data');
+  if (r.dataSource === 'ir-html') parts.push('IR HTML data');
   if (r.dataSource === 'playwright+pdf') parts.push('playwright fallback');
-  if (r.extractedData && r.stages.extraction.status === 'partial') parts.push('partial extraction');
-
-  const companyType = inferCompanyTypeTag(r);
-  if (companyType) parts.push(companyType);
+  if (r.extractedData && r.stages?.extraction?.status === 'partial') parts.push('partial extraction');
+  if (r.detectedCompanyType && r.detectedCompanyType !== 'industrial') parts.push(r.detectedCompanyType);
+  if (r.cached) parts.push('CACHED');
 
   return parts.join(', ');
 }
 
-function inferCompanyTypeTag(r: PipelineResult): string | null {
-  for (const note of r.extractionNotes) {
-    if (/investment company/i.test(note)) return 'investment company';
-    if (/bank/i.test(note)) return 'bank schema';
-  }
-  return null;
-}
-
 function failedAtLabel(r: PipelineResult): string {
+  if (!r.stages) return 'failed';
   const stageOrder = ['irDiscovery', 'reportDiscovery', 'download', 'extraction', 'validation'] as const;
   for (const name of stageOrder) {
     const stage = r.stages[name];
-    if (stage.status === 'failed') {
+    if (stage?.status === 'failed') {
       const labels: Record<string, string> = {
         irDiscovery: 'IR discovery',
         reportDiscovery: 'report discovery',
@@ -253,6 +312,14 @@ export function printRunSummary(results: PipelineResult[]): void {
 
   lines.push(sglBar);
   lines.push(`  Complete: ${complete}  |  Partial: ${partial}  |  Failed: ${failed}`);
+  const fb = tallyFailureBuckets(results);
+  const fbStr = Object.entries(fb)
+    .filter(([, n]) => n > 0)
+    .map(([k, n]) => `${k}=${n}`)
+    .join('  ');
+  if (fbStr) {
+    lines.push(`  By class: ${fbStr}`);
+  }
   lines.push(dblBar);
 
   // Detailed data per company
@@ -269,7 +336,7 @@ export function printRunSummary(results: PipelineResult[]): void {
     const conf = r.confidence !== null ? `${r.confidence}%` : 'N/A';
     const src = r.dataSource ?? '\u2014';
 
-    lines.push(`  ${r.company} (${r.ticker})`);
+    lines.push(`  ${r.company}${r.ticker ? ` (${r.ticker})` : ''}`);
     lines.push(`    Revenue: ${rev}  |  EBIT: ${ebit}`);
     lines.push(`    Employees: ${emp}  |  CEO: ${ceo}`);
     lines.push(`    FY: ${fy}  |  Confidence: ${conf}  |  Source: ${src}`);

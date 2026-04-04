@@ -4,17 +4,26 @@
 
 import * as path from 'path';
 
-/** Milliseconds to wait between HTTP requests to the same domain. */
-export const SAME_DOMAIN_DELAY_MS = 1_000;
+/** Base milliseconds to wait between HTTP requests to the same domain. */
+export const SAME_DOMAIN_DELAY_MS = 2_000;
 
-/** Milliseconds to wait between processing different companies. */
-export const INTER_COMPANY_DELAY_MS = 2_000;
+/** Random jitter added to per-domain delay (±this value in ms). */
+export const DOMAIN_DELAY_JITTER_MS = 1_000;
+
+/** Base delay when --slow flag is active. */
+export const SLOW_MODE_DELAY_MS = 8_000;
+
+/** Exponential backoff sequence for 403/429 responses (ms). */
+export const RATE_LIMIT_BACKOFF_SEQUENCE = [30_000, 60_000, 120_000, 300_000];
 
 /** Maximum retries per HTTP request before giving up. */
 export const MAX_RETRIES = 3;
 
 /** HTTP request timeout in milliseconds. */
 export const REQUEST_TIMEOUT_MS = 30_000;
+
+/** Maximum PDF candidates to try per fallback step before advancing. */
+export const MAX_CANDIDATES_PER_STEP = 5;
 
 /** User-Agent string sent with every request. */
 export const USER_AGENT =

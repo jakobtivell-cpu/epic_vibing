@@ -1,14 +1,12 @@
 // ---------------------------------------------------------------------------
-// Playwright fallback — OPTIONAL last-resort for JS-rendered IR pages.
+// Playwright fallback — Step 3 in the generic fallback chain.
 //
-// Fires between AEM CDN patterns (f) and allabolag data extraction (g).
+// Uses a full browser to render JS-heavy IR pages and extract PDF links
+// from the DOM and network responses. Generic — no company-specific logic.
 // If Playwright is not installed, skips gracefully and returns [].
-//
-// Known use case: Volvo Group IR pages render PDF links via client-side JS
-// that cheerio cannot see.
 // ---------------------------------------------------------------------------
 
-import { CompanyProfile, ReportCandidate } from '../types';
+import { ReportCandidate, SOURCE_PLAYWRIGHT_FALLBACK } from '../types';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('playwright');
@@ -29,6 +27,30 @@ const SUBPAGE_PATTERNS = [
   /rapporter/i,
 ];
 
+function scorePdfUrl(href: string): number {
+  if (!/\.pdf(\?|$)/i.test(href)) return -999;
+
+  let score = 4;
+  const hrefLower = href.toLowerCase();
+
+  if (/annual\s*(?:and\s*sustainability)?\s*report|arsredovisning|årsredovisning|annual-report/i.test(hrefLower)) {
+    score += 8;
+  }
+  if (/press|\/pr-|\/news\/|pressrelease|_pr_/i.test(hrefLower)) score -= 10;
+  if (/interim|quarterly|q[1-4]/i.test(hrefLower)) score -= 10;
+  if (/governance|remuneration|presentation/i.test(hrefLower)) score -= 6;
+
+  const yearMatch = href.match(/\b(20[12]\d)\b/);
+  if (yearMatch) {
+    const year = parseInt(yearMatch[1], 10);
+    if (year === RECENT_FISCAL_YEAR || year === CURRENT_YEAR) score += 5;
+    else if (year === RECENT_FISCAL_YEAR - 1) score += 2;
+    else if (year < RECENT_FISCAL_YEAR - 2) score -= 5 * (RECENT_FISCAL_YEAR - year - 2);
+  }
+
+  return score;
+}
+
 function scoreLink(href: string, text: string): number {
   if (!/\.pdf(\?|$)/i.test(href)) return -999;
 
@@ -39,11 +61,19 @@ function scoreLink(href: string, text: string): number {
   if (/annual\s+(?:and\s+sustainability\s+)?report/i.test(textLower)) score += 10;
   if (/årsredovisning/i.test(textLower)) score += 10;
   if (/annual|arsredovisning|årsredovisning/i.test(hrefLower)) score += 4;
+  if (/annual-and-sustainability|annual.report|arsredovisning|årsredovisning/i.test(hrefLower)) {
+    score += 3;
+  }
 
+  if (/press|\/pr-|\/news\/|pressrelease/i.test(hrefLower)) score -= 8;
   if (/Q[1-4]/i.test(textLower)) score -= 10;
   if (/interim|quarterly|delårsrapport/i.test(textLower)) score -= 10;
   if (/governance|remuneration|presentation/i.test(textLower)) score -= 8;
   if (/press\s*release|news/i.test(textLower)) score -= 8;
+  if (/voting|postal[\s-]*voting/i.test(textLower)) score -= 15;
+  if (/kallelse|bolagsstämma|stämma/i.test(textLower)) score -= 15;
+  if (/\bagm\b/i.test(textLower)) score -= 8;
+  if (/\bproxy\b/i.test(textLower)) score -= 8;
   if (/summary|sammandrag/i.test(textLower)) score -= 3;
 
   if (/sustainability|hållbarhet/i.test(textLower) && !/annual|årsredovisning/i.test(textLower)) {
@@ -90,12 +120,42 @@ async function extractLinksFromPage(page: any, baseUrl: string): Promise<PageLin
     .filter((r) => r.href.startsWith('http'));
 }
 
+const GOTO_TIMEOUT_MS = 25_000;
+
+async function gotoWithRetry(page: any, url: string, companyName: string): Promise<void> {
+  try {
+    await page.goto(url, { waitUntil: 'networkidle', timeout: GOTO_TIMEOUT_MS });
+  } catch {
+    log.debug(`[${companyName}] Playwright: networkidle timed out for ${url} — retrying with domcontentloaded`);
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: GOTO_TIMEOUT_MS });
+    await page.waitForTimeout(2_500);
+  }
+}
+
+function attachPdfResponseCollector(page: any, seen: Set<string>): void {
+  page.on('response', (response: { url: () => string; headers: () => Record<string, string> }) => {
+    try {
+      const url = response.url();
+      if (!url.startsWith('http')) return;
+      const ct = (response.headers()['content-type'] || '').toLowerCase();
+      const looksPdf =
+        /\.pdf(\?|$)/i.test(url) ||
+        ct.includes('application/pdf') ||
+        (ct.includes('application/octet-stream') && /\.pdf(\?|$)/i.test(url.split('?')[0]));
+      if (!looksPdf || ct.includes('text/html')) return;
+      seen.add(url.split('#')[0]);
+    } catch {
+      /* ignore */
+    }
+  });
+}
+
 /**
- * Attempt to use Playwright to render JS-heavy IR pages and extract PDF links.
+ * Use Playwright to render JS-heavy pages and extract PDF links.
  * Returns an empty array if Playwright is not installed.
  */
 export async function tryPlaywrightFallback(
-  company: CompanyProfile,
+  companyName: string,
   irPageUrl: string,
 ): Promise<ReportCandidate[]> {
   let chromium: any;
@@ -104,17 +164,14 @@ export async function tryPlaywrightFallback(
     const pw = await import('playwright');
     chromium = pw.chromium;
   } catch {
-    log.info(
-      `[${company.name}] Playwright not installed — skipping JS-rendered fallback`,
-    );
+    log.info(`[${companyName}] Playwright not installed — skipping JS-rendered fallback`);
     return [];
   }
 
-  log.info(`[${company.name}] Falling back to Playwright for JS-rendered content`);
+  log.info(`[${companyName}] Falling back to Playwright for JS-rendered content`);
 
   let browser: any = null;
   try {
-    // Prefer system Chrome (avoids Windows Defender blocking Playwright's bundled binary)
     try {
       browser = await chromium.launch({ channel: 'chrome', headless: true });
     } catch {
@@ -125,14 +182,14 @@ export async function tryPlaywrightFallback(
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     });
     const page = await context.newPage();
+    const networkPdfUrls = new Set<string>();
+    attachPdfResponseCollector(page, networkPdfUrls);
 
-    await page.goto(irPageUrl, { waitUntil: 'networkidle', timeout: 30_000 });
+    await gotoWithRetry(page, irPageUrl, companyName);
     await page.waitForTimeout(2_000);
 
     let allLinks = await extractLinksFromPage(page, irPageUrl);
-    log.info(
-      `[${company.name}] Playwright: ${allLinks.length} links found on IR page`,
-    );
+    log.info(`[${companyName}] Playwright: ${allLinks.length} links found on IR page`);
 
     const pdfCandidates: ReportCandidate[] = [];
     const seenPdfs = new Set<string>();
@@ -147,12 +204,25 @@ export async function tryPlaywrightFallback(
           url: link.href,
           score: s,
           text: `[playwright] ${link.text.substring(0, 100)}`,
-          source: 'fallback-playwright',
+          source: SOURCE_PLAYWRIGHT_FALLBACK,
         });
       }
     }
 
-    // If no PDFs found on the IR page, follow report sub-pages and event pages
+    for (const pdfUrl of networkPdfUrls) {
+      if (seenPdfs.has(pdfUrl)) continue;
+      seenPdfs.add(pdfUrl);
+      const s = scorePdfUrl(pdfUrl);
+      if (s > 0) {
+        pdfCandidates.push({
+          url: pdfUrl,
+          score: s,
+          text: `[playwright-network] ${pdfUrl.substring(0, 120)}`,
+          source: SOURCE_PLAYWRIGHT_FALLBACK,
+        });
+      }
+    }
+
     if (pdfCandidates.length === 0) {
       const visitedPages = new Set<string>([irPageUrl]);
       const dedupSubUrls = new Set<string>();
@@ -171,16 +241,11 @@ export async function tryPlaywrightFallback(
       for (const subLink of subPageLinks) {
         visitedPages.add(subLink.href);
 
-        log.info(
-          `[${company.name}] Playwright: following sub-page "${subLink.text}" → ${subLink.href}`,
-        );
+        log.info(`[${companyName}] Playwright: following sub-page "${subLink.text}" → ${subLink.href}`);
 
         try {
-          await page.goto(subLink.href, {
-            waitUntil: 'networkidle',
-            timeout: 20_000,
-          });
-          await page.waitForTimeout(2_000);
+          await gotoWithRetry(page, subLink.href, companyName);
+          await page.waitForTimeout(1_500);
 
           const subLinks = await extractLinksFromPage(page, subLink.href);
           for (const sl of subLinks) {
@@ -193,15 +258,26 @@ export async function tryPlaywrightFallback(
                 url: sl.href,
                 score: s,
                 text: `[playwright-sub] ${sl.text.substring(0, 100)}`,
-                source: 'fallback-playwright',
+                source: SOURCE_PLAYWRIGHT_FALLBACK,
+              });
+            }
+          }
+          for (const pdfUrl of networkPdfUrls) {
+            if (seenPdfs.has(pdfUrl)) continue;
+            seenPdfs.add(pdfUrl);
+            const s = scorePdfUrl(pdfUrl);
+            if (s > 0) {
+              pdfCandidates.push({
+                url: pdfUrl,
+                score: s - 1,
+                text: `[playwright-network-sub] ${pdfUrl.substring(0, 120)}`,
+                source: SOURCE_PLAYWRIGHT_FALLBACK,
               });
             }
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          log.debug(
-            `[${company.name}] Playwright sub-page failed: ${subLink.href} → ${msg}`,
-          );
+          log.debug(`[${companyName}] Playwright sub-page failed: ${subLink.href} → ${msg}`);
         }
       }
     }
@@ -212,20 +288,18 @@ export async function tryPlaywrightFallback(
     pdfCandidates.sort((a, b) => b.score - a.score);
 
     if (pdfCandidates.length > 0) {
-      log.info(
-        `[${company.name}] Playwright found ${pdfCandidates.length} PDF candidate(s)`,
-      );
+      log.info(`[${companyName}] Playwright found ${pdfCandidates.length} PDF candidate(s)`);
       for (const c of pdfCandidates.slice(0, 5)) {
-        log.info(`[${company.name}]   ${c.score}pts — "${c.text}" — ${c.url}`);
+        log.info(`[${companyName}]   ${c.score}pts — "${c.text}" — ${c.url}`);
       }
     } else {
-      log.info(`[${company.name}] Playwright found no PDF candidates`);
+      log.info(`[${companyName}] Playwright found no PDF candidates`);
     }
 
     return pdfCandidates;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    log.warn(`[${company.name}] Playwright fallback error: ${message}`);
+    log.warn(`[${companyName}] Playwright fallback error: ${message}`);
     if (browser) {
       try {
         await browser.close();

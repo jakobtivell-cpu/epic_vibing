@@ -1,12 +1,9 @@
 // ---------------------------------------------------------------------------
 // Post-download verification — catches wrong-entity, wrong-PDF-type, and
-// fiscal-year mismatches BEFORE field extraction runs. These checks exist
-// because the discovery heuristics can't guarantee correctness; they only
-// rank candidates. A single misranked link produces a plausible, confident,
-// and completely wrong result without these gates.
+// fiscal-year mismatches BEFORE field extraction runs. Generic — no
+// company-specific configuration required.
 // ---------------------------------------------------------------------------
 
-import { CompanyProfile } from '../types';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('post-check');
@@ -23,29 +20,57 @@ export interface EntityCheckResult {
 
 const FIRST_TWO_PAGES_CHARS = 6_000;
 
+/**
+ * Check if the company name (or any of its short-name variants) appears
+ * in the first ~2 pages of the PDF text.
+ * @param additionalNames  Extra names to check (e.g. ticker-derived short names).
+ */
 export function verifyEntityInPdf(
   text: string,
-  company: CompanyProfile,
+  companyName: string,
+  additionalNames?: string[],
 ): EntityCheckResult {
   const region = text.substring(0, FIRST_TWO_PAGES_CHARS).toLowerCase();
+  const nameLower = companyName.toLowerCase();
 
-  const terms = [
-    company.name,
-    company.ticker.replace(/\s+/g, ''),
-    ...company.knownAliases,
-  ];
+  if (nameLower.length >= 2 && region.includes(nameLower)) {
+    return { passed: true, matchedTerm: companyName, checkedRegion: 'first-2-pages' };
+  }
 
-  for (const term of terms) {
-    if (!term) continue;
-    const lower = term.toLowerCase();
-    if (lower.length < 2) continue;
-    if (region.includes(lower)) {
-      return { passed: true, matchedTerm: term, checkedRegion: 'first-2-pages' };
+  // Try individual words of the company name (handles "Atlas Copco" → "atlas" + "copco")
+  const words = nameLower.split(/\s+/).filter((w) => w.length > 2);
+  const skipWords = new Set(['ab', 'publ', 'the', 'and', 'och']);
+  const meaningfulWords = words.filter((w) => !skipWords.has(w));
+
+  if (meaningfulWords.length > 1) {
+    const allWordsFound = meaningfulWords.every((w) => region.includes(w));
+    if (allWordsFound) {
+      return { passed: true, matchedTerm: companyName, checkedRegion: 'first-2-pages' };
+    }
+  }
+
+  // Try additional short names (e.g. ticker base "SEB", stripped legal name)
+  // Only use short names (< 5 chars) if no distinctive words exist in the
+  // legal name. This prevents "SEB" from matching "Groupe SEB" when we're
+  // actually looking for "Skandinaviska Enskilda Banken".
+  const hasDistinctiveWords = meaningfulWords.some((w) => w.length >= 6);
+
+  if (additionalNames) {
+    for (const alt of additionalNames) {
+      const altLower = alt.toLowerCase();
+      if (altLower.length < 5 && hasDistinctiveWords) {
+        // Skip very short names when we have distinctive words available
+        // — they're too ambiguous (e.g. "SEB" matches "Groupe SEB")
+        continue;
+      }
+      if (altLower.length >= 2 && region.includes(altLower)) {
+        return { passed: true, matchedTerm: alt, checkedRegion: 'first-2-pages' };
+      }
     }
   }
 
   log.warn(
-    `[${company.name}] Entity check FAILED — none of [${terms.join(', ')}] found in first ${FIRST_TWO_PAGES_CHARS} chars`,
+    `[${companyName}] Entity check FAILED — "${companyName}" not found in first ${FIRST_TWO_PAGES_CHARS} chars`,
   );
   return { passed: false, matchedTerm: null, checkedRegion: 'first-2-pages' };
 }

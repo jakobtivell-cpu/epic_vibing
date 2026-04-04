@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Swedish Large Cap — AIFM Scraper Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#fff;--sf:#F8F9FA;--hv:#F1F3F5;--bd:#E9ECEF;--bl:#F1F3F5;--blue:#2563EB;--green:#059669;--amber:#D97706;--rose:#DC2626;--purple:#7C3AED;--tx:#111827;--t2:#6B7280;--t3:#9CA3AF}
+body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--sf);color:var(--tx);min-height:100vh}
+input:focus,textarea:focus{outline:none}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.hd{background:var(--bg);border-bottom:1px solid var(--bd);padding:24px 40px;display:flex;justify-content:space-between;align-items:center}
+.hd-s{font-size:11px;font-weight:500;color:var(--t3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:3px}
+.hd h1{font-size:20px;font-weight:700;letter-spacing:-.3px}
+.tabs{display:flex;gap:3px;background:var(--sf);border-radius:10px;padding:3px}
+.tab{padding:7px 16px;border:none;border-radius:7px;background:transparent;color:var(--t3);cursor:pointer;font-size:12.5px;font-weight:600;transition:all .15s;font-family:inherit}
+.tab.on{background:var(--bg);color:var(--tx);box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.mn{padding:24px 40px;max-width:1440px;margin:0 auto}
+.cd{background:var(--bg);border:1px solid var(--bd);border-radius:12px}
+.mono{font-family:'DM Mono',monospace}
+.ir{display:flex;gap:10px;align-items:center}
+.ir input{flex:1;padding:10px 14px;border-radius:8px;border:1px solid var(--bd);background:var(--sf);font-size:13.5px;color:var(--tx);font-family:inherit}
+.bp{padding:10px 20px;border-radius:8px;border:none;background:var(--tx);color:#fff;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit}
+.bp:hover{opacity:.85}
+.bo{padding:10px 16px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);font-size:12.5px;font-weight:600;color:var(--t2);cursor:pointer;white-space:nowrap;font-family:'DM Mono',monospace}
+.bo:hover{border-color:var(--t3);color:var(--tx)}
+.qb{padding:4px 12px;border-radius:6px;border:1px solid var(--bd);background:var(--bg);color:var(--t2);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit}
+.qb:hover{background:var(--sf);border-color:var(--t3)}
+table{width:100%;border-collapse:collapse}
+th{padding:10px 12px;font-size:9.5px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;background:var(--sf);border-bottom:1px solid var(--bd);white-space:nowrap}
+td{padding:11px 12px;border-bottom:1px solid var(--bl);font-size:12px}
+tbody tr{cursor:pointer;transition:background .15s}
+tbody tr:hover{background:var(--hv)}
+tbody tr.sel{background:var(--sf)}
+.tr{text-align:right}.tl{text-align:left}
+.bar-r{display:flex;align-items:center;gap:8px;padding:5px 0}
+.bar-l{min-width:85px;font-size:11px;color:var(--t2);text-align:right;flex-shrink:0}
+.bar-t{flex:1;height:14px;background:var(--bl);border-radius:5px;overflow:hidden}
+.bar-f{height:100%;border-radius:0 5px 5px 0;transition:width .4s ease}
+.bar-v{min-width:65px;font-size:10.5px;font-family:'DM Mono',monospace;color:var(--t2)}
+.badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:600;font-family:'DM Mono',monospace}
+.b-ok{background:#ECFDF5;color:#059669}
+.b-pt{background:#FFFBEB;color:#D97706}
+.b-fl{background:#FEF2F2;color:#DC2626}
+.b-run{background:#EFF6FF;color:#2563EB}
+.conf-w{width:44px;height:5px;border-radius:3px;background:var(--bl);overflow:hidden;display:inline-block;vertical-align:middle;margin-right:5px}
+.conf-f{height:100%;border-radius:3px}
+.dg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.dc{padding:9px 11px;border-radius:8px;background:var(--sf)}
+.dc .l{font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+.dc .v{font-size:13px;font-weight:600;color:var(--tx)}
+.dp{padding:5px 9px;border-radius:6px;background:var(--sf);font-family:'DM Mono',monospace;font-size:10.5px;color:var(--t2);word-break:break-all;line-height:1.5;margin-bottom:5px}
+.dp span{color:var(--t3)}
+.note{padding:4px 8px;border-radius:5px;font-size:11px;line-height:1.5;margin-bottom:4px}
+.note-e{background:#FEF2F2;color:#991B1B}
+.note-w{background:#FFFBEB;color:#92400E}
+.note-i{background:#F0FDF4;color:#166534}
+.job-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11.5px;animation:fadeUp .3s ease}
+.spinner{animation:spin .8s linear infinite;flex-shrink:0}
+.rm{margin-left:auto;padding:2px 8px;border-radius:4px;border:1px solid var(--bd);background:transparent;font-size:10px;color:var(--t3);cursor:pointer;font-family:'DM Mono',monospace}
+.logbox{margin-top:10px;padding:10px 12px;border-radius:8px;background:#1a1a2e;max-height:180px;overflow-y:auto}
+.ll{font-size:11px;line-height:1.6;font-family:'DM Mono',monospace;color:#94a3b8}
+.ll.e{color:#f87171}
+.av{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.empty{padding:60px 40px;text-align:center}
+.pm{display:flex;align-items:baseline;gap:3px}
+.pm .n{font-size:22px;font-weight:700;letter-spacing:-.5px}
+.pm .u{font-size:12px;color:var(--t3)}
+/* JSON import */
+.json-area{width:100%;min-height:80px;max-height:200px;padding:10px 14px;border-radius:8px;border:1px solid var(--bd);background:var(--sf);font-size:12px;color:var(--tx);font-family:'DM Mono',monospace;resize:vertical}
+.import-ok{border-color:var(--green);background:#F0FDF4}
+.import-err{border-color:var(--rose);background:#FEF2F2}
+</style>
+</head>
+<body>
+<div class="hd">
+  <div><div class="hd-s">AIFM Case · Nasdaq Stockholm</div><h1>Swedish Large Cap</h1></div>
+  <div class="tabs" id="tabs"></div>
+</div>
+<div class="mn" id="app"></div>
+<script>
+// ── SECTOR MAP ──
+const SMAP={Volvo:"Industrials",Ericsson:"Technology","H&M":"Consumer","Atlas Copco":"Industrials",Sandvik:"Industrials",SEB:"Financials",Investor:"Financials",Hexagon:"Technology",Essity:"Consumer","Alfa Laval":"Industrials"};
+const SC={Industrials:"#2563EB",Technology:"#7C3AED",Consumer:"#D97706",Financials:"#059669"};
+const SBG={Industrials:"#EFF6FF",Technology:"#F5F3FF",Consumer:"#FFFBEB",Financials:"#ECFDF5"};
+
+// Quick-add mock data (for simulated scrapes)
+const MOCK={
+volvo:{company:"Volvo",ticker:"VOLV B",website:"https://www.volvogroup.com",irPage:"https://www.volvogroup.com/en/investors.html",annualReportUrl:"https://www.volvogroup.com/.../AR-2025.pdf",annualReportDownloaded:"downloads/volv_b_2025.pdf",fiscalYear:2025,extractedData:{revenue_msek:457509,ebit_msek:44379,employees:98844,ceo:"Martin Lundstedt"},sustainability:{scope1_co2_tonnes:25,scope2_co2_tonnes:50,methodology:"market-based",confidence:"low"},dataSource:"pdf",confidence:100,status:"complete",extractionNotes:["Annual report includes sustainability content"]},
+ericsson:{company:"Ericsson",ticker:"ERIC B",website:"https://www.ericsson.com",irPage:"https://www.ericsson.com/en/investors",annualReportUrl:"https://www.ericsson.com/.../ar-2025.pdf",annualReportDownloaded:"downloads/eric_b_2025.pdf",fiscalYear:2025,extractedData:{revenue_msek:236681,ebit_msek:38634,employees:89425,ceo:"Börje Ekholm"},sustainability:{scope1_co2_tonnes:204,scope2_co2_tonnes:50,methodology:"market-based",confidence:"low"},dataSource:"pdf",confidence:100,status:"complete",extractionNotes:[]},
+"h&m":{company:"H&M",ticker:"HM B",website:"https://hmgroup.com",irPage:"https://hmgroup.com/investors/",annualReportUrl:"https://hmgroup.com/.../HM-AR-2025.pdf",annualReportDownloaded:"downloads/hm_b_2025.pdf",fiscalYear:2025,extractedData:{revenue_msek:228285,ebit_msek:18395,employees:94744,ceo:"Daniel Erver"},sustainability:{scope1_co2_tonnes:201,scope2_co2_tonnes:203,methodology:"market-based",confidence:"low"},dataSource:"pdf",confidence:100,status:"complete",extractionNotes:[]},
+sandvik:{company:"Sandvik",ticker:"SAND",website:"https://www.home.sandvik",irPage:"https://www.home.sandvik/en/investors",annualReportUrl:null,annualReportDownloaded:null,fiscalYear:null,extractedData:{revenue_msek:null,ebit_msek:null,employees:null,ceo:null},sustainability:{scope1_co2_tonnes:null,scope2_co2_tonnes:null},dataSource:"pdf",confidence:35,status:"failed",extractionNotes:["No income statement found","Revenue not extracted","EBIT not extracted"]},
+};
+
+// ── STATE ──
+let results=[];   // Full result objects (from import or simulated scrape)
+let jobs=[];      // Active/completed scrape jobs: {id,name,status,logs[]}
+let view="table",selTk=null,showLogs=false,showImport=false,importMsg="";
+
+// ── HELPERS ──
+const fmt=v=>v!=null?v.toLocaleString("sv-SE"):"—";
+const esc=s=>{const d=document.createElement("div");d.textContent=s;return d.innerHTML};
+const sec=c=>SMAP[c.company]||"Industrials";
+const mg=c=>{const d=c.extractedData;if(!d||!d.revenue_msek||!d.ebit_msek)return null;return((d.ebit_msek/d.revenue_msek)*100).toFixed(1)};
+const co2=c=>{const s=c.sustainability;if(!s)return null;const a=s.scope1_co2_tonnes,b=s.scope2_co2_tonnes;if(a==null&&b==null)return null;return(a||0)+(b||0)};
+const cc=v=>v==null?"var(--t3)":v>=80?"var(--green)":v>=50?"var(--amber)":"var(--rose)";
+const stBadge=s=>s==="complete"?'<span class="badge b-ok">complete</span>':s==="partial"?'<span class="badge b-pt">partial</span>':s==="running"?'<span class="badge b-run">running</span>':'<span class="badge b-fl">failed</span>';
+const confBar=v=>{if(v==null)return'<span class="mono" style="font-size:11px;color:var(--t3)">—</span>';return`<div class="conf-w"><div class="conf-f" style="width:${v}%;background:${cc(v)}"></div></div><span class="mono" style="font-size:11px;color:${cc(v)}">${v}%</span>`};
+
+// ── SVG ──
+const spin=(c,s=11)=>`<svg width="${s}" height="${s}" viewBox="0 0 16 16" class="spinner"><circle cx="8" cy="8" r="6" fill="none" stroke="${c}" stroke-width="2.5" stroke-dasharray="28" stroke-dashoffset="8" stroke-linecap="round"/></svg>`;
+const chk=()=>`<svg width="11" height="11" viewBox="0 0 16 16"><path d="M3 8.5l3.5 3.5 6.5-7" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const xx=()=>`<svg width="11" height="11" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="var(--rose)" stroke-width="2.5" stroke-linecap="round"/></svg>`;
+const avt=c=>`<div class="av" style="background:${SBG[sec(c)]};color:${SC[sec(c)]}">${esc(c.company.charAt(0))}</div>`;
+function bars(items,vFn,lFn,cFn){const mx=Math.max(...items.map(vFn),1);return items.map(c=>`<div class="bar-r"><div class="bar-l">${esc(c._n||c.company)}</div><div class="bar-t"><div class="bar-f" style="width:${(vFn(c)/mx)*100}%;background:${cFn(c)};opacity:.6"></div></div><div class="bar-v">${lFn(c)}</div></div>`).join("")}
+
+// ── IMPORT JSON ──
+function importJSON(){
+  const ta=document.getElementById("jsonInput");
+  if(!ta||!ta.value.trim()){importMsg="Paste JSON first";render();return}
+  try{
+    const raw=JSON.parse(ta.value.trim());
+    // Auto-detect format
+    if(raw.results&&Array.isArray(raw.results)){
+      // Full results.json format
+      results=raw.results.map(r=>({...r,_source:"import"}));
+      jobs=[];
+      importMsg=`✓ Imported ${results.length} companies from results.json (generated ${raw.generatedAt||"?"})`;
+    } else if(raw.companies&&Array.isArray(raw.companies)){
+      // Scrape summary format — merge into results as lightweight entries
+      raw.companies.forEach(c=>{
+        const existing=results.find(r=>r.ticker===c.ticker);
+        if(existing){
+          // Update status/confidence from summary
+          existing.confidence=c.confidence;
+          existing.status=c.status;
+          existing.dataSource=c.dataSource;
+          existing._fieldsExtracted=c.fieldsExtracted;
+          existing._failedAtStage=c.failedAtStage;
+          existing._errorSummary=c.errorSummary;
+        } else {
+          // Create stub entry from summary
+          results.push({
+            company:c.company,ticker:c.ticker,
+            website:null,irPage:null,annualReportUrl:null,annualReportDownloaded:null,
+            fiscalYear:null,
+            extractedData:null,
+            sustainability:{scope1_co2_tonnes:null,scope2_co2_tonnes:null},
+            dataSource:c.dataSource,confidence:c.confidence,status:c.status,
+            extractionNotes:c.errorSummary?[c.errorSummary]:[],
+            _fieldsExtracted:c.fieldsExtracted,
+            _failedAtStage:c.failedAtStage,
+            _errorSummary:c.errorSummary,
+            _source:"summary"
+          });
+        }
+      });
+      importMsg=`✓ Imported summary for ${raw.companies.length} companies (${raw.complete||0} ok, ${raw.partial||0} partial, ${raw.failed||0} failed)`;
+    } else if(Array.isArray(raw)){
+      // Plain array of result objects
+      results=raw.map(r=>({...r,_source:"import"}));
+      jobs=[];
+      importMsg=`✓ Imported ${results.length} companies`;
+    } else {
+      importMsg="✕ Unrecognized JSON format";render();return;
+    }
+    showImport=false;selTk=null;
+  }catch(e){importMsg="✕ Invalid JSON: "+e.message}
+  render();
+}
+
+// ── SIMULATED SCRAPER ──
+function addCompany(name){
+  const key=name.toLowerCase().trim();
+  if(results.some(r=>r.company.toLowerCase()===key)||jobs.some(j=>j.name.toLowerCase()===key))return;
+  const mock=MOCK[key];const dn=mock?mock.company:name.trim();
+  const id=key+"-"+Date.now();
+  const job={id,name:dn,status:"running",logs:[`[${dn}] Söker efter hemsida…`]};
+  jobs.push(job);render();
+
+  const upd=(l)=>{const j=jobs.find(x=>x.id===id);if(!j)return;if(l)j.logs.push(...l);render()};
+  const t1=300+Math.random()*400,t2=t1+500+Math.random()*700,t3=t2+300+Math.random()*500,t4=t3+200+Math.random()*300;
+
+  setTimeout(()=>upd(mock?[`[${dn}] Hittade hemsida: ${mock.website}`,`[${dn}] Navigerar till IR-sida…`]:[`[${dn}] Söker IR-sida via cheerio…`]),t1);
+  setTimeout(()=>upd(mock&&mock.annualReportUrl?[`[${dn}] Hittade IR-sida: ${mock.irPage}`,`[${dn}] Laddar ner PDF: ${mock.annualReportUrl}`]:[`[${dn}] Kunde inte hitta IR-sida`]),t2);
+  setTimeout(()=>upd(mock&&mock.annualReportDownloaded?[`[${dn}] PDF nedladdad → ${mock.annualReportDownloaded}`,`[${dn}] Extraherar nyckeltal med pdf-parse…`]:[`[${dn}] Ingen PDF hittad`]),t3);
+  setTimeout(()=>{
+    const j=jobs.find(x=>x.id===id);if(!j)return;
+    if(mock){
+      j.status="done";
+      const s=mock.sustainability;
+      j.logs.push(
+        ...(mock.extractedData.revenue_msek?[`[${dn}] Omsättning: ${fmt(mock.extractedData.revenue_msek)} MSEK`]:[`[${dn}] Omsättning: ej hittat`]),
+        ...(mock.extractedData.ebit_msek?[`[${dn}] EBIT: ${fmt(mock.extractedData.ebit_msek)} MSEK`]:[]),
+        ...(mock.extractedData.employees?[`[${dn}] Anställda: ${fmt(mock.extractedData.employees)}`]:[]),
+        ...(mock.extractedData.ceo?[`[${dn}] VD: ${mock.extractedData.ceo}`]:[]),
+        ...(s&&s.scope1_co2_tonnes!=null?[`[${dn}] CO₂ Scope 1+2: ${fmt((s.scope1_co2_tonnes||0)+(s.scope2_co2_tonnes||0))} ton`]:[`[${dn}] CO₂: ej hittat`]),
+        `[${dn}] ✓ Klar (${Math.round(t4)}ms)`
+      );
+      results.push({...mock,_source:"simulated"});
+    } else {
+      j.status="error";
+      j.logs.push(`[${dn}] ERROR: Kunde inte hitta eller parsa årsredovisning`);
+    }
+    render();
+  },t4);
+}
+function removeJob(id){jobs=jobs.filter(j=>j.id!==id);render()}
+function removeResult(ticker){results=results.filter(r=>r.ticker!==ticker);if(selTk===ticker)selTk=null;render()}
+
+function downloadJSON(){
+  const exp={generatedAt:new Date().toISOString(),companyCount:results.length,results:results.map(r=>{const{_source,_fieldsExtracted,_failedAtStage,_errorSummary,...clean}=r;return clean})};
+  const b=new Blob([JSON.stringify(exp,null,2)],{type:"application/json"});
+  const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download="results.json";a.click();URL.revokeObjectURL(u);
+}
+
+// ── DETAIL PANEL ──
+function renderDetail(){
+  const r=results.find(x=>x.ticker===selTk);if(!r)return"";
+  const d=r.extractedData;const s=r.sustainability;const m=mg(r);const c2=co2(r);
+  const paths=[{l:"website",v:r.website},{l:"irPage",v:r.irPage},{l:"annualReportUrl",v:r.annualReportUrl},{l:"annualReportDownloaded",v:r.annualReportDownloaded}].filter(x=>x.v);
+  const notes=r.extractionNotes||[];
+  return `<div class="cd detail" style="padding:20px;max-height:calc(100vh - 180px);overflow-y:auto;animation:fadeUp .3s ease">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="av" style="width:36px;height:36px;border-radius:10px;font-size:15px;font-weight:800;background:${SBG[sec(r)]};color:${SC[sec(r)]}">${esc(r.company.charAt(0))}</div>
+        <div><div style="font-size:16px;font-weight:700">${esc(r.company)}</div><div class="mono" style="font-size:11px;color:var(--t3)">${esc(r.ticker)} · ${sec(r)}${r.fiscalYear?" · FY"+r.fiscalYear:""}</div></div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">${stBadge(r.status)}<button onclick="selTk=null;render()" style="width:24px;height:24px;border-radius:6px;border:1px solid var(--bd);background:transparent;cursor:pointer;color:var(--t3);font-size:12px;display:flex;align-items:center;justify-content:center">✕</button></div>
+    </div>
+    <div class="dg">${[
+      {l:"Omsättning (MSEK)",v:d?fmt(d.revenue_msek):"—"},
+      {l:"EBIT (MSEK)",v:d?fmt(d.ebit_msek):"—"},
+      {l:"EBIT-marginal",v:m?m+"%":"—"},
+      {l:"Antal anställda",v:d?fmt(d.employees):"—"},
+      {l:"VD-namn",v:d&&d.ceo?d.ceo:"—"},
+      {l:"CO₂ Scope 1 (ton)",v:s&&s.scope1_co2_tonnes!=null?fmt(s.scope1_co2_tonnes):"—"},
+      {l:"CO₂ Scope 2 (ton)",v:s&&s.scope2_co2_tonnes!=null?fmt(s.scope2_co2_tonnes):"—"},
+      {l:"CO₂ S1+2 total",v:c2!=null?fmt(c2)+" ton":"—"},
+      {l:"Confidence",v:r.confidence!=null?r.confidence+"%":"—"},
+      {l:"Data source",v:r.dataSource||"—"},
+      ...(r._failedAtStage?[{l:"Failed at stage",v:r._failedAtStage}]:[]),
+    ].map(i=>`<div class="dc"><div class="l">${i.l}</div><div class="v">${esc(String(i.v))}</div></div>`).join("")}</div>
+    ${paths.map(x=>`<div class="dp"><span>${x.l}:</span> ${esc(x.v)}</div>`).join("")}
+    ${r._errorSummary?`<div class="note note-e" style="margin-top:6px">${esc(r._errorSummary)}</div>`:""}
+    ${notes.length?`<div style="margin-top:10px;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Extraction notes (${notes.length})</div>${notes.map(n=>{const isErr=n.includes("not found")||n.includes("not extracted")||n.includes("failed")||n.includes("ERROR");const isWarn=n.includes("mismatch")||n.includes("unusually")||n.includes("suspiciously")||n.includes("not applicable")||n.includes("below");return`<div class="note ${isErr?"note-e":isWarn?"note-w":"note-i"}">${esc(n)}</div>`}).join("")}`:""}
+    <button onclick="removeResult('${r.ticker}')" style="margin-top:12px;padding:6px 14px;border-radius:6px;border:1px solid var(--bd);background:transparent;color:var(--t3);font-size:11px;cursor:pointer;font-family:'DM Mono',monospace">Remove company</button>
+  </div>`;
+}
+
+// ── TABLE ──
+function renderTable(){
+  const rows=results.map((c,i)=>{
+    const d=c.extractedData;const m=mg(c);const c2v=co2(c);const sel=selTk===c.ticker;
+    return `<tr class="${sel?"sel":""}" onclick="selTk=selTk==='${c.ticker}'?null:'${c.ticker}';render()" style="animation:fadeUp .35s ease ${i*35}ms both">
+      <td class="tl" style="padding-left:14px"><div style="display:flex;align-items:center;gap:8px">${avt(c)}<div><div style="font-weight:600;font-size:12.5px">${esc(c.company)}</div><div class="mono" style="font-size:10px;color:var(--t3)">${esc(c.ticker)}</div></div></div></td>
+      <td class="tr">${stBadge(c.status)}</td>
+      <td class="tr mono">${d?fmt(d.revenue_msek):"—"}</td>
+      <td class="tr mono">${d?fmt(d.ebit_msek):"—"}</td>
+      <td class="tr mono" style="color:var(--t2)">${d?fmt(d.employees):"—"}</td>
+      <td class="tr mono" style="color:var(--t2)">${c2v!=null?fmt(c2v):"—"}</td>
+      <td class="tr">${confBar(c.confidence)}</td>
+      <td class="tr" style="color:var(--t2);padding-right:14px">${d&&d.ceo?esc(d.ceo):"—"}</td>
+    </tr>`}).join("");
+  return `<div style="display:grid;grid-template-columns:${selTk?"1fr 400px":"1fr"};gap:16px">
+    <div class="cd" style="overflow-x:auto"><table><thead><tr>
+      <th class="tl" style="padding-left:14px">Bolag</th><th class="tr">Status</th><th class="tr">Omsättning</th><th class="tr">EBIT</th><th class="tr">Anställda</th><th class="tr">CO₂ S1+2</th><th class="tr">Confidence</th><th class="tr" style="padding-right:14px">VD</th>
+    </tr></thead><tbody>${rows}</tbody></table></div>${selTk?renderDetail():""}</div>`;
+}
+
+// ── PERFORMANCE ──
+function renderPerf(){
+  if(!results.length)return`<div class="cd empty"><div style="font-size:14px;font-weight:600;margin-bottom:6px">No data yet</div><div style="font-size:12.5px;color:var(--t3)">Add companies or import JSON</div></div>`;
+  const ch=(t,h)=>`<div class="cd" style="padding:22px"><h3 style="margin:0 0 14px;font-size:13px;font-weight:600">${t}</h3>${h}</div>`;
+  const ok=results.filter(r=>r.status==="complete"),pt=results.filter(r=>r.status==="partial"),fl=results.filter(r=>r.status==="failed");
+  const avgConf=results.filter(r=>r.confidence!=null);
+  const avgConfVal=avgConf.length?Math.round(avgConf.reduce((s,r)=>s+r.confidence,0)/avgConf.length):0;
+  const fields=["revenue_msek","ebit_msek","employees","ceo"];
+  const fieldsTotal=results.length*6;
+  const fieldsOk=results.reduce((s,r)=>{const d=r.extractedData;if(!d)return s+(r._fieldsExtracted||0);return s+(d.revenue_msek!=null?1:0)+(d.ebit_msek!=null?1:0)+(d.employees!=null?1:0)+(d.ceo!=null?1:0)+(r.fiscalYear!=null?1:0)+((r.sustainability&&r.sustainability.scope1_co2_tonnes!=null)?1:0)},0);
+  const co2Found=results.filter(r=>r.sustainability&&(r.sustainability.scope1_co2_tonnes!=null||r.sustainability.scope2_co2_tonnes!=null)).length;
+
+  const agg=`<div class="cd" style="padding:18px;margin-bottom:16px"><div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Scraper overview · ${results.length} targets</div>
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px">${[
+      {n:ok.length,u:"/"+results.length,l:"Complete"},{n:pt.length,u:"",l:"Partial"},{n:fl.length,u:"",l:"Failed"},
+      {n:avgConfVal,u:"%",l:"Avg confidence"},{n:fieldsOk,u:"/"+fieldsTotal,l:"Fields found"},{n:co2Found,u:"/"+results.length,l:"CO₂ found"}
+    ].map(i=>`<div><div class="pm"><span class="n">${i.n}</span><span class="u">${i.u}</span></div><div style="font-size:10.5px;color:var(--t3);margin-top:2px">${i.l}</div></div>`).join("")}</div></div>`;
+
+  // 1: Confidence
+  const c1=bars([...results].sort((a,b)=>(b.confidence||0)-(a.confidence||0)).map(r=>({...r,_n:r.company})),r=>r.confidence||0,r=>(r.confidence||0)+"%",r=>r.status==="complete"?"#059669":r.status==="partial"?"#D97706":"#DC2626");
+
+  // 2: Field coverage
+  const c2=results.map(r=>{
+    const d=r.extractedData;
+    const fe=r._fieldsExtracted!=null?r._fieldsExtracted:(d?fields.filter(f=>d[f]!=null).length+(r.fiscalYear!=null?1:0)+((r.sustainability&&r.sustainability.scope1_co2_tonnes!=null)?1:0):0);
+    return`<div class="bar-r"><div class="bar-l">${esc(r.company)}</div><div style="flex:1;display:flex;gap:3px">${Array.from({length:fe},()=>`<div style="width:${100/6}%;height:14px;border-radius:3px;background:var(--green);opacity:.5"></div>`).join("")}${Array.from({length:6-fe},()=>`<div style="width:${100/6}%;height:14px;border-radius:3px;background:var(--bd);opacity:.3"></div>`).join("")}</div><div class="bar-v">${fe}/6</div></div>`}).join("");
+
+  // 3: Data source
+  const srcs={};results.forEach(r=>{const s=r.dataSource||"none";srcs[s]=(srcs[s]||0)+1});
+  const srcC={pdf:"var(--blue)",allabolag:"var(--amber)",none:"var(--t3)"};
+  const c3=Object.entries(srcs).map(([s,n])=>`<div style="display:flex;align-items:center;gap:10px;padding:6px 0"><div style="width:10px;height:10px;border-radius:3px;background:${srcC[s]||"var(--t3)"}"></div><span style="font-size:13px;font-weight:600;min-width:80px">${s}</span><div class="bar-t" style="max-width:200px"><div class="bar-f" style="width:${(n/results.length)*100}%;background:${srcC[s]||"var(--t3)"};opacity:.5"></div></div><span class="mono" style="font-size:12px;color:var(--t2)">${n}/${results.length}</span></div>`).join("");
+
+  // 4: Extraction notes heatmap
+  const c4=results.map(r=>{
+    const notes=r.extractionNotes||[];
+    const errs=notes.filter(n=>n.includes("not found")||n.includes("not extracted")||n.includes("failed")||n.includes("ERROR")).length;
+    const warns=notes.filter(n=>n.includes("mismatch")||n.includes("unusually")||n.includes("suspiciously")||n.includes("not applicable")||n.includes("below")).length;
+    const info=notes.length-errs-warns;
+    return`<div class="bar-r"><div class="bar-l">${esc(r.company)}</div><div style="display:flex;gap:2px">${Array.from({length:errs},()=>`<div style="width:10px;height:10px;border-radius:2px;background:var(--rose);opacity:.6"></div>`).join("")}${Array.from({length:warns},()=>`<div style="width:10px;height:10px;border-radius:2px;background:var(--amber);opacity:.6"></div>`).join("")}${Array.from({length:info},()=>`<div style="width:10px;height:10px;border-radius:2px;background:var(--green);opacity:.4"></div>`).join("")}</div><span class="mono" style="font-size:11px;color:var(--t2);margin-left:auto">${notes.length}</span></div>`}).join("")+`<div style="display:flex;gap:10px;font-size:10.5px;color:var(--t2);margin-top:8px" class="mono"><span style="color:var(--rose)">■</span> errors <span style="color:var(--amber)">■</span> warnings <span style="color:var(--green)">■</span> info</div>`;
+
+  return`${agg}<div class="g2">${ch("Confidence score",c1)}${ch("Field extraction",c2)}${ch("Data source",c3)}${ch("Extraction notes",c4)}</div>`;
+}
+
+// ── MAIN RENDER ──
+function render(){
+  const act=jobs.filter(j=>j.status==="running");
+  const hasData=results.length>0;
+  const allLogs=jobs.flatMap(j=>j.logs);
+
+  document.getElementById("tabs").innerHTML=hasData?["table","performance"].map(v=>`<button class="tab ${view===v?"on":""}" onclick="view='${v}';render()">${v==="performance"?"Performance":"Table"}</button>`).join(""):"";
+
+  let h="";
+
+  // ── INPUT + IMPORT AREA ──
+  h+=`<div class="cd" style="padding:16px 20px;margin-bottom:20px">
+    <div class="ir">
+      <input id="ci" placeholder="Enter company name — e.g. Volvo, Ericsson, H&M…" onkeydown="if(event.key==='Enter')doAdd()">
+      <button class="bp" onclick="doAdd()">+ Scrape</button>
+      <button class="bo" onclick="showImport=!showImport;render()" style="font-family:inherit;font-weight:600;font-size:12.5px">${showImport?"Cancel":"Import JSON"}</button>
+      ${hasData?`<button class="bo" onclick="downloadJSON()">↓ results.json (${results.length})</button>`:""}
+    </div>
+    ${showImport?`
+    <div style="margin-top:12px;animation:fadeUp .2s ease">
+      <div style="font-size:11.5px;color:var(--t2);margin-bottom:6px">Paste <span class="mono" style="font-size:11px">results.json</span> or <span class="mono" style="font-size:11px">scrape-summary.json</span> — format is auto-detected</div>
+      <textarea id="jsonInput" class="json-area" placeholder='{"generatedAt":"...","results":[...]}  or  {"timestamp":"...","companies":[...]}'></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+        <button class="bp" onclick="importJSON()" style="font-size:12px;padding:8px 16px">Import</button>
+        ${importMsg?`<span style="font-size:12px;color:${importMsg.startsWith("✓")?"var(--green)":"var(--rose)"}">${esc(importMsg)}</span>`:""}
+      </div>
+    </div>`:""}
+    ${!showImport&&!hasData&&jobs.length===0?`<div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span style="font-size:11.5px;color:var(--t3);margin-right:4px">Quick add:</span>${Object.values(MOCK).map(c=>`<button class="qb" onclick="addCompany('${esc(c.company)}')">${esc(c.company)}</button>`).join("")}</div>`:""}
+    ${!showImport&&importMsg&&!showImport?`<div style="margin-top:8px;font-size:12px;color:${importMsg.startsWith("✓")?"var(--green)":"var(--rose)"}">${esc(importMsg)}</div>`:""}
+  </div>`;
+
+  // ── ACTIVE JOBS ──
+  if(jobs.length>0){
+    h+=`<div class="cd mono" style="padding:14px 20px;margin-bottom:20px;font-size:11.5px;animation:fadeUp .4s ease">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <div style="width:6px;height:6px;border-radius:50%;background:${act.length?"var(--amber)":"var(--green)"};${act.length?"animation:pulse 1.2s ease infinite;":""}flex-shrink:0"></div>
+        <span style="font-weight:600;color:var(--tx)">scrape.ts ${act.length?"— running":"— idle"}</span>
+        <button class="rm" style="margin-left:auto" onclick="showLogs=!showLogs;render()">${showLogs?"hide logs":"show logs"}</button>
+      </div>
+      <div style="margin-top:4px;border-top:1px solid var(--bl);padding-top:8px">
+        ${jobs.map(j=>{const a=j.status==="running";return`<div class="job-row">${a?spin("#2563EB"):j.status==="done"?chk():xx()}<span style="font-weight:600;color:var(--tx);min-width:90px">${esc(j.name)}</span><span style="color:${a?"var(--blue)":j.status==="done"?"var(--green)":"var(--rose)"};font-weight:500">${a?"Scraping…":j.status==="done"?"Done":"Failed"}</span>${!a?`<button class="rm" onclick="event.stopPropagation();removeJob('${j.id}')">remove</button>`:""}</div>`}).join("")}
+      </div>${showLogs?`<div class="logbox">${allLogs.map(l=>`<div class="ll${l.includes("ERROR")?" e":""}">${esc(l)}</div>`).join("")}</div>`:""}</div>`;
+  }
+
+  // ── EMPTY STATE ──
+  if(!hasData&&!act.length) h+=`<div class="cd empty"><div style="font-size:32px;margin-bottom:12px;opacity:.15">⊞</div><div style="font-size:15px;font-weight:600;margin-bottom:6px">No companies yet</div><div style="font-size:13px;color:var(--t3);max-width:420px;margin:0 auto;line-height:1.5">Add companies one at a time to simulate scraping, or click <strong>Import JSON</strong> to paste your scraper output.</div></div>`;
+  else if(!hasData&&act.length>0) h+=`<div class="cd" style="padding:48px 40px;text-align:center">${spin("#2563EB",20)}<div style="font-size:14px;font-weight:600;margin-top:14px">Scraping in progress…</div></div>`;
+
+  // ── DATA VIEWS ──
+  if(hasData){
+    if(view==="table")h+=renderTable();
+    else h+=renderPerf();
+  }
+
+  if(results.length||jobs.length) h+=`<div style="margin-top:28px;padding-top:14px;border-top:1px solid var(--bd);display:flex;justify-content:space-between"><span class="mono" style="font-size:11px;color:var(--t3)">${results.filter(r=>r.status==="complete").length} complete · ${results.filter(r=>r.status==="partial").length} partial · ${results.filter(r=>r.status==="failed").length} failed${act.length?" · "+act.length+" running":""}</span><span style="font-size:11px;color:var(--t3)">In-memory · resets on refresh</span></div>`;
+
+  document.getElementById("app").innerHTML=h;
+  const inp=document.getElementById("ci");if(inp&&document.activeElement?.tagName!=="BUTTON"&&document.activeElement?.tagName!=="TEXTAREA")inp.focus();
+}
+function doAdd(){const i=document.getElementById("ci");if(i&&i.value.trim()){addCompany(i.value);i.value=""}}
+render();
+</script>
+</body>
+</html>

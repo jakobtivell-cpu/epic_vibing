@@ -1,219 +1,835 @@
 {
-    "AZN.ST": "AstraZeneca PLC",
+    "AZN.ST": {
+        "name": "AstraZeneca PLC",
+        "irPage": "https://www.astrazeneca.com/investor-relations.html",
+        "candidateDomains": [
+            "https://www.astrazeneca.com"
+        ]
+    },
     "ABB.ST": "ABB Ltd",
-    "INVE-A.ST": { "name": "Investor AB (publ)", "orgNumber": "556013-8449" },
-    "INVE-B.ST": { "name": "Investor AB (publ)", "orgNumber": "556013-8449" },
+    "INVE-A.ST": {
+        "name": "Investor AB (publ)",
+        "orgNumber": "556013-8449",
+        "irPage": "https://www.investorab.com/en/investors",
+        "candidateDomains": [
+            "https://www.investorab.com"
+        ]
+    },
+    "INVE-B.ST": {
+        "name": "Investor AB (publ)",
+        "orgNumber": "556013-8449",
+        "irPage": "https://www.investorab.com/en/investors",
+        "candidateDomains": [
+            "https://www.investorab.com"
+        ]
+    },
     "ATCO-A.ST": {
         "name": "Atlas Copco AB (publ)",
-        "candidateDomains": ["https://www.atcogroup.com", "https://www.atlascopco.com"]
+        "candidateDomains": [
+            "https://www.atcogroup.com",
+            "https://www.atlascopco.com"
+        ],
+        "irPage": "https://www.atlascopco.com/en/investors"
     },
     "ATCO-B.ST": {
         "name": "Atlas Copco AB (publ)",
-        "candidateDomains": ["https://www.atcogroup.com", "https://www.atlascopco.com"]
+        "candidateDomains": [
+            "https://www.atcogroup.com",
+            "https://www.atlascopco.com"
+        ],
+        "irPage": "https://www.atlascopco.com/en/investors"
     },
     "VOLV-A.ST": {
         "name": "AB Volvo (publ)",
         "orgNumber": "556012-5790",
-        "candidateDomains": ["https://www.volvogroup.com"]
+        "candidateDomains": [
+            "https://www.volvogroup.com"
+        ],
+        "irPage": "https://www.volvogroup.com/en/investors.html"
     },
     "VOLV-B.ST": {
         "name": "AB Volvo (publ)",
         "orgNumber": "556012-5790",
-        "candidateDomains": ["https://www.volvogroup.com"]
+        "candidateDomains": [
+            "https://www.volvogroup.com"
+        ],
+        "irPage": "https://www.volvogroup.com/en/investors.html"
     },
-    "NDA-SE.ST": "Nordea Bank Abp",
+    "NDA-SE.ST": {
+        "name": "Nordea Bank Abp",
+        "irPage": "https://www.nordea.com/en/investor-relations",
+        "candidateDomains": [
+            "https://www.nordea.com"
+        ]
+    },
     "SAND.ST": {
         "name": "Sandvik AB (publ)",
         "orgNumber": "556098-4739",
-        "candidateDomains": ["https://www.home.sandvik"]
+        "candidateDomains": [
+            "https://www.home.sandvik"
+        ],
+        "irPage": "https://www.home.sandvik/en/investors"
     },
     "NOKIA-SEK.ST": "Nokia Oyj",
     "DNBO.ST": "DNB Bank ASA",
-    "ASSA-B.ST": "ASSA ABLOY AB (publ)",
-    "SWED-A.ST": "Swedbank AB (publ)",
+    "ASSA-B.ST": {
+        "name": "ASSA ABLOY AB (publ)",
+        "irPage": "https://www.assaabloy.com/group/en/investors",
+        "candidateDomains": [
+            "https://www.assaabloy.com"
+        ]
+    },
+    "SWED-A.ST": {
+        "name": "Swedbank AB (publ)",
+        "irPage": "https://www.swedbank.com/investor-relations",
+        "candidateDomains": [
+            "https://www.swedbank.com"
+        ]
+    },
     "ERIC-A.ST": {
         "name": "Telefonaktiebolaget LM Ericsson (publ)",
         "orgNumber": "556016-0680",
-        "candidateDomains": ["https://www.ericsson.com"]
+        "candidateDomains": [
+            "https://www.ericsson.com"
+        ],
+        "irPage": "https://www.ericsson.com/en/investors"
     },
     "ERIC-B.ST": {
         "name": "Telefonaktiebolaget LM Ericsson (publ)",
         "orgNumber": "556016-0680",
-        "candidateDomains": ["https://www.ericsson.com"]
+        "candidateDomains": [
+            "https://www.ericsson.com"
+        ],
+        "irPage": "https://www.ericsson.com/en/investors"
     },
     "KOGO.ST": "Kongsberg Gruppen ASA",
-    "SAAB-B.ST": "Saab AB (publ)",
-    "SEB-A.ST": { "name": "Skandinaviska Enskilda Banken AB (publ)", "orgNumber": "502032-9081" },
-    "SEB-C.ST": { "name": "Skandinaviska Enskilda Banken AB (publ)", "orgNumber": "502032-9081" },
-    "EQT.ST": "EQT AB (publ)",
+    "SAAB-B.ST": {
+        "name": "Saab AB (publ)",
+        "irPage": "https://www.saab.com/investors/",
+        "candidateDomains": [
+            "https://www.saab.com"
+        ]
+    },
+    "SEB-A.ST": {
+        "name": "Skandinaviska Enskilda Banken AB (publ)",
+        "orgNumber": "502032-9081",
+        "irPage": "https://www.sebgroup.com/investor-relations",
+        "candidateDomains": [
+            "https://www.sebgroup.com"
+        ]
+    },
+    "SEB-C.ST": {
+        "name": "Skandinaviska Enskilda Banken AB (publ)",
+        "orgNumber": "502032-9081",
+        "irPage": "https://www.sebgroup.com/investor-relations",
+        "candidateDomains": [
+            "https://www.sebgroup.com"
+        ]
+    },
+    "EQT.ST": {
+        "name": "EQT AB (publ)",
+        "irPage": "https://eqtgroup.com/investors/",
+        "candidateDomains": [
+            "https://eqtgroup.com"
+        ]
+    },
     "HM-B.ST": {
         "name": "H & M Hennes & Mauritz AB (publ)",
         "orgNumber": "556042-7220",
-        "candidateDomains": ["https://hmgroup.com"]
+        "candidateDomains": [
+            "https://hmgroup.com"
+        ],
+        "irPage": "https://hmgroup.com/investors/"
     },
-    "EPI-A.ST": "Epiroc AB (publ)",
-    "EPI-B.ST": "Epiroc AB (publ)",
+    "EPI-A.ST": {
+        "name": "Epiroc AB (publ)",
+        "irPage": "https://www.epirocgroup.com/en/investors",
+        "candidateDomains": [
+            "https://www.epirocgroup.com"
+        ]
+    },
+    "EPI-B.ST": {
+        "name": "Epiroc AB (publ)",
+        "irPage": "https://www.epirocgroup.com/en/investors",
+        "candidateDomains": [
+            "https://www.epirocgroup.com"
+        ]
+    },
     "SAMPO-SEK.ST": "Sampo Oyj",
-    "SHB-A.ST": "Svenska Handelsbanken AB (publ)",
-    "SHB-B.ST": "Svenska Handelsbanken AB (publ)",
+    "SHB-A.ST": {
+        "name": "Svenska Handelsbanken AB (publ)",
+        "irPage": "https://www.handelsbanken.com/en/investor-relations",
+        "candidateDomains": [
+            "https://www.handelsbanken.com"
+        ]
+    },
+    "SHB-B.ST": {
+        "name": "Svenska Handelsbanken AB (publ)",
+        "irPage": "https://www.handelsbanken.com/en/investor-relations",
+        "candidateDomains": [
+            "https://www.handelsbanken.com"
+        ]
+    },
     "HEXA-B.ST": {
         "name": "Hexagon AB (publ)",
-        "candidateDomains": ["https://hexagon.com", "https://investors.hexagon.com"]
+        "candidateDomains": [
+            "https://hexagon.com",
+            "https://investors.hexagon.com"
+        ],
+        "irPage": "https://hexagon.com/en/investors"
     },
     "ALFA.ST": {
         "name": "Alfa Laval AB (publ)",
         "orgNumber": "556587-8054",
-        "candidateDomains": ["https://www.alfalaval.com"]
+        "candidateDomains": [
+            "https://www.alfalaval.com"
+        ],
+        "irPage": "https://www.alfalaval.com/en/investors/"
     },
-    "LUMI.ST": "Lundin Mining Corporation",
+    "LUMI.ST": {
+        "name": "Lundin Mining Corporation",
+        "irPage": "https://www.lundinmining.com/investors/",
+        "candidateDomains": [
+            "https://www.lundinmining.com"
+        ]
+    },
     "INDU-A.ST": {
         "name": "AB Industrivärden (publ)",
         "orgNumber": "556043-4200",
-        "candidateDomains": ["https://www.industrivarden.se"]
+        "candidateDomains": [
+            "https://www.industrivarden.se"
+        ],
+        "irPage": "https://www.industrivarden.se/en/investors"
     },
     "INDU-C.ST": {
         "name": "AB Industrivärden (publ)",
         "orgNumber": "556043-4200",
-        "candidateDomains": ["https://www.industrivarden.se"]
+        "candidateDomains": [
+            "https://www.industrivarden.se"
+        ],
+        "irPage": "https://www.industrivarden.se/en/investors"
     },
     "TELIA.ST": {
         "name": "Telia Company AB (publ)",
         "orgNumber": "556103-4249",
-        "candidateDomains": ["teliacompany.com"]
+        "candidateDomains": [
+            "teliacompany.com"
+        ],
+        "irPage": "https://www.teliacompany.com/en/investors"
     },
     "LUG.ST": "Lundin Gold Inc.",
     "8TRA.ST": "Traton SE",
     "ESSITY-A.ST": {
         "name": "Essity AB (publ)",
         "orgNumber": "556325-5511",
-        "candidateDomains": ["https://www.essity.com"]
+        "candidateDomains": [
+            "https://www.essity.com"
+        ],
+        "irPage": "https://www.essity.com/en/investors/"
     },
     "ESSITY-B.ST": {
         "name": "Essity AB (publ)",
         "orgNumber": "556325-5511",
-        "candidateDomains": ["https://www.essity.com"]
+        "candidateDomains": [
+            "https://www.essity.com"
+        ],
+        "irPage": "https://www.essity.com/en/investors/"
     },
-    "BOL.ST": "Boliden AB (publ)",
-    "SOBI.ST": "Swedish Orphan Biovitrum AB (publ)",
+    "BOL.ST": {
+        "name": "Boliden AB (publ)",
+        "irPage": "https://www.boliden.com/en/investors/",
+        "candidateDomains": [
+            "https://www.boliden.com"
+        ]
+    },
+    "SOBI.ST": {
+        "name": "Swedish Orphan Biovitrum AB (publ)",
+        "irPage": "https://www.sobi.com/investors/",
+        "candidateDomains": [
+            "https://www.sobi.com"
+        ]
+    },
     "TEL2-A.ST": "Tele2 AB (publ)",
     "TEL2-B.ST": "Tele2 AB (publ)",
-    "LUND-B.ST": "L E Lundbergföretagen AB (publ)",
-    "LATO-B.ST": "Investment AB Latour (publ)",
-    "LIFCO-B.ST": "Lifco AB (publ)",
-    "EVO.ST": "Evolution AB (publ)",
+    "LUND-B.ST": {
+        "name": "L E Lundbergföretagen AB (publ)",
+        "irPage": "https://www.lundbergforetagen.se/en/investors/",
+        "candidateDomains": [
+            "https://www.lundbergforetagen.se"
+        ]
+    },
+    "LATO-B.ST": {
+        "name": "Investment AB Latour (publ)",
+        "irPage": "https://www.latour.se/en/investors/",
+        "candidateDomains": [
+            "https://www.latour.se"
+        ]
+    },
+    "LIFCO-B.ST": {
+        "name": "Lifco AB (publ)",
+        "irPage": "https://www.lifco.com/en/investors/",
+        "candidateDomains": [
+            "https://www.lifco.com"
+        ]
+    },
+    "EVO.ST": {
+        "name": "Evolution AB (publ)",
+        "irPage": "https://www.evolution.com/investors/",
+        "candidateDomains": [
+            "https://www.evolution.com"
+        ]
+    },
     "VSURE.ST": "Verisure plc",
-    "SKF-A.ST": "AB SKF (publ)",
-    "SKF-B.ST": "AB SKF (publ)",
-    "SKA-B.ST": "Skanska AB (publ)",
-    "SECU-B.ST": "Securitas AB (publ)",
-    "ADDT-B.ST": "Addtech AB (publ.)",
-    "STE-A.ST": "Stora Enso Oyj",
-    "STE-R.ST": "Stora Enso Oyj",
-    "TREL-B.ST": "Trelleborg AB (publ)",
-    "NIBE-B.ST": "NIBE Industrier AB (publ)",
-    "INDT.ST": "Indutrade AB (publ)",
-    "SCA-A.ST": "Svenska Cellulosa Aktiebolaget SCA (publ)",
-    "SCA-B.ST": "Svenska Cellulosa Aktiebolaget SCA (publ)",
+    "SKF-A.ST": {
+        "name": "AB SKF (publ)",
+        "irPage": "https://www.skf.com/group/investors",
+        "candidateDomains": [
+            "https://www.skf.com"
+        ]
+    },
+    "SKF-B.ST": {
+        "name": "AB SKF (publ)",
+        "irPage": "https://www.skf.com/group/investors",
+        "candidateDomains": [
+            "https://www.skf.com"
+        ]
+    },
+    "SKA-B.ST": {
+        "name": "Skanska AB (publ)",
+        "irPage": "https://www.skanska.com/investors",
+        "candidateDomains": [
+            "https://www.skanska.com"
+        ]
+    },
+    "SECU-B.ST": {
+        "name": "Securitas AB (publ)",
+        "irPage": "https://www.securitas.com/en/investors/",
+        "candidateDomains": [
+            "https://www.securitas.com"
+        ]
+    },
+    "ADDT-B.ST": {
+        "name": "Addtech AB (publ.)",
+        "irPage": "https://www.addtech.com/investors",
+        "candidateDomains": [
+            "https://www.addtech.com"
+        ]
+    },
+    "STE-A.ST": {
+        "name": "Stora Enso Oyj",
+        "irPage": "https://www.storaenso.com/en/investors",
+        "candidateDomains": [
+            "https://www.storaenso.com"
+        ]
+    },
+    "STE-R.ST": {
+        "name": "Stora Enso Oyj",
+        "irPage": "https://www.storaenso.com/en/investors",
+        "candidateDomains": [
+            "https://www.storaenso.com"
+        ]
+    },
+    "TREL-B.ST": {
+        "name": "Trelleborg AB (publ)",
+        "irPage": "https://www.trelleborg.com/en/investors",
+        "candidateDomains": [
+            "https://www.trelleborg.com"
+        ]
+    },
+    "NIBE-B.ST": {
+        "name": "NIBE Industrier AB (publ)",
+        "irPage": "https://www.nibe.com/en/investors",
+        "candidateDomains": [
+            "https://www.nibe.com"
+        ]
+    },
+    "INDT.ST": {
+        "name": "Indutrade AB (publ)",
+        "irPage": "https://www.indutrade.com/en/investors/",
+        "candidateDomains": [
+            "https://www.indutrade.com"
+        ]
+    },
+    "SCA-A.ST": {
+        "name": "Svenska Cellulosa Aktiebolaget SCA (publ)",
+        "irPage": "https://www.sca.com/en/investors/",
+        "candidateDomains": [
+            "https://www.sca.com"
+        ]
+    },
+    "SCA-B.ST": {
+        "name": "Svenska Cellulosa Aktiebolaget SCA (publ)",
+        "irPage": "https://www.sca.com/en/investors/",
+        "candidateDomains": [
+            "https://www.sca.com"
+        ]
+    },
     "FROO.ST": "Frontline plc",
-    "SAVE.ST": "Nordnet AB (publ)",
-    "SSAB-A.ST": "SSAB AB (publ)",
-    "SSAB-B.ST": "SSAB AB (publ)",
+    "SAVE.ST": {
+        "name": "Nordnet AB (publ)",
+        "irPage": "https://www.nordnet.se/en/about-nordnet/investor-relations",
+        "candidateDomains": [
+            "https://www.nordnet.se"
+        ]
+    },
+    "SSAB-A.ST": {
+        "name": "SSAB AB (publ)",
+        "irPage": "https://www.ssab.com/en/investors/",
+        "candidateDomains": [
+            "https://www.ssab.com"
+        ]
+    },
+    "SSAB-B.ST": {
+        "name": "SSAB AB (publ)",
+        "irPage": "https://www.ssab.com/en/investors/",
+        "candidateDomains": [
+            "https://www.ssab.com"
+        ]
+    },
     "ALIV-SDB.ST": "Autoliv, Inc.",
-    "AXFO.ST": "Axfood AB (publ)",
-    "BALD-B.ST": "Fastighets AB Balder (publ)",
-    "BEIJ-B.ST": "Beijer Ref AB (publ)",
-    "VOLCAR-B.ST": "Volvo Car AB (publ.)",
-    "SAGA-A.ST": "AB Sagax (publ)",
-    "SAGA-B.ST": "AB Sagax (publ)",
-    "SAGA-D.ST": "AB Sagax (publ)",
-    "AAK.ST": "AAK AB (publ.)",
-    "AZA.ST": "Avanza Bank Holding AB (publ)",
-    "CAST.ST": "Castellum AB (publ)",
-    "GETI-B.ST": "Getinge AB (publ)",
-    "HOLM-A.ST": "Holmen AB (publ)",
-    "HOLM-B.ST": "Holmen AB (publ)",
-    "SWEC-A.ST": "Sweco AB (publ)",
-    "SWEC-B.ST": "Sweco AB (publ)",
-    "SECT-B.ST": "Sectra AB (publ)",
+    "AXFO.ST": {
+        "name": "Axfood AB (publ)",
+        "irPage": "https://www.axfood.com/en/investors/",
+        "candidateDomains": [
+            "https://www.axfood.com"
+        ]
+    },
+    "BALD-B.ST": {
+        "name": "Fastighets AB Balder (publ)",
+        "irPage": "https://www.balder.se/en/investor-relations/",
+        "candidateDomains": [
+            "https://www.balder.se"
+        ]
+    },
+    "BEIJ-B.ST": {
+        "name": "Beijer Ref AB (publ)",
+        "irPage": "https://www.beijerref.com/en/investors",
+        "candidateDomains": [
+            "https://www.beijerref.com"
+        ]
+    },
+    "VOLCAR-B.ST": {
+        "name": "Volvo Car AB (publ.)",
+        "irPage": "https://www.volvocars.com/investors",
+        "candidateDomains": [
+            "https://www.volvocars.com"
+        ]
+    },
+    "SAGA-A.ST": {
+        "name": "AB Sagax (publ)",
+        "irPage": "https://www.sagax.se/en/investors/",
+        "candidateDomains": [
+            "https://www.sagax.se"
+        ]
+    },
+    "SAGA-B.ST": {
+        "name": "AB Sagax (publ)",
+        "irPage": "https://www.sagax.se/en/investors/",
+        "candidateDomains": [
+            "https://www.sagax.se"
+        ]
+    },
+    "SAGA-D.ST": {
+        "name": "AB Sagax (publ)",
+        "irPage": "https://www.sagax.se/en/investors/",
+        "candidateDomains": [
+            "https://www.sagax.se"
+        ]
+    },
+    "AAK.ST": {
+        "name": "AAK AB (publ.)",
+        "irPage": "https://www.aak.com/en/investors/",
+        "candidateDomains": [
+            "https://www.aak.com"
+        ]
+    },
+    "AZA.ST": {
+        "name": "Avanza Bank Holding AB (publ)",
+        "irPage": "https://investors.avanza.se/en/",
+        "candidateDomains": [
+            "https://investors.avanza.se"
+        ]
+    },
+    "CAST.ST": {
+        "name": "Castellum AB (publ)",
+        "irPage": "https://www.castellum.com/en/investors/",
+        "candidateDomains": [
+            "https://www.castellum.com"
+        ]
+    },
+    "GETI-B.ST": {
+        "name": "Getinge AB (publ)",
+        "irPage": "https://www.getinge.com/en/investors",
+        "candidateDomains": [
+            "https://www.getinge.com"
+        ]
+    },
+    "HOLM-A.ST": {
+        "name": "Holmen AB (publ)",
+        "irPage": "https://www.holmen.com/en/investors/",
+        "candidateDomains": [
+            "https://www.holmen.com"
+        ]
+    },
+    "HOLM-B.ST": {
+        "name": "Holmen AB (publ)",
+        "irPage": "https://www.holmen.com/en/investors/",
+        "candidateDomains": [
+            "https://www.holmen.com"
+        ]
+    },
+    "SWEC-A.ST": {
+        "name": "Sweco AB (publ)",
+        "irPage": "https://www.sweco.com/en/investors/",
+        "candidateDomains": [
+            "https://www.sweco.com"
+        ]
+    },
+    "SWEC-B.ST": {
+        "name": "Sweco AB (publ)",
+        "irPage": "https://www.sweco.com/en/investors/",
+        "candidateDomains": [
+            "https://www.sweco.com"
+        ]
+    },
+    "SECT-B.ST": {
+        "name": "Sectra AB (publ)",
+        "irPage": "https://investor.sectra.com/en/",
+        "candidateDomains": [
+            "https://investor.sectra.com"
+        ]
+    },
     "MYCR.ST": "Mycronic AB (publ)",
     "LAGR-B.ST": "Lagercrantz Group AB (publ)",
     "NOBA.ST": "NOBA Bank Group AB (publ)",
     "CMBTOO.ST": "Cmb.Tech NV",
-    "PNDX-B.ST": "Pandox AB (publ)",
-    "CATE.ST": "Catena AB (publ)",
-    "LOOMIS.ST": "Loomis AB (publ)",
+    "PNDX-B.ST": {
+        "name": "Pandox AB (publ)",
+        "irPage": "https://www.pandox.se/en/investors/",
+        "candidateDomains": [
+            "https://www.pandox.se"
+        ]
+    },
+    "CATE.ST": {
+        "name": "Catena AB (publ)",
+        "irPage": "https://www.catena.se/en/investors/",
+        "candidateDomains": [
+            "https://www.catena.se"
+        ]
+    },
+    "LOOMIS.ST": {
+        "name": "Loomis AB (publ)",
+        "irPage": "https://www.loomis.com/en/investors/",
+        "candidateDomains": [
+            "https://www.loomis.com"
+        ]
+    },
     "MTRS.ST": "Munters Group AB (publ)",
-    "BIOA-B.ST": "BioArctic AB (publ)",
+    "BIOA-B.ST": {
+        "name": "BioArctic AB (publ)",
+        "irPage": "https://www.bioarctic.com/en/investors",
+        "candidateDomains": [
+            "https://www.bioarctic.com"
+        ]
+    },
     "CAMX.ST": "Camurus AB (publ)",
     "MCOV-B.ST": "Medicover AB (publ)",
     "IPCO.ST": "International Petroleum Corporation",
-    "PEAB-B.ST": "Peab AB (publ)",
-    "WIHL.ST": "Wihlborgs Fastigheter AB (publ)",
-    "WALL-B.ST": "Wallenstam AB (publ)",
+    "PEAB-B.ST": {
+        "name": "Peab AB (publ)",
+        "irPage": "https://www.peab.com/investors",
+        "candidateDomains": [
+            "https://www.peab.com"
+        ]
+    },
+    "WIHL.ST": {
+        "name": "Wihlborgs Fastigheter AB (publ)",
+        "irPage": "https://www.wihlborgs.se/en/investors/",
+        "candidateDomains": [
+            "https://www.wihlborgs.se"
+        ]
+    },
+    "WALL-B.ST": {
+        "name": "Wallenstam AB (publ)",
+        "irPage": "https://www.wallenstam.se/en/investors/",
+        "candidateDomains": [
+            "https://www.wallenstam.se"
+        ]
+    },
     "ASKER.ST": "Asker Healthcare Group AB",
     "HAUTOO.ST": "Höegh Autoliners ASA",
     "ASMDEE-B.ST": "Asmodee Group AB (publ)",
-    "HPOL-B.ST": "HEXPOL AB (publ)",
+    "HPOL-B.ST": {
+        "name": "HEXPOL AB (publ)",
+        "irPage": "https://www.hexpol.com/en/investors/",
+        "candidateDomains": [
+            "https://www.hexpol.com"
+        ]
+    },
     "TIETOS.ST": "Tieto Oyj",
-    "FABG.ST": "Fabege AB (publ)",
-    "CLAS-B.ST": "Clas Ohlson AB (publ)",
-    "HUFV-A.ST": "Hufvudstaden AB (publ)",
-    "THULE.ST": "Thule Group AB (publ)",
+    "FABG.ST": {
+        "name": "Fabege AB (publ)",
+        "irPage": "https://www.fabege.com/en/investors/",
+        "candidateDomains": [
+            "https://www.fabege.com"
+        ]
+    },
+    "CLAS-B.ST": {
+        "name": "Clas Ohlson AB (publ)",
+        "irPage": "https://www.clasohlson.com/en/investor-relations/",
+        "candidateDomains": [
+            "https://www.clasohlson.com"
+        ]
+    },
+    "HUFV-A.ST": {
+        "name": "Hufvudstaden AB (publ)",
+        "irPage": "https://www.hufvudstaden.com/en/investor-relations",
+        "candidateDomains": [
+            "https://www.hufvudstaden.com"
+        ]
+    },
+    "THULE.ST": {
+        "name": "Thule Group AB (publ)",
+        "irPage": "https://www.thulegroup.com/en/investors",
+        "candidateDomains": [
+            "https://www.thulegroup.com"
+        ]
+    },
     "ROKO-B.ST": "Röko AB (publ)",
     "HMS.ST": "HMS Networks AB (publ)",
-    "HUSQ-A.ST": "Husqvarna AB (publ)",
-    "HUSQ-B.ST": "Husqvarna AB (publ)",
-    "EKTA-B.ST": "Elekta AB (publ)",
+    "HUSQ-A.ST": {
+        "name": "Husqvarna AB (publ)",
+        "irPage": "https://www.husqvarnagroup.com/en/investors",
+        "candidateDomains": [
+            "https://www.husqvarnagroup.com"
+        ]
+    },
+    "HUSQ-B.ST": {
+        "name": "Husqvarna AB (publ)",
+        "irPage": "https://www.husqvarnagroup.com/en/investors",
+        "candidateDomains": [
+            "https://www.husqvarnagroup.com"
+        ]
+    },
+    "EKTA-B.ST": {
+        "name": "Elekta AB (publ)",
+        "irPage": "https://www.elekta.com/investors/",
+        "candidateDomains": [
+            "https://www.elekta.com"
+        ]
+    },
     "BRAV.ST": "Bravida Holding AB (publ)",
-    "NCC-A.ST": "NCC AB (publ)",
-    "NCC-B.ST": "NCC AB (publ)",
+    "NCC-A.ST": {
+        "name": "NCC AB (publ)",
+        "irPage": "https://www.ncc.com/en/investors/",
+        "candidateDomains": [
+            "https://www.ncc.com"
+        ]
+    },
+    "NCC-B.ST": {
+        "name": "NCC AB (publ)",
+        "irPage": "https://www.ncc.com/en/investors/",
+        "candidateDomains": [
+            "https://www.ncc.com"
+        ]
+    },
     "BUFAB.ST": "Bufab AB (publ)",
     "SHOT.ST": "Scandic Hotels Group AB (publ)",
-    "ATRLJ-B.ST": "Atrium Ljungberg AB (publ)",
+    "ATRLJ-B.ST": {
+        "name": "Atrium Ljungberg AB (publ)",
+        "irPage": "https://www.atriumljungberg.se/en/investors/",
+        "candidateDomains": [
+            "https://www.atriumljungberg.se"
+        ]
+    },
     "SINCH.ST": "Sinch AB (publ)",
     "ARION-SDB.ST": "Arion banki hf.",
-    "ALLEI.ST": "Alleima AB (publ)",
-    "BILL.ST": "Billerud AB (publ)",
-    "OEM-B.ST": "OEM International AB (publ)",
+    "ALLEI.ST": {
+        "name": "Alleima AB (publ)",
+        "irPage": "https://www.alleima.com/investors",
+        "candidateDomains": [
+            "https://www.alleima.com"
+        ]
+    },
+    "BILL.ST": {
+        "name": "Billerud AB (publ)",
+        "irPage": "https://www.billerud.com/investors/",
+        "candidateDomains": [
+            "https://www.billerud.com"
+        ]
+    },
+    "OEM-B.ST": {
+        "name": "OEM International AB (publ)",
+        "irPage": "https://www.oem.se/en/investors/",
+        "candidateDomains": [
+            "https://www.oem.se"
+        ]
+    },
     "HACK.ST": "Hacksaw AB (publ)",
     "INTEA-B.ST": "Intea Fastigheter AB (publ)",
     "INTEA-D.ST": "Intea Fastigheter AB (publ)",
-    "AQ.ST": "AQ Group AB (publ)",
-    "ALIF-B.ST": "AddLife AB (publ)",
-    "ELUX-A.ST": "AB Electrolux (publ)",
-    "ELUX-B.ST": "AB Electrolux (publ)",
-    "BURE.ST": "Bure Equity AB (publ)",
-    "GRNG.ST": "Gränges AB (publ)",
-    "NP3.ST": "NP3 Fastigheter AB (publ)",
-    "CLA-B.ST": "Cloetta AB (publ)",
+    "AQ.ST": {
+        "name": "AQ Group AB (publ)",
+        "irPage": "https://www.aqg.se/en/investors/",
+        "candidateDomains": [
+            "https://www.aqg.se"
+        ]
+    },
+    "ALIF-B.ST": {
+        "name": "AddLife AB (publ)",
+        "irPage": "https://www.add.life/en/investors",
+        "candidateDomains": [
+            "https://www.add.life"
+        ]
+    },
+    "ELUX-A.ST": {
+        "name": "AB Electrolux (publ)",
+        "irPage": "https://www.electroluxgroup.com/en/investors",
+        "candidateDomains": [
+            "https://www.electroluxgroup.com"
+        ]
+    },
+    "ELUX-B.ST": {
+        "name": "AB Electrolux (publ)",
+        "irPage": "https://www.electroluxgroup.com/en/investors",
+        "candidateDomains": [
+            "https://www.electroluxgroup.com"
+        ]
+    },
+    "BURE.ST": {
+        "name": "Bure Equity AB (publ)",
+        "irPage": "https://www.bure.se/en/investors",
+        "candidateDomains": [
+            "https://www.bure.se"
+        ]
+    },
+    "GRNG.ST": {
+        "name": "Gränges AB (publ)",
+        "irPage": "https://www.granges.com/en/investors",
+        "candidateDomains": [
+            "https://www.granges.com"
+        ]
+    },
+    "NP3.ST": {
+        "name": "NP3 Fastigheter AB (publ)",
+        "irPage": "https://www.np3fastigheter.se/en/investors/",
+        "candidateDomains": [
+            "https://www.np3fastigheter.se"
+        ]
+    },
+    "CLA-B.ST": {
+        "name": "Cloetta AB (publ)",
+        "irPage": "https://www.cloetta.com/investors/",
+        "candidateDomains": [
+            "https://www.cloetta.com"
+        ]
+    },
     "VIMIAN.ST": "Vimian Group AB (publ)",
     "ATT.ST": "Attendo AB (publ)",
     "STOR-B.ST": "Storskogen Group AB (publ)",
     "BEIA-B.ST": "Beijer Alma AB (publ)",
-    "SYSR.ST": "Systemair AB (publ)",
+    "SYSR.ST": {
+        "name": "Systemair AB (publ)",
+        "irPage": "https://www.systemair.com/en/investors",
+        "candidateDomains": [
+            "https://www.systemair.com"
+        ]
+    },
     "BWEO.ST": "BW Energy Limited",
     "EPRO-B.ST": "Electrolux Professional AB (publ)",
-    "RUSTA.ST": "Rusta AB (publ)",
-    "BONEX.ST": "Bonesupport Holding AB (publ)",
-    "KINV-A.ST": "Kinnevik AB",
-    "KINV-B.ST": "Kinnevik AB",
-    "AFRY.ST": "Afry AB",
-    "BETS-B.ST": "Betsson AB (publ)",
+    "RUSTA.ST": {
+        "name": "Rusta AB (publ)",
+        "irPage": "https://www.rusta.com/en/investor-relations",
+        "candidateDomains": [
+            "https://www.rusta.com"
+        ]
+    },
+    "BONEX.ST": {
+        "name": "Bonesupport Holding AB (publ)",
+        "irPage": "https://www.bonesupport.com/investors/",
+        "candidateDomains": [
+            "https://www.bonesupport.com"
+        ]
+    },
+    "KINV-A.ST": {
+        "name": "Kinnevik AB",
+        "irPage": "https://www.kinnevik.com/investors/",
+        "candidateDomains": [
+            "https://www.kinnevik.com"
+        ]
+    },
+    "KINV-B.ST": {
+        "name": "Kinnevik AB",
+        "irPage": "https://www.kinnevik.com/investors/",
+        "candidateDomains": [
+            "https://www.kinnevik.com"
+        ]
+    },
+    "AFRY.ST": {
+        "name": "Afry AB",
+        "irPage": "https://afry.com/en/investors",
+        "candidateDomains": [
+            "https://afry.com"
+        ]
+    },
+    "BETS-B.ST": {
+        "name": "Betsson AB (publ)",
+        "irPage": "https://www.betssonab.com/en/investor-relations",
+        "candidateDomains": [
+            "https://www.betssonab.com"
+        ]
+    },
     "NYF.ST": "Nyfosa AB (publ)",
     "HOFI.ST": "Hoist Finance AB (publ)",
-    "NOLA-B.ST": "Nolato AB (publ)",
-    "PDX.ST": "Paradox Interactive AB (publ)",
+    "NOLA-B.ST": {
+        "name": "Nolato AB (publ)",
+        "irPage": "https://www.nolato.com/en/investors/",
+        "candidateDomains": [
+            "https://www.nolato.com"
+        ]
+    },
+    "PDX.ST": {
+        "name": "Paradox Interactive AB (publ)",
+        "irPage": "https://www.paradoxinteractive.com/investors/",
+        "candidateDomains": [
+            "https://www.paradoxinteractive.com"
+        ]
+    },
     "SKIS-B.ST": "SkiStar AB (publ)",
-    "NEWA-B.ST": "New Wave Group AB (publ)",
-    "VITR.ST": "Vitrolife AB (publ)",
+    "NEWA-B.ST": {
+        "name": "New Wave Group AB (publ)",
+        "irPage": "https://www.newwavegroup.com/en/investors/",
+        "candidateDomains": [
+            "https://www.newwavegroup.com"
+        ]
+    },
+    "VITR.ST": {
+        "name": "Vitrolife AB (publ)",
+        "irPage": "https://www.vitrolife.com/investors/",
+        "candidateDomains": [
+            "https://www.vitrolife.com"
+        ]
+    },
     "IVSO.ST": "Invisio AB (publ)",
     "CIBUS.ST": "Cibus Nordic Real Estate AB (publ)",
     "BIOG-B.ST": "BioGaia AB (publ)",
     "LIAB.ST": "Lindab International AB (publ)",
     "BILI-A.ST": "Bilia AB (publ)",
     "ALIG.ST": "Alimak Group AB (publ)",
-    "MTG-A.ST": "Modern Times Group MTG AB",
-    "MTG-B.ST": "Modern Times Group MTG AB",
+    "MTG-A.ST": {
+        "name": "Modern Times Group MTG AB",
+        "irPage": "https://www.mtg.com/investors",
+        "candidateDomains": [
+            "https://www.mtg.com"
+        ]
+    },
+    "MTG-B.ST": {
+        "name": "Modern Times Group MTG AB",
+        "irPage": "https://www.mtg.com/investors",
+        "candidateDomains": [
+            "https://www.mtg.com"
+        ]
+    },
     "NCAB.ST": "NCAB Group AB (publ)",
     "AMBEA.ST": "Ambea AB (publ)"
-  }
+}

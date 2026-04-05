@@ -39,6 +39,8 @@ export interface EntityProfile {
   hostnameRejectRules: HostnameRejectRule[];
   /** Merged candidate domains from CompanyProfile */
   seedCandidateDomains: string[];
+  /** Optional extra match strings from CompanyProfile (brands, alternate names). */
+  knownAliases: string[];
 }
 
 interface ConfusionFile {
@@ -138,6 +140,7 @@ export function buildEntityProfile(company: CompanyProfile): EntityProfile {
   const ambiguityLevel = computeAmbiguity(legalName, company.ticker);
   const hostnameRejectRules = loadHostnameRejectRules();
   const seedCandidateDomains = [...(company.candidateDomains ?? [])];
+  const knownAliases = [...(company.knownAliases ?? [])].map((s) => s.trim()).filter(Boolean);
 
   log.info(
     `[entity] searchAnchor="${searchAnchor}" ambiguity=${ambiguityLevel} tokens=[${distinctiveTokens.slice(0, 5).join(', ')}]`,
@@ -156,6 +159,7 @@ export function buildEntityProfile(company: CompanyProfile): EntityProfile {
     reportingModelHint: reportingHintFromLegal(legalName),
     hostnameRejectRules,
     seedCandidateDomains,
+    knownAliases,
   };
 }
 

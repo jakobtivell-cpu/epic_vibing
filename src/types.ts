@@ -28,6 +28,8 @@ export interface CompanyProfile {
   orgNumber?: string;
   /** Multiple candidate domains to try for IR discovery (populated at runtime). */
   candidateDomains?: string[];
+  /** Extra strings that may appear in filings (brands, local names) — used for PDF entity check. */
+  knownAliases?: string[];
 }
 
 /** The 4 core financial fields the assignment requires. */

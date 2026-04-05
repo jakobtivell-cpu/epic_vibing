@@ -6,6 +6,7 @@
 import { ReportCandidate } from '../types';
 import type { EntityProfile } from '../entity/entity-profile';
 import { shouldRejectReportUrl } from '../entity/entity-profile';
+import { candidateUrlsOrTextImpliesStaleReport } from './report-candidate-stale-year';
 
 /**
  * Drop candidates that fail hostname collision rules, then re-rank by score.
@@ -17,6 +18,7 @@ export function filterAndRankReportCandidatesForEntity(
   const kept: ReportCandidate[] = [];
   for (const c of candidates) {
     if (shouldRejectReportUrl(c.url, profile)) continue;
+    if (candidateUrlsOrTextImpliesStaleReport(c.url, c.text)) continue;
     kept.push({
       ...c,
       score: c.score + entityUrlScoreAdjustment(c.url, profile),

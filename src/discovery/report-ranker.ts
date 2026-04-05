@@ -17,6 +17,7 @@ import {
 import { fetchPage, headCheck } from '../utils/http-client';
 import { resolveUrl, getPath } from '../utils/url-helpers';
 import { createLogger } from '../utils/logger';
+import { candidateUrlsOrTextImpliesStaleReport } from './report-candidate-stale-year';
 
 const log = createLogger('report-ranker');
 
@@ -150,6 +151,8 @@ function scoreLinkCandidate(
 
   const text = $(el).text().trim().replace(/\s+/g, ' ');
   if (!text && !href) return null;
+
+  if (candidateUrlsOrTextImpliesStaleReport(resolved, text)) return null;
 
   let score = 0;
 

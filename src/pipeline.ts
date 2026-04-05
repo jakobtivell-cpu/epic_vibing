@@ -227,11 +227,6 @@ async function tryPdfCandidates(
   const slug = entity.displayName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
   const verifyName = entity.searchAnchor;
   const ranked = filterAndRankReportCandidatesForEntity(candidates, entity);
-  const entityOpts = {
-    orgNumber: entity.orgNumber,
-    ambiguityHigh: entity.ambiguityLevel === 'high',
-    distinctiveTokens: entity.distinctiveTokens,
-  };
 
   const hostFailureCount = new Map<string, number>();
   const hostConsecutiveForbidden = new Map<string, number>();
@@ -319,12 +314,13 @@ async function tryPdfCandidates(
       continue;
     }
 
-    const entityCheck = verifyEntityInPdf(pdfText.text, verifyName, shortNames, entityOpts);
+    const entityCheck = verifyEntityInPdf(pdfText.text, entity);
     if (!entityCheck.passed) {
       log.warn(`[${entity.displayName}] Entity check FAILED for candidate #${displayIndex} — likely wrong company's report`);
       notes.push(`Rejected ${stepName} candidate #${displayIndex} "${candidate.url}" — entity check failed (wrong company)`);
       continue;
     }
+    notes.push(`Entity verified (${entityCheck.matchedTerm})`);
 
     for (const w of gateResult.contentCheck!.warnings) {
       notes.push(w);

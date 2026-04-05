@@ -4,6 +4,8 @@
 // company-specific configuration required.
 // ---------------------------------------------------------------------------
 
+import type { EntityProfile } from '../entity/entity-profile';
+import { deriveShortNames } from '../discovery/search-discovery';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('post-check');
@@ -14,94 +16,176 @@ const log = createLogger('post-check');
 
 export interface EntityCheckResult {
   passed: boolean;
+  /** Provenance label + matched text, e.g. `legal:stripped:Sandvik` or `org:digits:5560427220` */
   matchedTerm: string | null;
-  checkedRegion: 'first-2-pages';
+  checkedRegion: 'first-6000-chars';
 }
 
-/** Optional high-trust anchors from entity profiling (org number, ambiguity). */
-export interface EntityVerifyOptions {
-  orgNumber?: string | null;
-  /** When true, short ticker aliases alone are not sufficient evidence */
-  ambiguityHigh?: boolean;
-  distinctiveTokens?: string[];
+const ENTITY_CHECK_CHARS = 6_000;
+
+function stripLegalSuffixes(name: string): string {
+  return name
+    .replace(/\s*\(publ\)\s*$/i, '')
+    .replace(/\s+AB\s*\(publ\)\s*$/i, '')
+    .replace(/\s+AB\s*$/i, '')
+    .trim();
 }
 
-const FIRST_TWO_PAGES_CHARS = 6_000;
+/** Collapse patterns like "H & M" → "H&M" (word & word only, repeated). */
+function collapseAmpersandBrands(name: string): string {
+  let out = name;
+  let prev = '';
+  while (out !== prev) {
+    prev = out;
+    out = out.replace(/\b(\w)\s+&\s+(\w)\b/gi, '$1&$2');
+  }
+  return out.trim();
+}
 
 function regionHasDistinctiveToken(region: string, tokens?: string[]): boolean {
   if (!tokens?.length) return false;
   return tokens.some((t) => t.length >= 5 && region.includes(t.toLowerCase()));
 }
 
+function buildTickerVariants(ticker: string | null): string[] {
+  if (!ticker) return [];
+  let t = ticker.trim().toUpperCase().replace(/\s+/g, '');
+  if (!t) return [];
+  t = t.replace(/\.ST$/i, '');
+  const out: string[] = [];
+  const m = t.match(/^(.+)-([A-Z])$/);
+  if (m) {
+    const base = m[1];
+    const cls = m[2];
+    out.push(`${base} ${cls}`, `${base}-${cls}`);
+    if (base.length >= 2) out.push(base);
+  } else {
+    out.push(t);
+  }
+  return out;
+}
+
+export interface EntityCheckTerm {
+  needle: string;
+  provenance: string;
+}
+
 /**
- * Check if the company name (or any of its short-name variants) appears
- * in the first ~2 pages of the PDF text.
- * @param additionalNames  Extra names to check (e.g. ticker-derived short names).
- * @param opts  Org number match, ambiguity gating for short aliases.
+ * All substrings to search for in the first ~6000 chars of PDF text (order =
+ * priority for logging; first hit wins in {@link verifyEntityInPdf}).
  */
-export function verifyEntityInPdf(
-  text: string,
-  companyName: string,
-  additionalNames?: string[],
-  opts?: EntityVerifyOptions,
-): EntityCheckResult {
-  const region = text.substring(0, FIRST_TWO_PAGES_CHARS).toLowerCase();
-  const nameLower = companyName.toLowerCase();
+export function buildEntityCheckTerms(entity: EntityProfile): EntityCheckTerm[] {
+  const terms: EntityCheckTerm[] = [];
+  const seen = new Set<string>();
 
-  if (opts?.orgNumber) {
-    const digits = opts.orgNumber.replace(/\D/g, '');
-    if (digits.length >= 8 && region.includes(digits)) {
-      return { passed: true, matchedTerm: `org:${digits}`, checkedRegion: 'first-2-pages' };
+  const add = (raw: string, provenance: string) => {
+    const s = raw.trim();
+    if (s.length < 2) return;
+    const key = s.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    terms.push({ needle: s, provenance });
+  };
+
+  const legal = entity.legalName.trim();
+  add(legal, 'legal:full');
+
+  const stripped = stripLegalSuffixes(legal);
+  if (stripped.toLowerCase() !== legal.toLowerCase()) {
+    add(stripped, 'legal:stripped-suffix');
+  }
+
+  const collapsedStrip = collapseAmpersandBrands(stripped);
+  if (collapsedStrip.toLowerCase() !== stripped.toLowerCase()) {
+    add(collapsedStrip, 'legal:collapsed-spacing');
+  }
+
+  const collapsedFull = collapseAmpersandBrands(legal);
+  if (
+    collapsedFull.toLowerCase() !== legal.toLowerCase() &&
+    collapsedFull.toLowerCase() !== collapsedStrip.toLowerCase()
+  ) {
+    add(collapsedFull, 'legal:collapsed-full');
+  }
+
+  const display = entity.displayName.trim();
+  if (display.toLowerCase() !== legal.toLowerCase()) {
+    add(display, 'display:name');
+  }
+
+  const anchor = entity.searchAnchor.trim();
+  if (anchor.toLowerCase() !== legal.toLowerCase() && anchor.toLowerCase() !== display.toLowerCase()) {
+    add(anchor, 'search:anchor');
+  }
+
+  const dt = entity.distinctiveTokens;
+  if (dt.length > 0) {
+    const brand = dt[dt.length - 1];
+    if (brand.length >= 3) {
+      add(brand, 'entity:brand-token');
+    }
+  }
+  for (const tok of dt) {
+    if (tok.length >= 3) {
+      add(tok, 'entity:distinctive-token');
     }
   }
 
-  if (nameLower.length >= 2 && region.includes(nameLower)) {
-    return { passed: true, matchedTerm: companyName, checkedRegion: 'first-2-pages' };
+  for (const sn of deriveShortNames(entity.searchAnchor, entity.ticker ?? undefined)) {
+    add(sn, 'derived:short-name');
   }
 
-  // Try individual words of the company name (handles "Atlas Copco" → "atlas" + "copco")
-  const words = nameLower.split(/\s+/).filter((w) => w.length > 2);
-  const skipWords = new Set(['ab', 'publ', 'the', 'and', 'och']);
-  const meaningfulWords = words.filter((w) => !skipWords.has(w));
+  for (const tv of buildTickerVariants(entity.ticker)) {
+    add(tv, 'ticker:variant');
+  }
 
-  if (meaningfulWords.length > 1) {
-    const allWordsFound = meaningfulWords.every((w) => region.includes(w));
-    if (allWordsFound) {
-      if (
-        opts?.ambiguityHigh &&
-        !regionHasDistinctiveToken(region, opts.distinctiveTokens) &&
-        meaningfulWords.every((w) => w.length < 6)
-      ) {
-        /* all short words — weak for high-ambiguity entity */
-      } else {
-        return { passed: true, matchedTerm: companyName, checkedRegion: 'first-2-pages' };
-      }
+  if (entity.orgNumber) {
+    const compact = entity.orgNumber.replace(/\s/g, '');
+    add(compact, 'org:formatted');
+    const digits = entity.orgNumber.replace(/\D/g, '');
+    if (digits.length >= 8) {
+      add(digits, 'org:digits');
     }
   }
 
-  // Try additional short names (e.g. ticker base "SEB", stripped legal name)
-  // Only use short names (< 5 chars) if no distinctive words exist in the
-  // legal name. This prevents "SEB" from matching "Groupe SEB" when we're
-  // actually looking for "Skandinaviska Enskilda Banken".
-  const hasDistinctiveWords = meaningfulWords.some((w) => w.length >= 6);
+  for (const al of entity.knownAliases) {
+    add(al, 'alias:known');
+  }
 
-  if (additionalNames) {
-    for (const alt of additionalNames) {
-      const altLower = alt.toLowerCase();
-      if (altLower.length < 5 && (hasDistinctiveWords || opts?.ambiguityHigh)) {
-        // Skip very short names when we have distinctive words or entity is high-ambiguity
-        continue;
-      }
-      if (altLower.length >= 2 && region.includes(altLower)) {
-        return { passed: true, matchedTerm: alt, checkedRegion: 'first-2-pages' };
-      }
-    }
+  return terms;
+}
+
+/**
+ * Short / ticker-like needles on a high-ambiguity entity must co-occur with a
+ * distinctive token in the same region (reduces false positives vs other groups).
+ */
+function weakNeedleAllowed(region: string, needleLower: string, entity: EntityProfile): boolean {
+  if (needleLower.length >= 5) return true;
+  if (entity.ambiguityLevel !== 'high') return true;
+  return regionHasDistinctiveToken(region, entity.distinctiveTokens);
+}
+
+/**
+ * Pass if any generated entity term appears in the first 6000 characters.
+ */
+export function verifyEntityInPdf(text: string, entity: EntityProfile): EntityCheckResult {
+  const region = text.substring(0, ENTITY_CHECK_CHARS).toLowerCase();
+  const terms = buildEntityCheckTerms(entity);
+
+  for (const { needle, provenance } of terms) {
+    const n = needle.toLowerCase();
+    if (!region.includes(n)) continue;
+    if (!weakNeedleAllowed(region, n, entity)) continue;
+
+    const label = `${provenance}:${needle}`;
+    log.info(`[${entity.displayName}] Entity check OK — matched ${label}`);
+    return { passed: true, matchedTerm: label, checkedRegion: 'first-6000-chars' };
   }
 
   log.warn(
-    `[${companyName}] Entity check FAILED — "${companyName}" not found in first ${FIRST_TWO_PAGES_CHARS} chars`,
+    `[${entity.displayName}] Entity check FAILED — no entity term matched in first ${ENTITY_CHECK_CHARS} chars`,
   );
-  return { passed: false, matchedTerm: null, checkedRegion: 'first-2-pages' };
+  return { passed: false, matchedTerm: null, checkedRegion: 'first-6000-chars' };
 }
 
 // ---------------------------------------------------------------------------

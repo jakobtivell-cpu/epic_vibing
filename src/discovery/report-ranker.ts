@@ -646,6 +646,37 @@ function searchSitemapForReport(
   return null;
 }
 
+// ---- Quick single-page probe (no sub-pages, no fallback ladder) ----
+
+export interface DiscoverAnnualReportOptions {
+  /**
+   * When true, do not run deep sub-page crawl, direct URL patterns, or sitemap
+   * if the primary IR scan finds no PDFs — lets the pipeline try Playwright first.
+   */
+  skipFallbackLadder?: boolean;
+}
+
+/**
+ * One HTTP fetch + link scan only — for publication-hub probes without the full
+ * discoverAnnualReport cost (no sub-page fan-out, no fallback ladder).
+ */
+export async function quickScanPdfCandidatesOnPage(
+  companyName: string,
+  url: string,
+): Promise<ReportCandidate[]> {
+  log.debug(`[${companyName}] Quick PDF probe: ${url}`);
+  const result = await fetchPage(url, 10_000);
+  if (!result.ok) return [];
+
+  const candidates = scanPageForCandidates(
+    result.response.data,
+    result.response.finalUrl,
+    'corpus-hub',
+  );
+
+  return candidates.filter((c) => isPdfUrl(c.url) || c.score >= 25);
+}
+
 // ---- Main entry point ----
 
 /**
@@ -657,6 +688,7 @@ export async function discoverAnnualReport(
   companyName: string,
   website: string,
   irPageUrl: string,
+  options?: DiscoverAnnualReportOptions,
 ): Promise<StageResult<ReportDiscoveryResult>> {
   const startTime = Date.now();
   const visitedPages = new Set<string>();
@@ -756,7 +788,7 @@ export async function discoverAnnualReport(
   // --- Internal fallback ladder (only when primary path found zero PDFs) ---
   let fallbackWinner: ReportCandidate | null = null;
 
-  if (finalCandidates.length === 0) {
+  if (finalCandidates.length === 0 && !options?.skipFallbackLadder) {
     log.info(`[${companyName}] Primary scan found no PDFs — starting fallback ladder`);
 
     const deepCrawlCandidates = await fallbackDeepSubPageCrawl(
@@ -789,6 +821,10 @@ export async function discoverAnnualReport(
     } else {
       log.warn(`[${companyName}] All Cheerio-based fallbacks exhausted — no PDFs found`);
     }
+  } else if (finalCandidates.length === 0 && options?.skipFallbackLadder) {
+    log.info(
+      `[${companyName}] Primary scan found no PDFs — skipping internal fallback ladder (pipeline will try Playwright / deep scan later)`,
+    );
   }
 
   // --- Final result assembly ---

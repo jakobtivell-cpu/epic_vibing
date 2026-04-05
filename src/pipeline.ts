@@ -39,7 +39,7 @@ import {
   type SearchDiscoveryResult,
 } from './discovery/search-discovery';
 import { discoverIrPage } from './discovery/ir-finder';
-import { discoverAnnualReport } from './discovery/report-ranker';
+import { discoverAnnualReport, quickScanPdfCandidatesOnPage } from './discovery/report-ranker';
 import { collectPublicationHubUrls } from './discovery/report-corpus';
 import { filterAndRankReportCandidatesForEntity } from './discovery/candidate-ranking';
 import { tryPlaywrightFallback } from './discovery/playwright-fallback';
@@ -600,21 +600,26 @@ async function processCompany(
       if (!irPageUrl) irPageUrl = domainIrUrl;
       irResult = domainIrResult;
 
-      const domainReportResult = await discoverAnnualReport(entity.searchAnchor, domain, domainIrUrl);
+      const domainReportResult = await discoverAnnualReport(
+        entity.searchAnchor,
+        domain,
+        domainIrUrl,
+        { skipFallbackLadder: true },
+      );
 
       let mergedCandidates = [...(domainReportResult.value?.allCandidates ?? [])];
       const hubUrls = await collectPublicationHubUrls(domain);
-      state.notes.push(`REPORT_CORPUS: ${hubUrls.length} publication hub(s) probed on ${domain}`);
+      state.notes.push(
+        `REPORT_CORPUS: ${hubUrls.length} publication hub(s) quick-probed (single-page scan only) on ${domain}`,
+      );
       const seenCand = new Set(mergedCandidates.map((c) => c.url));
       for (const hub of hubUrls) {
         if (hub.replace(/\/$/, '') === domainIrUrl.replace(/\/$/, '')) continue;
-        const extra = await discoverAnnualReport(entity.searchAnchor, domain, hub);
-        if (extra.value?.allCandidates?.length) {
-          for (const c of extra.value.allCandidates) {
-            if (!seenCand.has(c.url)) {
-              mergedCandidates.push(c);
-              seenCand.add(c.url);
-            }
+        const quick = await quickScanPdfCandidatesOnPage(entity.searchAnchor, hub);
+        for (const c of quick) {
+          if (!seenCand.has(c.url)) {
+            mergedCandidates.push(c);
+            seenCand.add(c.url);
           }
         }
       }
@@ -671,6 +676,46 @@ async function processCompany(
             applyPdfSuccess(state, pwAttempt, 'playwright');
           } else {
             state.notes.push(...pwAttempt.notes);
+          }
+        }
+      }
+
+      if (!state.extractionResult.value) {
+        log.info(`[${name}] Cheerio deep fallback (full ladder once) on primary IR: ${domainIrUrl}`);
+        const deepReport = await discoverAnnualReport(entity.searchAnchor, domain, domainIrUrl);
+        if (deepReport.value?.allCandidates?.length) {
+          reportResult = deepReport.status === 'success' ? deepReport : reportResult;
+          const rankedDeep = filterAndRankReportCandidatesForEntity(
+            deepReport.value.allCandidates,
+            entity,
+          );
+          const irHighDeep = rankedDeep.filter((c) => c.score >= 10);
+          const irLowDeep = rankedDeep.filter((c) => c.score < 10);
+
+          if (irHighDeep.length > 0) {
+            const cheerioDeep = await tryPdfCandidates(
+              irHighDeep, entity, force, 'cheerio',
+              MAX_CANDIDATES_PER_STEP, shortNames,
+              CIRCUIT_PER_HOST,
+            );
+            if (cheerioDeep.success) {
+              applyPdfSuccess(state, cheerioDeep, 'cheerio');
+              return;
+            }
+            state.notes.push(...cheerioDeep.notes);
+          }
+
+          if (!state.extractionResult.value && irLowDeep.length > 0) {
+            const cheerioLowDeep = await tryPdfCandidates(
+              irLowDeep, entity, force, 'cheerio',
+              MAX_CANDIDATES_PER_STEP, shortNames,
+              CIRCUIT_PER_HOST,
+            );
+            if (cheerioLowDeep.success) {
+              applyPdfSuccess(state, cheerioLowDeep, 'cheerio');
+              return;
+            }
+            state.notes.push(...cheerioLowDeep.notes);
           }
         }
       }

@@ -35,8 +35,8 @@ export const EUR_MILLIONS_TO_MSEK_APPROX = 11.25;
 export const MAX_CANDIDATES_PER_STEP = 5;
 
 /**
- * Browser-like User-Agent — corporate CDNs often block generic/bot strings.
- * Used for HTML and HEAD; binary downloads add further Accept / Referer headers.
+ * Legacy default User-Agent (exported for tooling). Outbound HTTP uses a per-domain
+ * rotating pool in `src/utils/http-client.ts`.
  */
 export const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';

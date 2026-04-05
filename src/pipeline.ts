@@ -55,6 +55,7 @@ import {
   crossValidateFiscalYear,
 } from './validation';
 import { createLogger } from './utils/logger';
+import { isHostBrowserMode } from './utils/http-client';
 import { toAbsoluteHttpUrl } from './utils/url-helpers';
 import { runChallengerTrack } from './challenger';
 
@@ -742,6 +743,10 @@ async function processCompany(
 
   const processDomain = async (domain: string): Promise<void> => {
     log.info(`[${name}] --- Trying domain: ${domain} ---`);
+    const hk = originHostKey(domain);
+    if (hk && isHostBrowserMode(hk)) {
+      log.info(`[${name}] HTTP for ${hk}: using browser transport (first Axios response was 403)`);
+    }
 
     const domainIrResult = await discoverIrPage(entity.searchAnchor, domain);
 

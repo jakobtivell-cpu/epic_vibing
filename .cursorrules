@@ -44,3 +44,13 @@ DISCOVERY PHILOSOPHY:
 - The goal is to find every listed Large Cap company's annual report. A "failed" status for a company that publishes an annual report is a bug, not an acceptable outcome.
 - Discovery should work even when the company website cannot be resolved. Direct PDF search via Bing, multi-domain resolution, allabolag org-number lookup, and external financial data sources are all valid fallback paths.
 - When orgNumber is available in the company profile, always try the allabolag direct URL (https://www.allabolag.se/{orgNumberWithoutHyphen}) — do not rely on name search.
+DOMAIN RESOLUTION:
+- The pipeline must resolve any Swedish Large Cap company to its correct website from just a name or ticker. It must NOT depend on pre-configured domains to function.
+- ticker.json candidateDomains are a performance cache, not a dependency. The pipeline must work without them.
+- When inferring domains from company names, use the legal/brand name (e.g., "Ericsson" from "Telefonaktiebolaget LM Ericsson"), not the ticker slug (e.g., "ERIC"). Ticker slugs produce wrong domains (eric.se, hmb.se, telepathy.com).
+- Validate inferred domains: reject any domain that doesn't contain a recognizable word from the company name.
+- When domain inference fails, fall back to search engine queries ("{company name} investor relations site") before giving up.
+
+GIT DISCIPLINE:
+- Commit after every successful fix: git add -A && git commit -m "fix: [description]"
+- Never leave working code uncommitted across sessions.

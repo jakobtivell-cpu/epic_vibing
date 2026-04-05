@@ -7,6 +7,7 @@ import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
 import {
   USER_AGENT,
   REQUEST_TIMEOUT_MS,
+  PDF_DOWNLOAD_TIMEOUT_MS,
   MAX_RETRIES,
   SAME_DOMAIN_DELAY_MS,
   DOMAIN_DELAY_JITTER_MS,
@@ -251,10 +252,10 @@ export type BinaryHttpResult = BinaryResult | BinaryError;
 
 export async function fetchBinary(
   url: string,
-  timeoutMs: number = REQUEST_TIMEOUT_MS * 3,
+  timeoutMs: number = PDF_DOWNLOAD_TIMEOUT_MS,
 ): Promise<BinaryHttpResult> {
   const domain = extractDomain(url);
-  const maxAttempts = 2;
+  const maxAttempts = 4;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     await rateLimitDelay(domain);
@@ -265,7 +266,8 @@ export async function fetchBinary(
         responseType: 'arraybuffer',
         timeout: timeoutMs,
         headers: { 'User-Agent': USER_AGENT },
-        maxRedirects: 5,
+        maxRedirects: 10,
+        validateStatus: (s) => s >= 200 && s < 400,
       });
 
       const contentType =

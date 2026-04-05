@@ -18,20 +18,42 @@ export interface EntityCheckResult {
   checkedRegion: 'first-2-pages';
 }
 
+/** Optional high-trust anchors from entity profiling (org number, ambiguity). */
+export interface EntityVerifyOptions {
+  orgNumber?: string | null;
+  /** When true, short ticker aliases alone are not sufficient evidence */
+  ambiguityHigh?: boolean;
+  distinctiveTokens?: string[];
+}
+
 const FIRST_TWO_PAGES_CHARS = 6_000;
+
+function regionHasDistinctiveToken(region: string, tokens?: string[]): boolean {
+  if (!tokens?.length) return false;
+  return tokens.some((t) => t.length >= 5 && region.includes(t.toLowerCase()));
+}
 
 /**
  * Check if the company name (or any of its short-name variants) appears
  * in the first ~2 pages of the PDF text.
  * @param additionalNames  Extra names to check (e.g. ticker-derived short names).
+ * @param opts  Org number match, ambiguity gating for short aliases.
  */
 export function verifyEntityInPdf(
   text: string,
   companyName: string,
   additionalNames?: string[],
+  opts?: EntityVerifyOptions,
 ): EntityCheckResult {
   const region = text.substring(0, FIRST_TWO_PAGES_CHARS).toLowerCase();
   const nameLower = companyName.toLowerCase();
+
+  if (opts?.orgNumber) {
+    const digits = opts.orgNumber.replace(/\D/g, '');
+    if (digits.length >= 8 && region.includes(digits)) {
+      return { passed: true, matchedTerm: `org:${digits}`, checkedRegion: 'first-2-pages' };
+    }
+  }
 
   if (nameLower.length >= 2 && region.includes(nameLower)) {
     return { passed: true, matchedTerm: companyName, checkedRegion: 'first-2-pages' };
@@ -45,7 +67,15 @@ export function verifyEntityInPdf(
   if (meaningfulWords.length > 1) {
     const allWordsFound = meaningfulWords.every((w) => region.includes(w));
     if (allWordsFound) {
-      return { passed: true, matchedTerm: companyName, checkedRegion: 'first-2-pages' };
+      if (
+        opts?.ambiguityHigh &&
+        !regionHasDistinctiveToken(region, opts.distinctiveTokens) &&
+        meaningfulWords.every((w) => w.length < 6)
+      ) {
+        /* all short words — weak for high-ambiguity entity */
+      } else {
+        return { passed: true, matchedTerm: companyName, checkedRegion: 'first-2-pages' };
+      }
     }
   }
 
@@ -58,9 +88,8 @@ export function verifyEntityInPdf(
   if (additionalNames) {
     for (const alt of additionalNames) {
       const altLower = alt.toLowerCase();
-      if (altLower.length < 5 && hasDistinctiveWords) {
-        // Skip very short names when we have distinctive words available
-        // — they're too ambiguous (e.g. "SEB" matches "Groupe SEB")
+      if (altLower.length < 5 && (hasDistinctiveWords || opts?.ambiguityHigh)) {
+        // Skip very short names when we have distinctive words or entity is high-ambiguity
         continue;
       }
       if (altLower.length >= 2 && region.includes(altLower)) {

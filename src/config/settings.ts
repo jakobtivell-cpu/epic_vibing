@@ -22,6 +22,15 @@ export const MAX_RETRIES = 3;
 /** HTTP request timeout in milliseconds. */
 export const REQUEST_TIMEOUT_MS = 30_000;
 
+/** PDF binary GET timeout (large annual reports, slow CDNs). */
+export const PDF_DOWNLOAD_TIMEOUT_MS = 120_000;
+
+/**
+ * When income statements use EUR millions, convert to MSEK with this approximate rate.
+ * Official reports often footnote the average rate; this is a generic fallback.
+ */
+export const EUR_MILLIONS_TO_MSEK_APPROX = 11.25;
+
 /** Maximum PDF candidates to try per fallback step before advancing. */
 export const MAX_CANDIDATES_PER_STEP = 5;
 

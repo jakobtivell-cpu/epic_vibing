@@ -8,9 +8,23 @@
 // ---------------------------------------------------------------------------
 
 import { ExtractedData, CompanyType } from '../types';
-import { INDUSTRIAL_LABELS, BANK_LABELS, INVESTMENT_LABELS, LabelSet } from './labels';
+import type { ReportingModelHint } from '../entity/entity-profile';
+import {
+  INDUSTRIAL_LABELS,
+  BANK_LABELS,
+  BANK_REVENUE_LABELS_PRIMARY,
+  BANK_EBIT_LABELS_PRIMARY,
+  INVESTMENT_LABELS,
+  LabelSet,
+} from './labels';
 import { createLogger } from '../utils/logger';
+import { EUR_MILLIONS_TO_MSEK_APPROX } from '../config/settings';
 import { parseNumber } from './number-parse';
+import {
+  classifyRevenueMapping,
+  classifyEbitMapping,
+  formatMappingNotes,
+} from './schema-mapping';
 
 const log = createLogger('field-extract');
 
@@ -66,8 +80,11 @@ function getLabels(companyType: CompanyType): LabelSet {
 const BANK_SIGNALS = [
   /\bnet\s+interest\s+income\b/i,
   /\bcredit\s+loss/i,
+  /\bkreditförlust/i,
   /\bräntenetto\b/i,
   /\btotal\s+operating\s+income\b/i,
+  /\btotala\s+rörelseintäkter\b/i,
+  /\bsumma\s+rörelseintäkter\b/i,
   /\blending\b/i,
   /\bdeposits?\s+from\s+(the\s+)?public\b/i,
   /\bcapital\s+adequacy\b/i,
@@ -99,9 +116,21 @@ export function detectCompanyType(text: string): CompanyType {
   }
 
   if (investScore >= 3) return 'investment_company';
-  if (bankScore >= 3) return 'bank';
+  if (bankScore >= 2) return 'bank';
 
   return 'industrial';
+}
+
+/** Merge legal-name hint with PDF signals — hint wins for bank / investment when set. */
+export function resolveCompanyTypeForExtraction(
+  text: string,
+  hint?: ReportingModelHint | null,
+): CompanyType {
+  const detected = detectCompanyType(text);
+  if (hint === 'bank') return 'bank';
+  if (hint === 'investment_company') return 'investment_company';
+  if (hint === 'industrial') return 'industrial';
+  return detected;
 }
 
 // ---------------------------------------------------------------------------
@@ -230,11 +259,11 @@ function isSkippableCell(cell: string): boolean {
 // Unit-context detection — many reports state "amounts in MSEK" once
 // ---------------------------------------------------------------------------
 
-type UnitContext = 'msek' | 'bsek' | 'ksek' | 'sek';
+type UnitContext = 'msek' | 'bsek' | 'ksek' | 'sek' | 'eur_m';
 
 function detectUnitContext(text: string): UnitContext | null {
   const lower = text.toLowerCase();
-
+  // SEK units before EUR — many PDFs mention EUR/FX in notes but report in SEK.
   if (
     /amounts?\s+in\s+sek\s*m\b/.test(lower) ||
     /belopp\s+i\s+msek\b/.test(lower) ||
@@ -248,7 +277,11 @@ function detectUnitContext(text: string): UnitContext | null {
   if (
     /amounts?\s+in\s+sek\s*bn\b/.test(lower) ||
     /amounts?\s+in\s+bsek\b/.test(lower) ||
-    /\bmdkr\b/.test(lower)
+    /\bmdkr\b/.test(lower) ||
+    /\bamounts?\s+in\s+sek\s*billion/i.test(lower) ||
+    /\bbillion\s+sek\b/.test(lower) ||
+    /\bmiljard(er)?\s+sek\b/.test(lower) ||
+    /\bsek\s*billion\b/.test(lower)
   ) {
     return 'bsek';
   }
@@ -259,6 +292,19 @@ function detectUnitContext(text: string): UnitContext | null {
     /\btkr\b/.test(lower)
   ) {
     return 'ksek';
+  }
+
+  if (
+    /\bamounts?\s+in\s+(?:million\s+)?euros?\b/.test(lower) ||
+    /\bin\s+eur\s*m\b/.test(lower) ||
+    /\bmeur\b/.test(lower) ||
+    /\b€\s*m\b/.test(lower) ||
+    /\beur\s*million/i.test(lower) ||
+    /\bmillion\s+euros?\b/.test(lower) ||
+    /\belopp\s+i\s+meur\b/.test(lower) ||
+    /\bi\s+miljoner\s+euro\b/.test(lower)
+  ) {
+    return 'eur_m';
   }
 
   return null;
@@ -305,6 +351,8 @@ function normalizeToMsek(value: number, unit: UnitContext | null): number {
       return value / 1_000;
     case 'sek':
       return value / 1_000_000;
+    case 'eur_m':
+      return Math.round(value * EUR_MILLIONS_TO_MSEK_APPROX);
     case 'msek':
     default:
       return value;
@@ -367,6 +415,22 @@ interface NumberSearchOpts {
   maxValue?: number;
   exclusions?: RegExp[];
 }
+
+/** Wider rows / offsets help bank PDFs where tables flow into long single lines. */
+interface ScanConstraints {
+  table: { maxLineLen: number; maxLabelOffset: number };
+  loose: { maxLineLen: number; maxLabelOffset: number };
+}
+
+const SCAN_DEFAULT: ScanConstraints = {
+  table: { maxLineLen: 150, maxLabelOffset: 60 },
+  loose: { maxLineLen: 500, maxLabelOffset: 200 },
+};
+
+const SCAN_BANK: ScanConstraints = {
+  table: { maxLineLen: 300, maxLabelOffset: 140 },
+  loose: { maxLineLen: 900, maxLabelOffset: 360 },
+};
 
 /** Internal match record with provenance data. */
 interface NumberMatch {
@@ -487,17 +551,12 @@ function findLabeledNumber(
   labels: string[],
   opts: NumberSearchOpts = {},
   pickContext?: NumberPickContext,
+  scan: ScanConstraints = SCAN_DEFAULT,
 ): NumberMatch | null {
-  const tableResult = scanForNumber(lines, labels, opts, {
-    maxLineLen: 150,
-    maxLabelOffset: 60,
-  }, pickContext);
+  const tableResult = scanForNumber(lines, labels, opts, scan.table, pickContext);
   if (tableResult !== null) return tableResult;
 
-  return scanForNumber(lines, labels, opts, {
-    maxLineLen: 500,
-    maxLabelOffset: 200,
-  }, pickContext);
+  return scanForNumber(lines, labels, opts, scan.loose, pickContext);
 }
 
 /**
@@ -509,6 +568,7 @@ function findFinancialNumber(
   labels: string[],
   opts: NumberSearchOpts = {},
   pick?: NumberPickContext,
+  scan: ScanConstraints = SCAN_DEFAULT,
 ): NumberMatch | null {
   const isSections = findIncomeStatementSections(lines);
 
@@ -516,7 +576,7 @@ function findFinancialNumber(
   if (isSections.length > 0) {
     for (const section of isSections) {
       const sectionLines = lines.slice(section.start, section.end);
-      const result = findLabeledNumber(sectionLines, labels, opts, pick);
+      const result = findLabeledNumber(sectionLines, labels, opts, pick, scan);
       if (result !== null) {
         result.lineIndex += section.start;
         result.context = 'income-statement';
@@ -534,7 +594,7 @@ function findFinancialNumber(
   if (highlightSections.length > 0) {
     for (const section of highlightSections) {
       const sectionLines = lines.slice(section.start, section.end);
-      const result = findLabeledNumber(sectionLines, labels, opts, pick);
+      const result = findLabeledNumber(sectionLines, labels, opts, pick, scan);
       if (result !== null) {
         result.lineIndex += section.start;
         result.context = 'highlights';
@@ -548,7 +608,14 @@ function findFinancialNumber(
   }
 
   // Fallback: general search, but skip matches inside segment sections
-  const allMatches = findAllLabeledNumbers(lines, labels, opts, pick);
+  const allMatches = findAllLabeledNumbers(
+    lines,
+    labels,
+    opts,
+    pick,
+    scan.loose.maxLineLen,
+    scan.loose.maxLabelOffset,
+  );
   const nonSegmentMatch = allMatches.find((m) => !isInSegmentSection(m.lineIndex, lines));
   if (nonSegmentMatch) {
     nonSegmentMatch.context = 'general';
@@ -568,6 +635,20 @@ function findFinancialNumber(
   }
 
   return null;
+}
+
+/** Try bank-specific (or other primary) labels first, then the full merged list. */
+function findFinancialNumberPhased(
+  lines: string[],
+  primaryLabels: string[],
+  allLabels: string[],
+  opts: NumberSearchOpts,
+  pick: NumberPickContext | undefined,
+  scan: ScanConstraints,
+): NumberMatch | null {
+  const primary = findFinancialNumber(lines, primaryLabels, opts, pick, scan);
+  if (primary !== null) return primary;
+  return findFinancialNumber(lines, allLabels, opts, pick, scan);
 }
 
 /**
@@ -644,6 +725,8 @@ function findAllLabeledNumbers(
   labels: string[],
   opts: NumberSearchOpts = {},
   pickContext?: NumberPickContext,
+  maxLineLen = 150,
+  maxLabelOffset = 60,
 ): NumberMatch[] {
   const results: NumberMatch[] = [];
   const { minValue = -Infinity, maxValue = Infinity, exclusions } = opts;
@@ -652,10 +735,10 @@ function findAllLabeledNumbers(
     const labelLower = label.toLowerCase();
 
     for (let i = 0; i < lines.length; i++) {
-      if (lines[i].length > 150) continue;
+      if (lines[i].length > maxLineLen) continue;
       const lineLower = lines[i].toLowerCase();
       const labelIdx = lineLower.indexOf(labelLower);
-      if (labelIdx < 0 || labelIdx > 60) continue;
+      if (labelIdx < 0 || labelIdx > maxLabelOffset) continue;
 
       if (labelIdx >= 6) {
         const before = lineLower.substring(Math.max(0, labelIdx - 6), labelIdx).trim();
@@ -888,6 +971,32 @@ function findManagementSections(lines: string[]): Array<{ start: number; end: nu
   return sections;
 }
 
+function isAgmOrVotingContext(block: string): boolean {
+  const l = block.toLowerCase();
+  return (
+    /\bagm\b/.test(l) ||
+    /annual\s+general\s+meeting/.test(l) ||
+    /extraordinary\s+general/.test(l) ||
+    /bolagsstämma|bolagsstamma/.test(l) ||
+    /\bkallelse\b/.test(l) ||
+    /postal\s+vote|postal\s+voting/.test(l) ||
+    /\bröstmaterial\b/.test(l) ||
+    /notice\s+of\s+(?:the\s+)?(?:annual|general)\s+meeting/.test(l) ||
+    /valberedningens\s+förslag/.test(l)
+  );
+}
+
+function isNominationElectionContext(block: string): boolean {
+  const l = block.toLowerCase();
+  return (
+    /\bproposal\b/.test(l) ||
+    /\bnomination\s+committee\b/.test(l) ||
+    /\belection\s+of\b/.test(l) ||
+    /\bvalberedning\b/.test(l) ||
+    /\bförslag\s+till\s+styrelsen\b/.test(l)
+  );
+}
+
 function lineDescribesFormerOrOtherCeo(line: string, labelIdx: number): boolean {
   const before = line.substring(0, labelIdx).toLowerCase();
   if (/\bformer\b/.test(before)) return true;
@@ -920,6 +1029,14 @@ function scanForCeo(
       const lineLower = lines[i].toLowerCase();
       const idx = lineLower.indexOf(labelLower);
       if (idx < 0) continue;
+
+      const ctxLo = Math.max(0, i - 2);
+      const ctxHi = Math.min(lines.length, i + 2);
+      const contextBlock = lines.slice(ctxLo, ctxHi).join(' ');
+      if (isAgmOrVotingContext(contextBlock) || isNominationElectionContext(contextBlock)) {
+        log.debug(`Skipping CEO in AGM/nomination context: "${lines[i].trim().substring(0, 90)}"`);
+        continue;
+      }
 
       if (lineContainsNonCeoRole(lines[i]) && !/\bceo\b/i.test(lines[i]) && !/\bvd\b/i.test(lines[i])) {
         continue;
@@ -1054,9 +1171,11 @@ export function extractFields(
   text: string,
   companyName: string,
   fallbackFiscalYear: number | null,
+  reportingModelHint?: ReportingModelHint | null,
 ): FieldExtractionResult {
-  const detectedType = detectCompanyType(text);
+  const detectedType = resolveCompanyTypeForExtraction(text, reportingModelHint);
   const labels = getLabels(detectedType);
+  const bankScan = detectedType === 'bank' ? SCAN_BANK : SCAN_DEFAULT;
   const lines = text
     .split(/\n/)
     .map((l) => l.trim())
@@ -1064,7 +1183,7 @@ export function extractFields(
   const notes: string[] = [];
 
   log.info(
-    `Extracting fields for ${companyName} (auto-detected: ${detectedType}) — ${lines.length} text lines`,
+    `Extracting fields for ${companyName} (type: ${detectedType}${reportingModelHint && reportingModelHint !== 'unspecified' ? `, hint=${reportingModelHint}` : ''}) — ${lines.length} text lines`,
   );
 
   const unitContext = detectUnitContext(text);
@@ -1090,11 +1209,25 @@ export function extractFields(
   if (detectedType === 'investment_company') {
     notes.push('Investment company — standard revenue/EBIT not applicable');
   } else {
+    const revMin = detectedType === 'bank' ? 50 : 100;
     if (detectedType === 'bank') {
-      notes.push('Bank — mapped from banking income statement terms');
+      revMatch = findFinancialNumberPhased(
+        lines,
+        BANK_REVENUE_LABELS_PRIMARY,
+        labels.revenue,
+        { minValue: revMin },
+        tablePickBase,
+        bankScan,
+      );
+    } else {
+      revMatch = findFinancialNumber(
+        lines,
+        labels.revenue,
+        { minValue: revMin },
+        tablePickBase,
+        SCAN_DEFAULT,
+      );
     }
-
-    revMatch = findFinancialNumber(lines, labels.revenue, { minValue: 100 }, tablePickBase);
     if (revMatch !== null) {
       const revUnit = revMatch.sectionRange
         ? detectSectionUnitContext(lines, revMatch.sectionRange.start, revMatch.sectionRange.end, unitContext)
@@ -1102,6 +1235,14 @@ export function extractFields(
       revenue = Math.round(normalizeToMsek(revMatch.value, revUnit));
       revProvenance = numMatchToProvenance(revMatch);
       log.info(`Revenue: ${revenue} MSEK`);
+      if (detectedType === 'bank') {
+        notes.push(`Bank — '${revMatch.label}' mapped to revenue_msek`);
+      }
+      if (revUnit === 'eur_m') {
+        notes.push(
+          `Revenue converted from EUR millions using approximate EUR/SEK ${EUR_MILLIONS_TO_MSEK_APPROX} — verify report footnote`,
+        );
+      }
     }
 
     // Cross-check: BSEK narrative mention provides an anchor when table extraction is dubious
@@ -1138,16 +1279,22 @@ export function extractFields(
       preferredFiscalYear: fallbackFiscalYear,
       revenueRawHintForEbit: revMatch !== null ? revMatch.value : null,
     };
-    const ebitMatch = findFinancialNumber(
-      lines,
-      labels.ebit,
-      {
-        minValue: -500_000,
-        maxValue: 500_000,
-        exclusions: EBIT_EXCLUSIONS,
-      },
-      ebitPick,
-    );
+    const ebitOpts: NumberSearchOpts = {
+      minValue: detectedType === 'bank' ? -1_000_000 : -500_000,
+      maxValue: detectedType === 'bank' ? 1_000_000 : 500_000,
+      exclusions: EBIT_EXCLUSIONS,
+    };
+    const ebitMatch =
+      detectedType === 'bank'
+        ? findFinancialNumberPhased(
+            lines,
+            BANK_EBIT_LABELS_PRIMARY,
+            labels.ebit,
+            ebitOpts,
+            ebitPick,
+            bankScan,
+          )
+        : findFinancialNumber(lines, labels.ebit, ebitOpts, ebitPick, SCAN_DEFAULT);
     if (ebitMatch !== null) {
       const ebitUnit = ebitMatch.sectionRange
         ? detectSectionUnitContext(lines, ebitMatch.sectionRange.start, ebitMatch.sectionRange.end, unitContext)
@@ -1155,6 +1302,14 @@ export function extractFields(
       ebit = Math.round(normalizeToMsek(ebitMatch.value, ebitUnit));
       ebitProvenance = numMatchToProvenance(ebitMatch);
       log.info(`EBIT: ${ebit} MSEK`);
+      if (detectedType === 'bank') {
+        notes.push(`Bank — '${ebitMatch.label}' mapped to ebit_msek`);
+      }
+      if (ebitUnit === 'eur_m') {
+        notes.push(
+          `EBIT converted from EUR millions using approximate EUR/SEK ${EUR_MILLIONS_TO_MSEK_APPROX} — verify report footnote`,
+        );
+      }
     } else {
       notes.push(`EBIT not found for ${companyName}`);
       log.warn(`EBIT not found for ${companyName}`);
@@ -1170,6 +1325,7 @@ export function extractFields(
       maxValue: 1_000_000,
     },
     tablePickBase,
+    detectedType === 'bank' ? bankScan : SCAN_DEFAULT,
   );
   let employees: number | null = null;
   if (empMatch !== null) {
@@ -1218,6 +1374,13 @@ export function extractFields(
   if (ebit !== null && fusedYearRe.test(String(ebit))) {
     notes.push(`EBIT ${ebit} discarded — fused year pattern detected`);
     ebit = null;
+  }
+
+  // Explicit assignment-schema mapping (native label → revenue_msek / ebit_msek)
+  if (detectedType !== 'investment_company' && (revProvenance || ebitProvenance)) {
+    const revMap = classifyRevenueMapping(detectedType, revProvenance?.matchedLabel ?? null);
+    const ebitMap = classifyEbitMapping(detectedType, ebitProvenance?.matchedLabel ?? null);
+    notes.push(...formatMappingNotes([revMap, ebitMap]));
   }
 
   return {

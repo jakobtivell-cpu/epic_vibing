@@ -61,14 +61,22 @@ const TEXT_NEGATIVE: { pattern: RegExp; points: number }[] = [
   { pattern: /capital\s*markets?\s*day/i, points: -8 },
   { pattern: /\bpress\s*release\b/i, points: -10 },
   { pattern: /\bnews\b/i, points: -8 },
-  { pattern: /\bgeneral\s*meeting\b/i, points: -8 },
-  { pattern: /\bagm\b/i, points: -8 },
-  { pattern: /\bproxy\b/i, points: -8 },
-  { pattern: /\bvoting\b/i, points: -15 },
-  { pattern: /\bpostal[\s-]*voting\b/i, points: -15 },
-  { pattern: /\bkallelse\b/i, points: -15 },
-  { pattern: /\bstämma\b/i, points: -10 },
-  { pattern: /\bbolagsstämma\b/i, points: -15 },
+  { pattern: /\bgeneral\s*meeting\b/i, points: -12 },
+  { pattern: /\bannual\s+general\s+meeting\b/i, points: -18 },
+  { pattern: /\bextraordinary\s+general\b/i, points: -18 },
+  { pattern: /\bagm\b/i, points: -14 },
+  { pattern: /\bproxy\b/i, points: -14 },
+  { pattern: /\bvoting\b/i, points: -22 },
+  { pattern: /\bpostal[\s-]*voting\b/i, points: -22 },
+  { pattern: /\bpost[\s-]*vote\b/i, points: -18 },
+  { pattern: /\bkallelse\b/i, points: -22 },
+  { pattern: /\bstämma\b/i, points: -16 },
+  { pattern: /\bbolagsstämma\b/i, points: -22 },
+  { pattern: /\bbolagsstamma\b/i, points: -20 },
+  { pattern: /\bröstmaterial\b/i, points: -20 },
+  { pattern: /\bvalberedning/i, points: -12 },
+  { pattern: /\bnotice\s+of\s+(?:the\s+)?(?:annual|general|egm)\b/i, points: -18 },
+  { pattern: /\binstructions\s+for\s+(?:voting|shareholders)\b/i, points: -16 },
   { pattern: /\bsummary\b/i, points: -3 },
   { pattern: /\bsammandrag\b/i, points: -3 },
   { pattern: /\besef\b/i, points: -3 },
@@ -95,7 +103,9 @@ function urlScore(href: string): number {
   }
   if (/press|\/pr-|\/news\/|pressrelease|_pr_/i.test(lower)) score -= 10;
   if (/interim|quarterly|q[1-4]\b/i.test(lower)) score -= 8;
-  if (/voting|kallelse|proxy|bolagsstamma|stamma/i.test(lower)) score -= 15;
+  if (/voting|postal[\s-]*vote|kallelse|proxy|bolagsst(a|ä)mma|röstmaterial|\/agm\b|_agm_|instruktioner/i.test(lower)) {
+    score -= 22;
+  }
 
   const urlYear = extractYear(href);
   if (urlYear !== null) {
@@ -146,8 +156,10 @@ function scoreLinkCandidate(
   for (const { pattern, points } of TEXT_POSITIVE) {
     if (pattern.test(text)) score += points;
   }
+  // Penalize proxy/AGM/voting in link text *or* URL path (many IR lists use empty anchor text).
+  const negHaystack = `${text} ${resolved}`.toLowerCase();
   for (const { pattern, points } of TEXT_NEGATIVE) {
-    if (pattern.test(text)) score += points;
+    if (pattern.test(negHaystack)) score += points;
   }
   score += sustainabilityPenalty(text);
 

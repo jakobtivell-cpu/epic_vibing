@@ -1,7 +1,7 @@
 export { parseNumber } from './number-parse';
 export { extractTextFromPdf } from './text-extractor';
 export type { PdfTextResult, TextExtractorOptions } from './text-extractor';
-export { extractFields, detectCompanyType } from './field-extractor';
+export { extractFields, detectCompanyType, resolveCompanyTypeForExtraction } from './field-extractor';
 export type { FieldExtractionResult, FieldProvenance } from './field-extractor';
 export { INDUSTRIAL_LABELS, BANK_LABELS, INVESTMENT_LABELS, SUSTAINABILITY_LABELS } from './labels';
 export type { LabelSet, SustainabilityLabelSet } from './labels';

@@ -2,8 +2,7 @@ You are building a production-minded Node.js + TypeScript scraper for Swedish La
 
 NON-NEGOTIABLE CONSTRAINTS:
 - Public websites only. No API keys.
-- Headless browser only as optional last-resort fallback (see Playwright policy below).
-- Use cheerio for HTML parsing.
+- Use cheerio for HTML parsing as the primary method.
 - Use pdf-parse for PDF text extraction.
 - Script must run with: npx ts-node scrape.ts
 - Output must be a structured results.json.
@@ -24,19 +23,24 @@ WORKING STYLE:
 - Keep functions small and named clearly.
 - Separate discovery, download, extraction, normalization, and persistence into distinct modules.
 - Build for reruns and partial reruns.
-- Prefer deterministic heuristics over AI-like guessing.
-- When uncertain, return null with an explanation — never fabricate a value.
+- Use deterministic heuristics as the primary extraction method, but when heuristics fail or produce ambiguous results, use web search (Bing), multi-domain resolution, or other creative discovery methods as fallbacks. The goal is zero failed rows for listed Large Cap companies.
+- When uncertain about an extracted VALUE, return null with an explanation — never fabricate a value.
+- When uncertain about DISCOVERY (finding the right PDF), be aggressive — try multiple domains, search engines, URL patterns, and external sources before giving up.
 - Optimize for a repo that can be shown to a demanding technical evaluator.
 
 COMPANY INPUT MODEL:
-- A "company profile" is a runtime object with: name, ticker, website URL, and optional IR path hints.
+- A "company profile" is a runtime object with: name, ticker, website URL, optional IR path hints, optional candidateDomains, companyType, orgNumber, and knownAliases.
 - A default registry of 10 companies ships with the project, but the architecture must support swapping in any other Swedish Large Cap company by editing a single config file or passing CLI arguments.
 - Company-specific logic is confined to the profile config — the pipeline code itself is company-agnostic.
 
 PLAYWRIGHT FALLBACK POLICY:
 - cheerio is the primary and default HTML parser for all companies.
-- Playwright is an OPTIONAL last-resort fallback, used ONLY when cheerio + all static fallbacks have failed to find PDF links (confirmed case: JS-rendered IR pages like Volvo Group).
-- Playwright must be an optional dependency — the project must work without it installed.
-- If Playwright is not available at runtime, skip gracefully and fall through to the next fallback (allabolag data extraction).
-- Never use Playwright as a first attempt. The fallback ladder is: cheerio IR scan → sub-page crawl → direct URL patterns → sitemap → Playwright (if installed) → Avanza → AEM CDN patterns → allabolag data fallback.
+- Playwright is an OPTIONAL fallback for JS-rendered pages. It must be an optional dependency — the project must work without it installed.
+- If a company profile indicates JS-rendered content (e.g., jsRendered: true or previous runs failed with 0 PDF links from cheerio), Playwright may be tried EARLIER in the fallback ladder — not necessarily last.
+- If Playwright is not available at runtime, skip gracefully and continue to the next fallback.
 - In logs, always indicate when Playwright is being used: "[Company] Falling back to Playwright for JS-rendered content"
+
+DISCOVERY PHILOSOPHY:
+- The goal is to find every listed Large Cap company's annual report. A "failed" status for a company that publishes an annual report is a bug, not an acceptable outcome.
+- Discovery should work even when the company website cannot be resolved. Direct PDF search via Bing, multi-domain resolution, allabolag org-number lookup, and external financial data sources are all valid fallback paths.
+- When orgNumber is available in the company profile, always try the allabolag direct URL (https://www.allabolag.se/{orgNumberWithoutHyphen}) — do not rely on name search.

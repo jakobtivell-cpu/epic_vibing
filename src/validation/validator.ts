@@ -1,7 +1,6 @@
 // ---------------------------------------------------------------------------
 // Validation — sanity-checks extracted data and assigns a confidence score.
-// Values that fail hard constraints are nulled out (never returned unchecked).
-// Company type is auto-detected and passed in — no preconfigured types.
+// Rules depend on detected reporting model (industrial / bank / investment).
 // ---------------------------------------------------------------------------
 
 import { ExtractedData, CompanyType } from '../types';
@@ -37,17 +36,32 @@ export function validateExtractedData(
     warnings.push(`Revenue implausibly high (${cleaned.revenue_msek} MSEK) — discarded`);
     cleaned.revenue_msek = null;
     score -= 15;
-  } else if (cleaned.revenue_msek < 1_000 && companyType === 'industrial') {
-    warnings.push(`Revenue ${cleaned.revenue_msek} MSEK below 1,000 — implausible for Large Cap`);
+  } else if (
+    companyType === 'bank' &&
+    cleaned.revenue_msek > 0 &&
+    cleaned.revenue_msek < 10_000
+  ) {
+    // Banks' operating-income lines can be mis-scaled or segment-level; do not apply industrial floor
+    warnings.push(
+      `Bank revenue-equivalent ${cleaned.revenue_msek} MSEK below 10,000 — verify units (kept; not an industrial Large Cap gate)`,
+    );
+    score -= 6;
+  } else if (companyType === 'industrial' && cleaned.revenue_msek < 1_000) {
+    warnings.push(`Revenue ${cleaned.revenue_msek} MSEK below 1,000 — implausible for Large Cap industrial`);
     cleaned.revenue_msek = null;
     score -= 15;
+  } else if (companyType === 'bank' && cleaned.revenue_msek < 1_000) {
+    warnings.push(
+      `Bank revenue-equivalent ${cleaned.revenue_msek} MSEK below 1,000 — may be unit/segment error; kept with low trust`,
+    );
+    score -= 10;
   }
 
   // --- EBIT ---
   if (cleaned.ebit_msek === null) {
     warnings.push('EBIT not extracted');
     score -= 15;
-  } else if (Math.abs(cleaned.ebit_msek) > 2_000_000) {
+  } else if (Math.abs(cleaned.ebit_msek) > (companyType === 'bank' ? 3_000_000 : 2_000_000)) {
     warnings.push(`EBIT implausibly large (${cleaned.ebit_msek} MSEK) — discarded`);
     cleaned.ebit_msek = null;
     score -= 15;
@@ -58,11 +72,27 @@ export function validateExtractedData(
     cleaned.ebit_msek !== null &&
     cleaned.ebit_msek > cleaned.revenue_msek
   ) {
-    warnings.push(
-      `EBIT (${cleaned.ebit_msek}) exceeds revenue (${cleaned.revenue_msek}) — likely extraction error, discarding EBIT`,
-    );
-    cleaned.ebit_msek = null;
-    score -= 15;
+    if (companyType === 'bank') {
+      const ratio = cleaned.ebit_msek / Math.max(cleaned.revenue_msek, 1);
+      if (ratio <= 1.25) {
+        warnings.push(
+          `Bank: operating result (${cleaned.ebit_msek}) above revenue-equivalent (${cleaned.revenue_msek}) — may reflect credit-loss / line definitions; kept`,
+        );
+        score -= 5;
+      } else {
+        warnings.push(
+          `Bank: operating result (${cleaned.ebit_msek}) exceeds revenue-equivalent (${cleaned.revenue_msek}) — possible semantic mismatch; discarding EBIT for assignment safety`,
+        );
+        cleaned.ebit_msek = null;
+        score -= 12;
+      }
+    } else {
+      warnings.push(
+        `EBIT (${cleaned.ebit_msek}) exceeds revenue (${cleaned.revenue_msek}) — likely extraction error, discarding EBIT`,
+      );
+      cleaned.ebit_msek = null;
+      score -= 15;
+    }
   }
 
   // --- Employees ---
@@ -79,6 +109,14 @@ export function validateExtractedData(
     score -= 15;
   }
 
+  // Bank: employee vs revenue-equivalent ratios differ from industrial
+  if (companyType === 'bank' && cleaned.revenue_msek !== null && cleaned.employees !== null) {
+    if (cleaned.employees < cleaned.revenue_msek / 50) {
+      warnings.push('Bank: employee count low vs operating income — verify consolidated figures');
+      score -= 5;
+    }
+  }
+
   // --- CEO ---
   if (cleaned.ceo === null) {
     warnings.push('CEO not extracted');
@@ -91,7 +129,15 @@ export function validateExtractedData(
     }
   }
 
-  // --- Confidence penalties for upstream warnings ---
+  // --- Investment company ---
+  if (companyType === 'investment_company') {
+    if (cleaned.revenue_msek !== null || cleaned.ebit_msek !== null) {
+      warnings.push('Investment company — revenue/EBIT may not match industrial definitions');
+      score -= 8;
+    }
+  }
+
+  // --- Upstream notes ---
   if (pipelineNotes) {
     if (pipelineNotes.some((n) => n.startsWith('ENTITY WARNING'))) {
       warnings.push('Entity verification failed — low trust in all extracted values');

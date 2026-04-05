@@ -7,6 +7,7 @@ export {
 } from './post-download-checks';
 export type {
   EntityCheckResult,
+  EntityVerifyOptions,
   ContentCheckResult,
   FiscalYearCheckResult,
 } from './post-download-checks';

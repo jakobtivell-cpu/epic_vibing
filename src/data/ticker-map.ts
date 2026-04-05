@@ -18,6 +18,8 @@ const TICKERS_PATH = join(__dirname, '..', '..', 'data', 'ticker.json');
 interface TickerEntry {
   name: string;
   orgNumber?: string;
+  /** Extra origins to try when the primary website / IR discovery fails (full URLs with scheme). */
+  candidateDomains?: string[];
 }
 
 /** Raw map: ticker symbol → canonical legal entity name. */
@@ -54,7 +56,16 @@ export function loadTickerMap(): void {
       if (typeof val === 'string') {
         tickerMap[key] = { name: val };
       } else if (typeof val === 'object' && val !== null && 'name' in val) {
-        tickerMap[key] = val as TickerEntry;
+        const o = val as Record<string, unknown>;
+        tickerMap[key] = {
+          name: String(o.name),
+          ...(typeof o.orgNumber === 'string' ? { orgNumber: o.orgNumber } : {}),
+          ...(Array.isArray(o.candidateDomains)
+            ? {
+                candidateDomains: o.candidateDomains.filter((x): x is string => typeof x === 'string'),
+              }
+            : {}),
+        };
       }
     }
 
@@ -81,6 +92,12 @@ export function resolveTicker(ticker: string): string | null {
 export function resolveOrgNumber(ticker: string): string | null {
   const entry = resolveTickerEntry(ticker);
   return entry?.orgNumber ?? null;
+}
+
+export function resolveCandidateDomains(ticker: string): string[] | null {
+  const entry = resolveTickerEntry(ticker);
+  const d = entry?.candidateDomains;
+  return d && d.length > 0 ? d : null;
 }
 
 function resolveTickerEntry(ticker: string): TickerEntry | null {

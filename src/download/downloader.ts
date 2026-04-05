@@ -6,7 +6,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { StageResult } from '../types';
-import { DOWNLOADS_DIR } from '../config/settings';
+import { DOWNLOADS_DIR, PDF_DOWNLOAD_TIMEOUT_MS } from '../config/settings';
 import { fetchBinary } from '../utils/http-client';
 import { createLogger } from '../utils/logger';
 
@@ -52,7 +52,7 @@ export async function downloadPdf(
   }
 
   log.info(`Downloading PDF: ${url}`);
-  const result = await fetchBinary(url);
+  const result = await fetchBinary(url, PDF_DOWNLOAD_TIMEOUT_MS);
 
   if (!result.ok) {
     return {

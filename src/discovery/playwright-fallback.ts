@@ -39,6 +39,9 @@ function scorePdfUrl(href: string): number {
   if (/press|\/pr-|\/news\/|pressrelease|_pr_/i.test(hrefLower)) score -= 10;
   if (/interim|quarterly|q[1-4]/i.test(hrefLower)) score -= 10;
   if (/governance|remuneration|presentation/i.test(hrefLower)) score -= 6;
+  if (/voting|kallelse|proxy|bolagsst(a|ä)mma|stämma|röstmaterial|\bagm\b|postal/i.test(hrefLower)) {
+    score -= 22;
+  }
 
   const yearMatch = href.match(/\b(20[12]\d)\b/);
   if (yearMatch) {
@@ -70,10 +73,16 @@ function scoreLink(href: string, text: string): number {
   if (/interim|quarterly|delårsrapport/i.test(textLower)) score -= 10;
   if (/governance|remuneration|presentation/i.test(textLower)) score -= 8;
   if (/press\s*release|news/i.test(textLower)) score -= 8;
-  if (/voting|postal[\s-]*voting/i.test(textLower)) score -= 15;
-  if (/kallelse|bolagsstämma|stämma/i.test(textLower)) score -= 15;
-  if (/\bagm\b/i.test(textLower)) score -= 8;
-  if (/\bproxy\b/i.test(textLower)) score -= 8;
+  const combinedLower = `${textLower} ${hrefLower}`;
+  if (
+    /voting|postal[\s-]*voting|postal[\s-]*vote|kallelse|bolagsst(a|ä)mma|stämma|röstmaterial|notice\s+of\s+(?:the\s+)?(?:annual|general)/i.test(
+      combinedLower,
+    )
+  ) {
+    score -= 22;
+  }
+  if (/\bagm\b/i.test(combinedLower)) score -= 14;
+  if (/\bproxy\b/i.test(combinedLower)) score -= 14;
   if (/summary|sammandrag/i.test(textLower)) score -= 3;
 
   if (/sustainability|hållbarhet/i.test(textLower) && !/annual|årsredovisning/i.test(textLower)) {

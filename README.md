@@ -26,9 +26,13 @@ scrape.ts                         CLI entrypoint (commander)
   ▼
 src/pipeline.ts                   Orchestrator — runs stages sequentially per company
   │
+  ├─► src/entity/
+  │     entity-profile.ts         Legal-name anchor, ambiguity, collision rules, domain seeds
   ├─► src/discovery/
   │     ir-finder.ts              IR page discovery (hint → homepage → brute-force → sitemap)
   │     report-ranker.ts          PDF candidate scoring + fallback ladder
+  │     report-corpus.ts          Publication / reports-hub URL probes (corpus expansion)
+  │     candidate-ranking.ts      Entity-aware filter + score adjustments on candidates
   │     external-fallbacks.ts     Avanza, AEM CDN pattern fallbacks
   │     playwright-fallback.ts    Optional headless browser for JS-rendered pages
   │
@@ -38,6 +42,7 @@ src/pipeline.ts                   Orchestrator — runs stages sequentially per 
   ├─► src/extraction/
   │     text-extractor.ts         pdf-parse wrapper, whitespace normalization, scanned-PDF detection
   │     field-extractor.ts        Revenue/EBIT/employees/CEO/FY extraction (bilingual heuristics)
+  │     schema-mapping.ts         Native label → assignment field (notes / provenance)
   │     labels.ts                 Swedish + English label dictionaries per company type
   │     sustainability-extractor  Scope 1/2 CO2 extraction with unit conversion
   │     allabolag-extractor.ts    Last-resort data fallback from allabolag.se
@@ -65,8 +70,9 @@ src/utils/logger.ts               Leveled logger with timestamps
 
 ```
 CompanyProfile
+  → Build EntityProfile (legal anchor, ambiguity, collision rules)
   → Discover IR page (heuristic scoring, 4-step fallback)
-  → Find annual report PDF (candidate ranking across IR page + sub-pages)
+  → Find annual report PDF (ranking + optional publication-hub corpus merge)
   → Download PDF (cached, magic-byte validated)
   → Extract text (pdf-parse, whitespace normalized)
   → Verify entity + content type (post-download gates)
@@ -75,6 +81,22 @@ CompanyProfile
   → Extract sustainability data (bonus, non-blocking)
   → Write result (atomic, merge-safe)
 ```
+
+### Methodology: identity, corpora, and assignment mapping
+
+The scraper is built for **classes** of failure (ambiguous tickers, bank reporting, sprawling IR sites), not one-off site hacks.
+
+1. **Canonical entity first** — Before any HTTP discovery, the pipeline builds an `EntityProfile` (`src/entity/entity-profile.ts`): legal name as the **search anchor**, org number, ticker, distinctive tokens from the legal name, and an **ambiguity level** for short aliases. Data-driven **hostname collision rules** live in `data/entity-confusion.json` (extend this for new “same letters, different company” cases).
+
+2. **Report corpus, not only one IR page** — After the primary annual-report discovery path, the pipeline probes generic **publication / reports hub** URL patterns (`src/discovery/report-corpus.ts`), merges unique PDF candidates, and **re-ranks** the combined set. Ranking is entity-aware (`src/discovery/candidate-ranking.ts`): penalties when a high-ambiguity issuer’s PDF host lacks legal-name evidence, bonuses when the org number appears in the URL, and drops for forbidden hosts.
+
+3. **Native labels vs assignment fields** — Output JSON stays `revenue_msek` / `ebit_msek` / … for compatibility. Internally, extraction records how PDF labels map to those slots (`src/extraction/schema-mapping.ts`); notes include `SCHEMA_MAP[...]` lines with **exact / mapped / unsupported** semantics so reviewers see when a bank “revenue” is really operating income.
+
+4. **Type-aware validation** — `src/validation/validator.ts` applies different plausibility logic for **industrial**, **bank**, and **investment_company** (e.g. banks are not forced through the same sub-1,000 MSEK “Large Cap industrial” revenue gate; EBIT vs revenue conflicts get bank-specific messaging).
+
+5. **Stronger PDF gates** — Post-download entity checks (`src/validation/post-download-checks.ts`) accept org-number evidence and avoid over-trusting short aliases when ambiguity is high.
+
+Together, this makes ambiguous issuers and non-industrial reports **first-class** without changing the assignment schema. For file-level flow and insertion points, see `docs/ARCHITECTURE_ENTITY_AND_DISCOVERY.md`.
 
 ## Prerequisites
 
@@ -92,8 +114,11 @@ npm install
 
 ### Run all 10 default companies
 
+With no `--company` or `--ticker`, the CLI runs a fixed Large Cap list (Volvo, Ericsson, H&M, Atlas Copco, Sandvik, SEB, Investor, Hexagon, Essity, Alfa Laval), resolving each via `data/ticker.json` (including optional `candidateDomains` on some tickers).
+
 ```bash
 npx ts-node scrape.ts
+npx ts-node scrape.ts --force
 ```
 
 ### Run a single company

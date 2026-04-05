@@ -34,7 +34,10 @@ import { MAX_CANDIDATES_PER_STEP, RESULTS_PATH } from './config/settings';
 import { searchDiscovery, directPdfSearch, deriveShortNames } from './discovery/search-discovery';
 import { discoverIrPage } from './discovery/ir-finder';
 import { discoverAnnualReport } from './discovery/report-ranker';
+import { collectPublicationHubUrls } from './discovery/report-corpus';
+import { filterAndRankReportCandidatesForEntity } from './discovery/candidate-ranking';
 import { tryPlaywrightFallback } from './discovery/playwright-fallback';
+import { buildEntityProfile, type EntityProfile } from './entity';
 import { downloadPdf } from './download';
 import { extractTextFromPdf, extractFields, extractFromAllabolag } from './extraction';
 import { extractFromIrHtml } from './extraction/ir-html-extractor';
@@ -179,28 +182,35 @@ interface PdfExtractionFailure {
 
 async function tryPdfCandidates(
   candidates: ReportCandidate[],
-  companyName: string,
+  entity: EntityProfile,
   force: boolean,
   stepName: FallbackStep,
   maxAttempts: number = MAX_CANDIDATES_PER_STEP,
-  entityNames?: string[],
+  shortNames: string[],
 ): Promise<PdfExtractionSuccess | PdfExtractionFailure> {
   const notes: string[] = [];
   const triedUrls = new Set<string>();
-  const slug = companyName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
+  const slug = entity.displayName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
+  const verifyName = entity.searchAnchor;
+  const ranked = filterAndRankReportCandidatesForEntity(candidates, entity);
+  const entityOpts = {
+    orgNumber: entity.orgNumber,
+    ambiguityHigh: entity.ambiguityLevel === 'high',
+    distinctiveTokens: entity.distinctiveTokens,
+  };
 
-  for (let i = 0; i < Math.min(candidates.length, maxAttempts); i++) {
-    const candidate = candidates[i];
+  for (let i = 0; i < Math.min(ranked.length, maxAttempts); i++) {
+    const candidate = ranked[i];
     if (triedUrls.has(candidate.url)) continue;
     triedUrls.add(candidate.url);
 
     const discoveryFiscalYear = extractYearFromCandidate(candidate);
 
-    log.info(`[${companyName}] Trying candidate #${i + 1} (${stepName}): ${candidate.url}`);
+    log.info(`[${entity.displayName}] Trying candidate #${i + 1} (${stepName}): ${candidate.url}`);
 
     const downloadResult = await downloadPdf(candidate.url, slug, discoveryFiscalYear, force);
     if (downloadResult.status !== 'success' || !downloadResult.value) {
-      log.warn(`[${companyName}] Download failed for candidate #${i + 1}`);
+      log.warn(`[${entity.displayName}] Download failed for candidate #${i + 1}`);
       notes.push(`Download failed for ${stepName} candidate #${i + 1}: ${candidate.url}`);
       continue;
     }
@@ -211,21 +221,21 @@ async function tryPdfCandidates(
     });
 
     if (!pdfText.text) {
-      log.warn(`[${companyName}] Text extraction failed for candidate #${i + 1}`);
+      log.warn(`[${entity.displayName}] Text extraction failed for candidate #${i + 1}`);
       notes.push(`Text extraction failed for ${stepName} candidate #${i + 1}`);
       continue;
     }
 
-    const gateResult = applyQualityGates(pdfText.text, companyName);
+    const gateResult = applyQualityGates(pdfText.text, verifyName);
     if (!gateResult.passed) {
-      log.warn(`[${companyName}] Quality gate rejected candidate #${i + 1}: ${gateResult.reason}`);
+      log.warn(`[${entity.displayName}] Quality gate rejected candidate #${i + 1}: ${gateResult.reason}`);
       notes.push(`Rejected ${stepName} candidate #${i + 1} "${candidate.url}" — ${gateResult.reason}`);
       continue;
     }
 
-    const entityCheck = verifyEntityInPdf(pdfText.text, companyName, entityNames);
+    const entityCheck = verifyEntityInPdf(pdfText.text, verifyName, shortNames, entityOpts);
     if (!entityCheck.passed) {
-      log.warn(`[${companyName}] Entity check FAILED for candidate #${i + 1} — likely wrong company's report`);
+      log.warn(`[${entity.displayName}] Entity check FAILED for candidate #${i + 1} — likely wrong company's report`);
       notes.push(`Rejected ${stepName} candidate #${i + 1} "${candidate.url}" — entity check failed (wrong company)`);
       continue;
     }
@@ -238,12 +248,27 @@ async function tryPdfCandidates(
       notes.push(`PDF text suspiciously short (${pdfText.textLength} chars / ${pdfText.pageCount} pages)`);
     }
 
-    const extraction = extractFields(pdfText.text, companyName, discoveryFiscalYear);
+    const extraction = extractFields(
+      pdfText.text,
+      verifyName,
+      discoveryFiscalYear,
+      entity.reportingModelHint !== 'unspecified' ? entity.reportingModelHint : null,
+    );
     for (const n of extraction.notes) notes.push(n);
 
     const rev = extraction.data.revenue_msek;
-    if (rev !== null && (rev < 1_000 || rev > 5_000_000)) {
-      log.warn(`[${companyName}] Revenue ${rev} MSEK implausible — rejecting candidate #${i + 1}`);
+    if (rev !== null && rev > 5_000_000) {
+      log.warn(`[${entity.displayName}] Revenue ${rev} MSEK implausible — rejecting candidate #${i + 1}`);
+      notes.push(`Rejected ${stepName} candidate #${i + 1} — revenue ${rev} MSEK implausible`);
+      continue;
+    }
+    if (
+      rev !== null &&
+      rev < 1_000 &&
+      entity.reportingModelHint !== 'bank' &&
+      extraction.detectedCompanyType !== 'bank'
+    ) {
+      log.warn(`[${entity.displayName}] Revenue ${rev} MSEK implausible — rejecting candidate #${i + 1}`);
       notes.push(`Rejected ${stepName} candidate #${i + 1} — revenue ${rev} MSEK implausible`);
       continue;
     }
@@ -361,8 +386,9 @@ async function processCompany(
   company: CompanyProfile,
   force: boolean,
 ): Promise<PipelineResult> {
+  const entity = buildEntityProfile(company);
   const name = company.name;
-  const shortNames = deriveShortNames(name, company.ticker);
+  const shortNames = deriveShortNames(entity.searchAnchor, company.ticker);
 
   const skipped: StageResult<never> = {
     status: 'skipped',
@@ -383,20 +409,22 @@ async function processCompany(
     detectedCompanyType: null,
     fiscalYear: null,
     extractionResult: skipped,
-    notes: [],
+    notes: [
+      `ENTITY_PROFILE: searchAnchor="${entity.searchAnchor}" ambiguity=${entity.ambiguityLevel} reportingHint=${entity.reportingModelHint} org=${entity.orgNumber ?? 'none'}`,
+    ],
   };
 
   let validationResult: StageResult<ExtractedData> = skipped;
   let confidence: number | null = null;
   let website = company.website ?? null;
   let irPageUrl: string | null = null;
-  const candidateDomains: string[] = [...(company.candidateDomains ?? [])];
+  const candidateDomains: string[] = [...entity.seedCandidateDomains];
 
   // =========================================================================
   // Step 1: Search engine discovery (filetype:pdf, multi-query, short names)
   // =========================================================================
   log.info(`[${name}] === Step 1: Search engine discovery ===`);
-  const searchResult = await searchDiscovery(name, company.ticker);
+  const searchResult = await searchDiscovery(entity.searchAnchor, company.ticker);
 
   if (!website && searchResult.discoveredWebsite) {
     website = searchResult.discoveredWebsite;
@@ -418,7 +446,7 @@ async function processCompany(
 
   if (searchResult.pdfCandidates.length > 0) {
     const searchAttempt = await tryPdfCandidates(
-      searchResult.pdfCandidates, name, force, 'search',
+      searchResult.pdfCandidates, entity, force, 'search',
       MAX_CANDIDATES_PER_STEP, shortNames,
     );
     if (searchAttempt.success) {
@@ -440,20 +468,38 @@ async function processCompany(
       log.info(`[${name}] --- Trying domain: ${domain} ---`);
 
       // Step 2: Cheerio IR discovery + report scan
-      const domainIrResult = await discoverIrPage(name, domain);
+      const domainIrResult = await discoverIrPage(entity.searchAnchor, domain);
 
       if (domainIrResult.status === 'success' && domainIrResult.value) {
         const domainIrUrl = domainIrResult.value;
         if (!irPageUrl) irPageUrl = domainIrUrl;
         irResult = domainIrResult;
 
-        const domainReportResult = await discoverAnnualReport(name, domain, domainIrUrl);
+        const domainReportResult = await discoverAnnualReport(entity.searchAnchor, domain, domainIrUrl);
 
-        if (domainReportResult.value?.allCandidates && domainReportResult.value.allCandidates.length > 0) {
+        let mergedCandidates = [...(domainReportResult.value?.allCandidates ?? [])];
+        const hubUrls = await collectPublicationHubUrls(domain);
+        state.notes.push(`REPORT_CORPUS: ${hubUrls.length} publication hub(s) probed on ${domain}`);
+        const seenCand = new Set(mergedCandidates.map((c) => c.url));
+        for (const hub of hubUrls) {
+          if (hub.replace(/\/$/, '') === domainIrUrl.replace(/\/$/, '')) continue;
+          const extra = await discoverAnnualReport(entity.searchAnchor, domain, hub);
+          if (extra.value?.allCandidates?.length) {
+            for (const c of extra.value.allCandidates) {
+              if (!seenCand.has(c.url)) {
+                mergedCandidates.push(c);
+                seenCand.add(c.url);
+              }
+            }
+          }
+        }
+        mergedCandidates = filterAndRankReportCandidatesForEntity(mergedCandidates, entity);
+
+        if (mergedCandidates.length > 0) {
           reportResult = domainReportResult;
 
           const cheerioAttempt = await tryPdfCandidates(
-            domainReportResult.value.allCandidates, name, force, 'cheerio',
+            mergedCandidates, entity, force, 'cheerio',
             MAX_CANDIDATES_PER_STEP, shortNames,
           );
 
@@ -467,11 +513,12 @@ async function processCompany(
         // Step 3: Playwright on this domain's IR page
         if (!state.extractionResult.value) {
           log.info(`[${name}] Playwright crawl on: ${domainIrUrl}`);
-          const playwrightCandidates = await tryPlaywrightFallback(name, domainIrUrl);
+          const playwrightCandidates = await tryPlaywrightFallback(entity.searchAnchor, domainIrUrl);
 
           if (playwrightCandidates.length > 0) {
+            const rankedPw = filterAndRankReportCandidatesForEntity(playwrightCandidates, entity);
             const pwAttempt = await tryPdfCandidates(
-              playwrightCandidates, name, force, 'playwright',
+              rankedPw, entity, force, 'playwright',
               MAX_CANDIDATES_PER_STEP, shortNames,
             );
 
@@ -494,13 +541,17 @@ async function processCompany(
         const w = website ?? candidateDomains[0];
         if (!w) continue;
 
-        const searchIrReport = await discoverAnnualReport(name, w, candidateIr);
+        const searchIrReport = await discoverAnnualReport(entity.searchAnchor, w, candidateIr);
         if (searchIrReport.value?.allCandidates && searchIrReport.value.allCandidates.length > 0) {
           irPageUrl = candidateIr;
           reportResult = searchIrReport;
 
+          const rankedSearch = filterAndRankReportCandidatesForEntity(
+            searchIrReport.value.allCandidates,
+            entity,
+          );
           const attempt = await tryPdfCandidates(
-            searchIrReport.value.allCandidates, name, force, 'cheerio',
+            rankedSearch, entity, force, 'cheerio',
             MAX_CANDIDATES_PER_STEP, shortNames,
           );
 
@@ -520,12 +571,13 @@ async function processCompany(
   if (!state.extractionResult.value) {
     log.info(`[${name}] === Step 4: Direct PDF search (reverse discovery) ===`);
     const directCandidates = await directPdfSearch(
-      name, company.ticker, candidateDomains,
+      entity.searchAnchor, company.ticker, candidateDomains,
     );
 
     if (directCandidates.length > 0) {
+      const rankedDirect = filterAndRankReportCandidatesForEntity(directCandidates, entity);
       const directAttempt = await tryPdfCandidates(
-        directCandidates, name, force, 'direct-pdf-search',
+        rankedDirect, entity, force, 'direct-pdf-search',
         MAX_CANDIDATES_PER_STEP, shortNames,
       );
 
@@ -542,7 +594,7 @@ async function processCompany(
   // =========================================================================
   if (!state.extractionResult.value && irPageUrl) {
     log.info(`[${name}] === Step 5: IR page HTML key figures ===`);
-    const irHtmlResult = await extractFromIrHtml(irPageUrl, name);
+    const irHtmlResult = await extractFromIrHtml(irPageUrl, entity.searchAnchor);
 
     if (irHtmlResult) {
       state.fallbackStep = 'ir-html';

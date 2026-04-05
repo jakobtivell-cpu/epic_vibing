@@ -1,0 +1,9 @@
+{
+  "hostnameRejectRules": [
+    {
+      "comment": "Generic pattern: Swedish bank legal name vs unrelated consumer brand on same short ticker letters",
+      "ifLegalNameMatches": "(enskilda|skandinaviska).{0,40}bank",
+      "rejectHostSubstrings": ["groupeseb"]
+    }
+  ]
+}

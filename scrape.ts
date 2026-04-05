@@ -19,7 +19,12 @@ import {
 } from './src/config';
 import { CompanyProfile, RunConfig } from './src/types';
 import { createLogger, setLogLevel, setSlowMode } from './src/utils';
-import { loadTickerMap, resolveTicker, resolveOrgNumber } from './src/data/ticker-map';
+import {
+  loadTickerMap,
+  resolveTicker,
+  resolveOrgNumber,
+  resolveCandidateDomains,
+} from './src/data/ticker-map';
 import { runPipeline } from './src/pipeline';
 import { writeResults, mergeResults, writeRunSummary, printRunSummary } from './src/output';
 
@@ -98,6 +103,9 @@ async function main(): Promise<void> {
   printRunSummary(results);
 }
 
+const DEFAULT_LARGE_CAP_TICKERS =
+  'VOLV-B.ST,ERIC-B.ST,HM-B.ST,ATCO-B.ST,SAND.ST,SEB-A.ST,INVE-B.ST,HEXA-B.ST,ESSITY-B.ST,ALFA.ST';
+
 // ---------------------------------------------------------------------------
 // Build the company list from CLI flags, resolving tickers and deduplicating
 // ---------------------------------------------------------------------------
@@ -105,9 +113,12 @@ async function main(): Promise<void> {
 function buildCompanyList(opts: Record<string, unknown>): CompanyProfile[] {
   const profiles: CompanyProfile[] = [];
 
+  const companyOpt = typeof opts.company === 'string' ? opts.company.trim() : '';
+  const tickerOpt = typeof opts.ticker === 'string' ? opts.ticker.trim() : '';
+
   // --company flag: raw names, no ticker resolution
-  if (typeof opts.company === 'string' && opts.company.length > 0) {
-    const names = (opts.company as string)
+  if (companyOpt.length > 0) {
+    const names = companyOpt
       .split(',')
       .map((n) => n.trim())
       .filter((n) => n.length > 0);
@@ -117,9 +128,16 @@ function buildCompanyList(opts: Record<string, unknown>): CompanyProfile[] {
     }
   }
 
-  // --ticker flag: resolve each ticker to a legal name
-  if (typeof opts.ticker === 'string' && opts.ticker.length > 0) {
-    const tickers = (opts.ticker as string)
+  const tickerSource =
+    tickerOpt.length > 0 ? tickerOpt : companyOpt.length > 0 ? '' : DEFAULT_LARGE_CAP_TICKERS;
+
+  if (tickerSource.length > 0 && tickerOpt.length === 0 && companyOpt.length === 0) {
+    log.info('No --company/--ticker — using default Large Cap set (10 tickers)');
+  }
+
+  // --ticker flag (or default set): resolve each ticker to a legal name
+  if (tickerSource.length > 0) {
+    const tickers = tickerSource
       .split(',')
       .map((t) => t.trim())
       .filter((t) => t.length > 0);
@@ -127,6 +145,7 @@ function buildCompanyList(opts: Record<string, unknown>): CompanyProfile[] {
     for (const rawTicker of tickers) {
       const legalName = resolveTicker(rawTicker);
       const orgNumber = resolveOrgNumber(rawTicker) ?? undefined;
+      const candidateDomains = resolveCandidateDomains(rawTicker) ?? undefined;
       if (legalName) {
         log.info(`Ticker ${rawTicker} → "${legalName}"${orgNumber ? ` (org: ${orgNumber})` : ''}`);
         profiles.push({
@@ -134,6 +153,7 @@ function buildCompanyList(opts: Record<string, unknown>): CompanyProfile[] {
           ticker: rawTicker,
           legalName,
           orgNumber,
+          ...(candidateDomains?.length ? { candidateDomains } : {}),
         });
       } else {
         log.warn(`Ticker ${rawTicker} not found in ticker map — using as company name`);

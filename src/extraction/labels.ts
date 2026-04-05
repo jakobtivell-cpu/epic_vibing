@@ -65,20 +65,48 @@ export const INDUSTRIAL_LABELS: LabelSet = {
   ],
 };
 
+/**
+ * Bank revenue-equivalent lines — matched before industrial fallbacks.
+ * Order: consolidated / total operating income first, then interest income.
+ */
+export const BANK_REVENUE_LABELS_PRIMARY: string[] = [
+  'summa rörelseintäkter',
+  'totala rörelseintäkter',
+  'total operating income',
+  'räntenetto',
+  'net interest income',
+];
+
+/**
+ * Bank operating-result lines — matched before industrial EBIT fallbacks.
+ */
+export const BANK_EBIT_LABELS_PRIMARY: string[] = [
+  'resultat före kreditförluster',
+  'result before credit losses',
+  'rörelseresultat',
+  'operating profit',
+  'operating result',
+  'operating profit before impairments',
+  'profit before credit losses',
+];
+
+function dedupeLabels(primary: string[], rest: string[]): string[] {
+  const seen = new Set(primary.map((s) => s.toLowerCase()));
+  const out = [...primary];
+  for (const r of rest) {
+    if (seen.has(r.toLowerCase())) continue;
+    seen.add(r.toLowerCase());
+    out.push(r);
+  }
+  return out;
+}
+
 export const BANK_LABELS: LabelSet = {
-  revenue: [
-    'total operating income',
-    'totala rörelseintäkter',
-    'net interest income',
-    'räntenetto',
+  revenue: dedupeLabels(BANK_REVENUE_LABELS_PRIMARY, [
     'total income',
     ...INDUSTRIAL_LABELS.revenue,
-  ],
-  ebit: [
-    'operating profit before impairments',
-    'profit before credit losses',
-    ...INDUSTRIAL_LABELS.ebit,
-  ],
+  ]),
+  ebit: dedupeLabels(BANK_EBIT_LABELS_PRIMARY, INDUSTRIAL_LABELS.ebit),
   employees: INDUSTRIAL_LABELS.employees,
   ceo: [
     'president and group chief executive',

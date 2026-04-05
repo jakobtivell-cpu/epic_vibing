@@ -281,8 +281,17 @@ function scorePdfCandidate(
   if (/press|pressrelease|\/news\//i.test(urlLower)) score -= 10;
   if (/interim|quarterly|q[1-4]/i.test(combined)) score -= 10;
   if (/governance|remuneration/i.test(combined)) score -= 8;
-  if (/voting|postal[\s-]*voting|kallelse|bolagsstämma|stämma/i.test(combined)) score -= 15;
-  if (/\bagm\b|\bproxy\b/i.test(combined)) score -= 8;
+  if (
+    /voting|postal[\s-]*voting|postal[\s-]*vote|kallelse|bolagsst(a|ä)mma|stämma|röstmaterial|notice\s+of\s+(?:the\s+)?(?:annual|general)/i.test(
+      combined,
+    )
+  ) {
+    score -= 22;
+  }
+  if (/\bagm\b|\bproxy\b/i.test(combined)) score -= 14;
+  if (/voting|kallelse|proxy|bolagsst(a|ä)mma|stämma|röstmaterial|\bagm\b|postal/i.test(urlLower)) {
+    score -= 22;
+  }
   if (/summary|sammandrag/i.test(combined)) score -= 3;
 
   const yearMatch = url.match(/\b(20[12]\d)\b/) ?? title.match(/\b(20[12]\d)\b/);

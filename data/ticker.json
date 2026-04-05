@@ -3,8 +3,14 @@
     "ABB.ST": "ABB Ltd",
     "INVE-A.ST": { "name": "Investor AB (publ)", "orgNumber": "556013-8449" },
     "INVE-B.ST": { "name": "Investor AB (publ)", "orgNumber": "556013-8449" },
-    "ATCO-A.ST": "Atlas Copco AB (publ)",
-    "ATCO-B.ST": "Atlas Copco AB (publ)",
+    "ATCO-A.ST": {
+        "name": "Atlas Copco AB (publ)",
+        "candidateDomains": ["https://www.atcogroup.com", "https://www.atlascopco.com"]
+    },
+    "ATCO-B.ST": {
+        "name": "Atlas Copco AB (publ)",
+        "candidateDomains": ["https://www.atcogroup.com", "https://www.atlascopco.com"]
+    },
     "VOLV-A.ST": { "name": "AB Volvo (publ)", "orgNumber": "556012-5790" },
     "VOLV-B.ST": { "name": "AB Volvo (publ)", "orgNumber": "556012-5790" },
     "NDA-SE.ST": "Nordea Bank Abp",
@@ -26,7 +32,10 @@
     "SAMPO-SEK.ST": "Sampo Oyj",
     "SHB-A.ST": "Svenska Handelsbanken AB (publ)",
     "SHB-B.ST": "Svenska Handelsbanken AB (publ)",
-    "HEXA-B.ST": "Hexagon AB (publ)",
+    "HEXA-B.ST": {
+        "name": "Hexagon AB (publ)",
+        "candidateDomains": ["https://hexagon.com", "https://investors.hexagon.com"]
+    },
     "ALFA.ST": { "name": "Alfa Laval AB (publ)", "orgNumber": "556587-8054" },
     "LUMI.ST": "Lundin Mining Corporation",
     "INDU-A.ST": "AB Industrivärden (publ)",

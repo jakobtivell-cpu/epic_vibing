@@ -14,6 +14,7 @@ const hmLikeProfile = (): EntityProfile => ({
   reportingModelHint: 'unspecified',
   hostnameRejectRules: [],
   seedCandidateDomains: [],
+  seedIrPage: null,
   knownAliases: [],
 });
 

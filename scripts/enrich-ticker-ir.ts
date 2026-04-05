@@ -4,6 +4,10 @@
  *
  * Does not create new ticker keys — only enriches existing entries.
  * Preserves existing irPage and merges candidateDomains (prepends origin if missing).
+ *
+ * When JM / Ratos (RATO) OMX keys are added to ticker.json, extend IR_BY_GROUP with:
+ *   JM: https://www.jm.se/en/investor-relations/
+ *   RATO: https://www.ratos.se/en/investors/
  */
 import * as fs from 'fs';
 import { join } from 'path';
@@ -105,7 +109,6 @@ const IR_BY_GROUP: Record<string, string> = {
   LATO: 'https://www.latour.se/en/investors/',
   LUND: 'https://www.lundbergforetagen.se/en/investors/',
   BURE: 'https://www.bure.se/en/investors',
-  RATO: 'https://www.ratos.se/en/investors/',
   BALD: 'https://www.balder.se/en/investor-relations/',
   CAST: 'https://www.castellum.com/en/investors/',
   FABG: 'https://www.fabege.com/en/investors/',
@@ -144,7 +147,6 @@ const IR_BY_GROUP: Record<string, string> = {
   SKA: 'https://www.skanska.com/investors',
   NCC: 'https://www.ncc.com/en/investors/',
   PEAB: 'https://www.peab.com/investors',
-  JM: 'https://www.jm.se/en/investor-relations/',
   SECU: 'https://www.securitas.com/en/investors/',
   LOOMIS: 'https://www.loomis.com/en/investors/',
   AAK: 'https://www.aak.com/en/investors/',
@@ -189,6 +191,19 @@ function enrichValue(key: string, val: unknown): unknown {
   return next;
 }
 
+/** Short tickers from the curated list that have no .ST key in ticker.json (never create keys). */
+const CSV_EXPECTED_MISSING = [
+  'TIGO',
+  'ORI',
+  'CORE',
+  'INTRUM',
+  'FING',
+  'DOM',
+  'EMBRAC',
+  'RATO',
+  'JM',
+] as const;
+
 function main(): void {
   const raw = fs.readFileSync(TICKER_PATH, 'utf-8');
   const data = JSON.parse(raw) as Record<string, unknown>;
@@ -196,10 +211,20 @@ function main(): void {
     throw new Error('ticker.json root must be an object');
   }
 
+  const keys = Object.keys(data);
+  for (const shortTicker of CSV_EXPECTED_MISSING) {
+    const hasAny = keys.some((k) => groupKey(k) === shortTicker);
+    if (!hasAny) {
+      console.warn(
+        `[enrich-ticker-ir] Curated list includes "${shortTicker}" but no listing key maps to that group in ticker.json — not enriched.`,
+      );
+    }
+  }
+
   const out: Record<string, unknown> = {};
   const usedGroups = new Set<string>();
 
-  for (const key of Object.keys(data)) {
+  for (const key of keys) {
     const enriched = enrichValue(key, data[key]);
     out[key] = enriched;
     const g = groupKey(key);

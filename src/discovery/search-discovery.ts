@@ -544,6 +544,15 @@ function buildDirectPdfUrls(shortNames: string[], websites: string[]): ReportCan
 // Main entry point — Step 1 discovery
 // ---------------------------------------------------------------------------
 
+function hostnameKeyFromUrl(raw: string): string | null {
+  try {
+    const u = new URL(raw.startsWith('http') ? raw : `https://${raw}`);
+    return u.hostname.replace(/^www\./, '').toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
 function dedupeOriginsByHost(urls: string[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
@@ -582,10 +591,12 @@ function appendTrustedOrigin(
 /**
  * @param companyName  Primary search term (legal name or user-supplied name)
  * @param ticker       Optional raw ticker symbol (e.g. "SEB-A.ST")
+ * @param trustedSeeds Optional high-trust origins from ticker.json — no extra HEAD burst on those hosts
  */
 export async function searchDiscovery(
   companyName: string,
   ticker?: string,
+  trustedSeeds?: string[],
 ): Promise<SearchDiscoveryResult> {
   log.info(`[${companyName}] Starting search-engine-based discovery${ticker ? ` (ticker: ${ticker})` : ''}`);
 
@@ -599,11 +610,23 @@ export async function searchDiscovery(
   const shortNames = deriveShortNames(companyName, ticker);
   log.info(`[${companyName}] Derived short names: ${shortNames.join(', ')}`);
 
-  const searchEngineDomains = dedupeOriginsByHost(
-    await discoverCorporateDomainsFromSearch(companyName, brandSlugs),
+  const seedDeduped = dedupeOriginsByHost(trustedSeeds ?? []);
+  const seedHostKeys = new Set(
+    seedDeduped.map((u) => hostnameKeyFromUrl(u)).filter((k): k is string => k !== null),
   );
+  if (seedDeduped.length > 0) {
+    log.info(`[${companyName}] Trusted seed domains (from config): ${seedDeduped.join(', ')}`);
+  }
 
-  const slugGuessUrls = buildLikelyUrlsFromBrandSlugs(brandSlugs);
+  const searchEngineDomains = dedupeOriginsByHost([
+    ...seedDeduped,
+    ...(await discoverCorporateDomainsFromSearch(companyName, brandSlugs)),
+  ]);
+
+  const slugGuessUrls = buildLikelyUrlsFromBrandSlugs(brandSlugs).filter((u) => {
+    const k = hostnameKeyFromUrl(u);
+    return k !== null && !seedHostKeys.has(k);
+  });
   const slugResult = await headCheckTrustedOrigins(slugGuessUrls, companyName, brandSlugs);
   const slugInferenceDomains = dedupeOriginsByHost(slugResult.allResolvedDomains);
 

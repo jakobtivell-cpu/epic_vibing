@@ -379,7 +379,11 @@ async function processCompany(
   // Step 1: Search engine discovery (filetype:pdf, multi-query, short names)
   // =========================================================================
   log.info(`[${name}] === Step 1: Search engine discovery ===`);
-  const searchResult = await searchDiscovery(entity.searchAnchor, company.ticker);
+  const searchResult = await searchDiscovery(
+    entity.searchAnchor,
+    company.ticker,
+    entity.seedCandidateDomains,
+  );
 
   if (!website && searchResult.discoveredWebsite) {
     website = searchResult.discoveredWebsite;

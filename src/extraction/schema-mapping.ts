@@ -53,10 +53,11 @@ export function classifyRevenueMapping(
   }
   if (detectedType === 'bank') {
     const isBankNative = BANK_REV_MAPPED.some((p) => label.includes(p));
+    // Always 'mapped': assignment revenue_msek is never industrial net sales; isBankNative only picks the explanation.
     return {
       assignmentField: 'revenue_msek',
       nativeLabelMatched: matchedLabel,
-      basis: isBankNative ? 'mapped' : 'mapped',
+      basis: 'mapped',
       explanation: isBankNative
         ? `Bank: assignment revenue_msek derived from native line "${matchedLabel}" (operating-income family, not industrial net sales)`
         : `Bank: assignment revenue_msek from "${matchedLabel}" — verify against annual report definitions`,
@@ -88,10 +89,11 @@ export function classifyEbitMapping(
   }
   if (detectedType === 'bank') {
     const fragile = /\b(before tax|före skatt|impairment|credit loss)\b/i.test(label);
+    // Always 'mapped': bank operating result → ebit_msek is a reporting-model mapping; fragile only adjusts the explanation.
     return {
       assignmentField: 'ebit_msek',
       nativeLabelMatched: matchedLabel,
-      basis: fragile ? 'mapped' : 'mapped',
+      basis: 'mapped',
       explanation: fragile
         ? `Bank: EBIT assignment from "${matchedLabel}" — may differ from industrial EBIT; confirm in report`
         : `Bank: operating result mapped to ebit_msek from "${matchedLabel}"`,

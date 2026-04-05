@@ -101,6 +101,12 @@ let results=[];   // Full result objects (from API)
 let jobs=[];      // Active/completed scrape jobs: {id,name,status,logs[]}
 let view="table",selTk=null,showLogs=false,inlineStatusMsg="";
 
+/** Tab switching — use a named function so clicks always update script scope (inline handlers + top-level `let`). */
+function setMainView(v){
+  view=v==="performance"?"performance":"table";
+  render();
+}
+
 /** API origin: same host when served from Express; localhost when opening this file from disk. */
 const API_BASE = (typeof window !== "undefined" && window.location.protocol === "file:")
   ? "http://localhost:3000"
@@ -569,7 +575,7 @@ function renderPerf(){
 
   // 3: Data source
   const srcs={};results.forEach(r=>{const s=r.dataSource||"none";srcs[s]=(srcs[s]||0)+1});
-  const srcC={pdf:"var(--blue)",allabolag:"var(--amber)",none:"var(--t3)"};
+  const srcC={pdf:"var(--blue)",allabolag:"var(--amber)","playwright+pdf":"var(--purple)","search+pdf":"var(--purple)","ir-html":"var(--purple)",none:"var(--t3)"};
   const c3=Object.entries(srcs).map(([s,n])=>`<div style="display:flex;align-items:center;gap:10px;padding:6px 0"><div style="width:10px;height:10px;border-radius:3px;background:${srcC[s]||"var(--t3)"}"></div><span style="font-size:13px;font-weight:600;min-width:80px">${s}</span><div class="bar-t" style="max-width:200px"><div class="bar-f" style="width:${(n/results.length)*100}%;background:${srcC[s]||"var(--t3)"};opacity:.5"></div></div><span class="mono" style="font-size:12px;color:var(--t2)">${n}/${results.length}</span></div>`).join("");
 
   // 4: Extraction notes heatmap
@@ -589,7 +595,11 @@ function render(){
   const hasData=results.length>0;
   const allLogs=jobs.flatMap(j=>j.logs);
 
-  document.getElementById("tabs").innerHTML=hasData?["table","performance"].map(v=>`<button class="tab ${view===v?"on":""}" onclick="view='${v}';render()">${v==="performance"?"Performance":"Table"}</button>`).join(""):"";
+  if(!hasData&&view==="performance")view="table";
+
+  document.getElementById("tabs").innerHTML=hasData
+    ?`<button type="button" class="tab ${view==="table"?"on":""}" onclick="setMainView('table')">Table</button><button type="button" class="tab ${view==="performance"?"on":""}" onclick="setMainView('performance')">Performance</button>`
+    :"";
 
   let h="";
 
@@ -626,7 +636,8 @@ function render(){
   // ── DATA VIEWS ──
   if(hasData){
     if(view==="table")h+=renderTable();
-    else h+=renderPerf();
+    else if(view==="performance")h+=renderPerf();
+    else{view="table";h+=renderTable();}
   }
 
   if(results.length||jobs.length) h+=`<div style="margin-top:28px;padding-top:14px;border-top:1px solid var(--bd);display:flex;justify-content:space-between"><span class="mono" style="font-size:11px;color:var(--t3)">${results.filter(r=>r.status==="complete").length} complete · ${results.filter(r=>r.status==="partial").length} partial · ${results.filter(r=>r.status==="failed").length} failed${act.length?" · "+act.length+" running":""}</span><span style="font-size:11px;color:var(--t3)">${API_BASE?"File mode · API at localhost:3000":"Table from output/results.json via API"}</span></div>`;

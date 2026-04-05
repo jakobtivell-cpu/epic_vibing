@@ -75,6 +75,19 @@ tbody tr.sel{background:var(--sf)}
 .json-area{width:100%;min-height:80px;max-height:200px;padding:10px 14px;border-radius:8px;border:1px solid var(--bd);background:var(--sf);font-size:12px;color:var(--tx);font-family:'DM Mono',monospace;resize:vertical}
 .import-ok{border-color:var(--green);background:#F0FDF4}
 .import-err{border-color:var(--rose);background:#FEF2F2}
+/* Company autocomplete */
+.ac-wrap{flex:1;min-width:0;position:relative}
+.ac-dd{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:40;background:var(--bg);border:1px solid var(--bd);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.08);max-height:260px;overflow-y:auto;animation:fadeUp .15s ease}
+.ac-item{padding:9px 12px;cursor:pointer;font-size:13.5px;color:var(--tx);font-family:inherit;border-bottom:1px solid var(--bl);display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.ac-item:last-child{border-bottom:none}
+.ac-item:hover,.ac-item.ac-sel{background:var(--hv)}
+.ac-item.ac-sel{box-shadow:inset 3px 0 0 var(--blue)}
+.ac-n{font-weight:500;flex:1;min-width:0;word-break:break-word}
+.ac-t{font-family:'DM Mono',monospace;font-size:11px;color:var(--t2);flex-shrink:0}
+/* Sortable table headers */
+th.th-sort{cursor:pointer;user-select:none;white-space:nowrap}
+th.th-sort:hover{color:var(--tx);background:var(--hv)}
+.th-sort-ind{font-size:8px;margin-left:4px;opacity:.85;vertical-align:middle}
 </style>
 </head>
 <body>
@@ -89,7 +102,7 @@ const SMAP={Volvo:"Industrials",Ericsson:"Technology","H&M":"Consumer","Atlas Co
 const SC={Industrials:"#2563EB",Technology:"#7C3AED",Consumer:"#D97706",Financials:"#059669"};
 const SBG={Industrials:"#EFF6FF",Technology:"#F5F3FF",Consumer:"#FFFBEB",Financials:"#ECFDF5"};
 
-// Quick-add mock data (for simulated scrapes)
+// Quick-add presets (same as typing the company name — calls POST /api/scrape)
 const MOCK={
 volvo:{company:"Volvo",ticker:"VOLV B",website:"https://www.volvogroup.com",irPage:"https://www.volvogroup.com/en/investors.html",annualReportUrl:"https://www.volvogroup.com/.../AR-2025.pdf",annualReportDownloaded:"downloads/volv_b_2025.pdf",fiscalYear:2025,extractedData:{revenue_msek:457509,ebit_msek:44379,employees:98844,ceo:"Martin Lundstedt"},sustainability:{scope1_co2_tonnes:25,scope2_co2_tonnes:50,methodology:"market-based",confidence:"low"},dataSource:"pdf",confidence:100,status:"complete",extractionNotes:["Annual report includes sustainability content"]},
 ericsson:{company:"Ericsson",ticker:"ERIC B",website:"https://www.ericsson.com",irPage:"https://www.ericsson.com/en/investors",annualReportUrl:"https://www.ericsson.com/.../ar-2025.pdf",annualReportDownloaded:"downloads/eric_b_2025.pdf",fiscalYear:2025,extractedData:{revenue_msek:236681,ebit_msek:38634,employees:89425,ceo:"Börje Ekholm"},sustainability:{scope1_co2_tonnes:204,scope2_co2_tonnes:50,methodology:"market-based",confidence:"low"},dataSource:"pdf",confidence:100,status:"complete",extractionNotes:[]},
@@ -102,6 +115,20 @@ let results=[];   // Full result objects (from import or simulated scrape)
 let jobs=[];      // Active/completed scrape jobs: {id,name,status,logs[]}
 let view="table",selTk=null,showLogs=false,showImport=false,importMsg="";
 
+/** API origin: same host when served from Express; localhost when opening this file from disk. */
+const API_BASE = (typeof window !== "undefined" && window.location.protocol === "file:")
+  ? "http://localhost:3000"
+  : "";
+
+let companyInputValue="";
+let companyCatalog=[];
+let acIndex=-1;
+let acMatches=[];
+
+/** Sortable table: default confidence descending */
+let tableSortKey="confidence";
+let tableSortDir="desc";
+
 // ── HELPERS ──
 const fmt=v=>v!=null?v.toLocaleString("sv-SE"):"—";
 const esc=s=>{const d=document.createElement("div");d.textContent=s;return d.innerHTML};
@@ -110,6 +137,72 @@ const mg=c=>{const d=c.extractedData;if(!d||!d.revenue_msek||!d.ebit_msek)return
 const co2=c=>{const s=c.sustainability;if(!s)return null;const a=s.scope1_co2_tonnes,b=s.scope2_co2_tonnes;if(a==null&&b==null)return null;return(a||0)+(b||0)};
 const cc=v=>v==null?"var(--t3)":v>=80?"var(--green)":v>=50?"var(--amber)":"var(--rose)";
 const stBadge=s=>s==="complete"?'<span class="badge b-ok">complete</span>':s==="partial"?'<span class="badge b-pt">partial</span>':s==="running"?'<span class="badge b-run">running</span>':'<span class="badge b-fl">failed</span>';
+
+const SORT_NUM_KEYS=new Set(["revenue","ebit","employees","fy","confidence"]);
+
+function tableSortValue(r,key){
+  const d=r.extractedData;
+  switch(key){
+    case "company":return (r.company??"").toLowerCase();
+    case "status":return (r.status??"").toLowerCase();
+    case "revenue":return d&&d.revenue_msek!=null&&!Number.isNaN(Number(d.revenue_msek))?Number(d.revenue_msek):null;
+    case "ebit":return d&&d.ebit_msek!=null&&!Number.isNaN(Number(d.ebit_msek))?Number(d.ebit_msek):null;
+    case "employees":return d&&d.employees!=null&&!Number.isNaN(Number(d.employees))?Number(d.employees):null;
+    case "fy":return r.fiscalYear!=null&&!Number.isNaN(Number(r.fiscalYear))?Number(r.fiscalYear):null;
+    case "confidence":return r.confidence!=null&&!Number.isNaN(Number(r.confidence))?Number(r.confidence):null;
+    default:return null;
+  }
+}
+
+function cmpNullsLastNum(a,b,dir){
+  const aN=a===null||a===undefined||Number.isNaN(a);
+  const bN=b===null||b===undefined||Number.isNaN(b);
+  if(aN&&bN)return 0;
+  if(aN)return 1;
+  if(bN)return-1;
+  if(a===b)return 0;
+  return dir*(a<b?-1:1);
+}
+
+function cmpStrCol(a,b,dir){
+  const sa=a==null||a===""?"":String(a);
+  const sb=b==null||b===""?"":String(b);
+  const ea=!sa.length,eb=!sb.length;
+  if(ea&&eb)return 0;
+  if(ea)return 1;
+  if(eb)return-1;
+  const c=sa.localeCompare(sb,"sv",{sensitivity:"base"});
+  if(c===0)return 0;
+  return dir*c;
+}
+
+function sortedResultsForTable(){
+  const key=tableSortKey,dir=tableSortDir==="asc"?1:-1;
+  const rows=results.slice();
+  const num=SORT_NUM_KEYS.has(key);
+  rows.sort((ra,rb)=>{
+    const va=tableSortValue(ra,key),vb=tableSortValue(rb,key);
+    return num?cmpNullsLastNum(va,vb,dir):cmpStrCol(va,vb,dir);
+  });
+  return rows;
+}
+
+function toggleTableSort(key){
+  if(tableSortKey===key)tableSortDir=tableSortDir==="asc"?"desc":"asc";
+  else{
+    tableSortKey=key;
+    tableSortDir=SORT_NUM_KEYS.has(key)?"desc":"asc";
+  }
+  render();
+}
+
+function thSort(label,key,align){
+  const act=tableSortKey===key;
+  const ind=act?(tableSortDir==="asc"?"▲":"▼"):"";
+  const cls=(align==="tr"?"tr":"tl")+" th-sort";
+  const st=key==="company"?"padding-left:14px":"";
+  return`<th class="${cls}" style="${st}" onclick="event.stopPropagation();toggleTableSort('${key}')" role="columnheader" aria-sort="${act?tableSortDir==="asc"?"ascending":"descending":"none"}">${esc(label)}${act?`<span class="th-sort-ind mono" aria-hidden="true">${ind}</span>`:""}</th>`;
+}
 const confBar=v=>{if(v==null)return'<span class="mono" style="font-size:11px;color:var(--t3)">—</span>';return`<div class="conf-w"><div class="conf-f" style="width:${v}%;background:${cc(v)}"></div></div><span class="mono" style="font-size:11px;color:${cc(v)}">${v}%</span>`};
 
 // ── SVG ──
@@ -174,43 +267,275 @@ function importJSON(){
   render();
 }
 
-// ── SIMULATED SCRAPER ──
-function addCompany(name){
-  const key=name.toLowerCase().trim();
-  if(results.some(r=>r.company.toLowerCase()===key)||jobs.some(j=>j.name.toLowerCase()===key))return;
-  const mock=MOCK[key];const dn=mock?mock.company:name.trim();
-  const id=key+"-"+Date.now();
-  const job={id,name:dn,status:"running",logs:[`[${dn}] Söker efter hemsida…`]};
-  jobs.push(job);render();
-
-  const upd=(l)=>{const j=jobs.find(x=>x.id===id);if(!j)return;if(l)j.logs.push(...l);render()};
-  const t1=300+Math.random()*400,t2=t1+500+Math.random()*700,t3=t2+300+Math.random()*500,t4=t3+200+Math.random()*300;
-
-  setTimeout(()=>upd(mock?[`[${dn}] Hittade hemsida: ${mock.website}`,`[${dn}] Navigerar till IR-sida…`]:[`[${dn}] Söker IR-sida via cheerio…`]),t1);
-  setTimeout(()=>upd(mock&&mock.annualReportUrl?[`[${dn}] Hittade IR-sida: ${mock.irPage}`,`[${dn}] Laddar ner PDF: ${mock.annualReportUrl}`]:[`[${dn}] Kunde inte hitta IR-sida`]),t2);
-  setTimeout(()=>upd(mock&&mock.annualReportDownloaded?[`[${dn}] PDF nedladdad → ${mock.annualReportDownloaded}`,`[${dn}] Extraherar nyckeltal med pdf-parse…`]:[`[${dn}] Ingen PDF hittad`]),t3);
-  setTimeout(()=>{
-    const j=jobs.find(x=>x.id===id);if(!j)return;
-    if(mock){
-      j.status="done";
-      const s=mock.sustainability;
-      j.logs.push(
-        ...(mock.extractedData.revenue_msek?[`[${dn}] Omsättning: ${fmt(mock.extractedData.revenue_msek)} MSEK`]:[`[${dn}] Omsättning: ej hittat`]),
-        ...(mock.extractedData.ebit_msek?[`[${dn}] EBIT: ${fmt(mock.extractedData.ebit_msek)} MSEK`]:[]),
-        ...(mock.extractedData.employees?[`[${dn}] Anställda: ${fmt(mock.extractedData.employees)}`]:[]),
-        ...(mock.extractedData.ceo?[`[${dn}] VD: ${mock.extractedData.ceo}`]:[]),
-        ...(s&&s.scope1_co2_tonnes!=null?[`[${dn}] CO₂ Scope 1+2: ${fmt((s.scope1_co2_tonnes||0)+(s.scope2_co2_tonnes||0))} ton`]:[`[${dn}] CO₂: ej hittat`]),
-        `[${dn}] ✓ Klar (${Math.round(t4)}ms)`
-      );
-      results.push({...mock,_source:"simulated"});
-    } else {
-      j.status="error";
-      j.logs.push(`[${dn}] ERROR: Kunde inte hitta eller parsa årsredovisning`);
-    }
-    render();
-  },t4);
+// ── SCRAPER (POST /api/scrape + SSE /api/stream/:jobId) ──
+async function loadResultsFromServer(){
+  try{
+    const r=await fetch(API_BASE+"/api/results");
+    if(!r.ok)return;
+    const data=await r.json();
+    results=Array.isArray(data.results)?data.results.map(x=>({...x,_source:"api"})):[];
+  }catch(e){console.warn("loadResultsFromServer",e)}
 }
-function removeJob(id){jobs=jobs.filter(j=>j.id!==id);render()}
+
+async function loadCompaniesCatalog(){
+  try{
+    const r=await fetch(API_BASE+"/api/companies");
+    if(!r.ok){companyCatalog=[];return}
+    const data=await r.json();
+    companyCatalog=Array.isArray(data)?data:[];
+  }catch(e){
+    console.warn("loadCompaniesCatalog",e);
+    companyCatalog=[];
+  }
+}
+
+function isSubsequence(q,s){
+  const ql=q.toLowerCase();
+  const sl=s.toLowerCase();
+  let i=0;
+  for(let p=0;p<sl.length&&i<ql.length;p++){
+    if(sl[p]===ql[i])i++;
+  }
+  return i===ql.length;
+}
+
+/** Lower is better. Null = no match. */
+function matchCompanyScore(q,name,ticker){
+  const ql=q.toLowerCase().trim();
+  if(ql.length<2)return null;
+  const nl=name.toLowerCase();
+  const tl=ticker.toLowerCase();
+  const hay=nl+" "+tl;
+  if(hay.includes(ql)){
+    let sc=50;
+    if(nl.startsWith(ql))sc=-100;
+    else{
+      const ni=nl.indexOf(ql);
+      if(ni>=0)sc=Math.min(sc,ni);
+    }
+    if(tl.includes(ql))sc=Math.min(sc,20+tl.indexOf(ql));
+    return sc;
+  }
+  if(isSubsequence(ql,nl)||isSubsequence(ql,tl)){
+    let end=-1,i=0;
+    for(let p=0;p<nl.length&&i<ql.length;p++){
+      if(nl[p]===ql[i]){end=p;i++}
+    }
+    if(i===ql.length)return 400+end;
+    end=-1;
+    i=0;
+    for(let p=0;p<tl.length&&i<ql.length;p++){
+      if(tl[p]===ql[i]){end=p;i++}
+    }
+    return i===ql.length?500+end:9999;
+  }
+  return null;
+}
+
+function fuzzyCompanyMatches(catalog,q){
+  const ql=q.trim();
+  if(ql.length<2)return[];
+  const scored=[];
+  for(const row of catalog){
+    const sc=matchCompanyScore(ql,row.name,row.ticker);
+    if(sc!==null)scored.push({row,sc});
+  }
+  scored.sort((a,b)=>a.sc-b.sc||a.row.name.localeCompare(b.row.name)||a.row.ticker.localeCompare(b.row.ticker));
+  return scored.map(x=>x.row).slice(0,16);
+}
+
+function hideAc(){
+  acIndex=-1;
+  acMatches=[];
+  const dd=document.getElementById("ac-dd");
+  if(dd){
+    dd.style.display="none";
+    dd.innerHTML="";
+  }
+}
+
+function paintAcDropdown(){
+  const dd=document.getElementById("ac-dd");
+  if(!dd)return;
+  const q=companyInputValue.trim();
+  if(q.length<2){
+    dd.style.display="none";
+    dd.innerHTML="";
+    acMatches=[];
+    return;
+  }
+  acMatches=fuzzyCompanyMatches(companyCatalog,q);
+  if(!acMatches.length){
+    dd.style.display="none";
+    dd.innerHTML="";
+    return;
+  }
+  if(acIndex>=acMatches.length)acIndex=acMatches.length-1;
+  dd.style.display="block";
+  dd.innerHTML=acMatches.map((row,i)=>`<div class="ac-item ${i===acIndex?"ac-sel":""}" role="option" aria-selected="${i===acIndex}" onmousedown="event.preventDefault();selectAcSuggestion(${i})"><span class="ac-n">${esc(row.name)}</span><span class="ac-t">${esc(row.ticker)}</span></div>`).join("");
+}
+
+function selectAcSuggestion(i){
+  if(i<0||i>=acMatches.length)return;
+  const row=acMatches[i];
+  companyInputValue="";
+  hideAc();
+  addCompany(row.ticker);
+}
+
+function onCiInput(ev){
+  companyInputValue=ev.target.value;
+  acIndex=-1;
+  paintAcDropdown();
+}
+
+function onCiKeydown(ev){
+  const q=companyInputValue.trim();
+
+  if(ev.key==="Escape"){
+    ev.preventDefault();
+    acIndex=-1;
+    acMatches=[];
+    const dd=document.getElementById("ac-dd");
+    if(dd){dd.style.display="none";dd.innerHTML=""}
+    return;
+  }
+
+  if((ev.key==="ArrowDown"||ev.key==="ArrowUp")&&q.length>=2){
+    ev.preventDefault();
+    if(!acMatches.length)paintAcDropdown();
+    if(!acMatches.length)return;
+    if(ev.key==="ArrowDown"){
+      acIndex=acIndex<acMatches.length-1?acIndex+1:acIndex;
+      if(acIndex<0)acIndex=0;
+    }else{
+      acIndex=acIndex>0?acIndex-1:-1;
+    }
+    paintAcDropdown();
+    const dd=document.getElementById("ac-dd");
+    const sel=dd&&dd.querySelector(".ac-sel");
+    if(sel&&typeof sel.scrollIntoView==="function")sel.scrollIntoView({block:"nearest"});
+    return;
+  }
+
+  if(ev.key==="Enter"){
+    if(q.length>=2&&acMatches.length&&acIndex>=0){
+      ev.preventDefault();
+      selectAcSuggestion(acIndex);
+      return;
+    }
+    ev.preventDefault();
+    doAdd();
+  }
+}
+
+function onDocMouseDown(ev){
+  if(ev.target.closest&&ev.target.closest(".ac-wrap"))return;
+  acIndex=-1;
+  acMatches=[];
+  const dd=document.getElementById("ac-dd");
+  if(dd){dd.style.display="none";dd.innerHTML=""}
+}
+
+function connectJobStream(job){
+  const es=new EventSource(API_BASE+"/api/stream/"+encodeURIComponent(job.id));
+  job.es=es;
+  let seenDone=false;
+  es.addEventListener("message",(ev)=>{
+    try{
+      const d=JSON.parse(ev.data);
+      if(d.type==="log"){
+        job.logs.push(d.line);
+        render();
+        return;
+      }
+      if(d.type==="done"){
+        if(seenDone)return;
+        seenDone=true;
+        try{es.close()}catch(_){}
+        job.es=null;
+        job.exitCode=d.exitCode;
+        job.status=d.exitCode===0?"done":"failed";
+        if(d.exitCode!==0){
+          job.logs.push("ERROR: Scraper exited with code "+d.exitCode+". See log lines above for details.");
+        }
+        loadResultsFromServer().then(()=>render());
+      }
+    }catch(e){console.warn(e)}
+  });
+  es.addEventListener("error",()=>{
+    if(seenDone||job.status!=="running"){try{es.close()}catch(_){};return}
+    job.logs.push("[dashboard] Log stream disconnected. The scrape may still be running on the server — refresh this page or check the server terminal.");
+    job.es=null;
+    try{es.close()}catch(_){}
+    render();
+  });
+}
+
+async function addCompany(name){
+  const trimmed=name.trim();
+  if(!trimmed)return;
+  const key=trimmed.toLowerCase();
+  const isTicker=trimmed.includes(".");
+
+  const dupResult=results.some(r=>{
+    if(isTicker){
+      if(r.ticker)return String(r.ticker).toLowerCase()===key;
+      return false;
+    }
+    return (r.company||"").toLowerCase()===key;
+  });
+  if(dupResult)return;
+  if(jobs.some(j=>j.status==="running"&&j.queryKey===key))return;
+
+  let res;
+  try{
+    res=await fetch(API_BASE+"/api/scrape",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(isTicker?{ticker:trimmed}:{company:trimmed}),
+    });
+  }catch(e){
+    importMsg="✕ Cannot reach API: "+e.message+". Start the server with npm run server (default http://localhost:3000).";
+    render();
+    return;
+  }
+
+  if(res.status===429){
+    const errBody=await res.json().catch(()=>({}));
+    importMsg="✕ "+(errBody.error||"Too many scrapes at once (max 3 concurrent jobs). Wait for one to finish.");
+    render();
+    return;
+  }
+
+  if(!res.ok){
+    const errBody=await res.json().catch(()=>({}));
+    importMsg="✕ "+(errBody.error||("HTTP "+res.status));
+    render();
+    return;
+  }
+
+  const body=await res.json().catch(()=>({}));
+  if(!body.jobId){
+    importMsg="✕ Invalid response from server (missing jobId)";
+    render();
+    return;
+  }
+
+  importMsg="";
+  showLogs=true;
+  const job={id:body.jobId,name:trimmed,status:"running",logs:[],queryKey:key,es:null,exitCode:null};
+  jobs.push(job);
+  render();
+  connectJobStream(job);
+}
+
+function removeJob(id){
+  const j=jobs.find(x=>x.id===id);
+  if(j&&j.es){try{j.es.close()}catch(_){};j.es=null}
+  jobs=jobs.filter(x=>x.id!==id);
+  render();
+}
 function removeResult(ticker){results=results.filter(r=>r.ticker!==ticker);if(selTk===ticker)selTk=null;render()}
 
 function downloadJSON(){
@@ -255,21 +580,32 @@ function renderDetail(){
 
 // ── TABLE ──
 function renderTable(){
-  const rows=results.map((c,i)=>{
-    const d=c.extractedData;const m=mg(c);const c2v=co2(c);const sel=selTk===c.ticker;
-    return `<tr class="${sel?"sel":""}" onclick="selTk=selTk==='${c.ticker}'?null:'${c.ticker}';render()" style="animation:fadeUp .35s ease ${i*35}ms both">
+  const sorted=sortedResultsForTable();
+  const rows=sorted.map((c,i)=>{
+    const d=c.extractedData;const c2v=co2(c);const sel=selTk===c.ticker;
+    const tk=(c.ticker!=null?String(c.ticker):"").replace(/\\/g,"\\\\").replace(/'/g,"\\'").replace(/\n/g,"\\n");
+    return `<tr class="${sel?"sel":""}" onclick="selTk=selTk==='${tk}'?null:'${tk}';render()" style="animation:fadeUp .35s ease ${i*35}ms both">
       <td class="tl" style="padding-left:14px"><div style="display:flex;align-items:center;gap:8px">${avt(c)}<div><div style="font-weight:600;font-size:12.5px">${esc(c.company)}</div><div class="mono" style="font-size:10px;color:var(--t3)">${esc(c.ticker)}</div></div></div></td>
-      <td class="tr">${stBadge(c.status)}</td>
       <td class="tr mono">${d?fmt(d.revenue_msek):"—"}</td>
       <td class="tr mono">${d?fmt(d.ebit_msek):"—"}</td>
       <td class="tr mono" style="color:var(--t2)">${d?fmt(d.employees):"—"}</td>
+      <td class="tr mono" style="color:var(--t2)">${c.fiscalYear!=null?esc(String(c.fiscalYear)):"—"}</td>
       <td class="tr mono" style="color:var(--t2)">${c2v!=null?fmt(c2v):"—"}</td>
       <td class="tr">${confBar(c.confidence)}</td>
+      <td class="tr">${stBadge(c.status)}</td>
       <td class="tr" style="color:var(--t2);padding-right:14px">${d&&d.ceo?esc(d.ceo):"—"}</td>
     </tr>`}).join("");
   return `<div style="display:grid;grid-template-columns:${selTk?"1fr 400px":"1fr"};gap:16px">
     <div class="cd" style="overflow-x:auto"><table><thead><tr>
-      <th class="tl" style="padding-left:14px">Bolag</th><th class="tr">Status</th><th class="tr">Omsättning</th><th class="tr">EBIT</th><th class="tr">Anställda</th><th class="tr">CO₂ S1+2</th><th class="tr">Confidence</th><th class="tr" style="padding-right:14px">VD</th>
+      ${thSort("Bolag","company","tl")}
+      ${thSort("Omsättning","revenue","tr")}
+      ${thSort("EBIT","ebit","tr")}
+      ${thSort("Anställda","employees","tr")}
+      ${thSort("FY","fy","tr")}
+      <th class="tr">CO₂ S1+2</th>
+      ${thSort("Confidence","confidence","tr")}
+      ${thSort("Status","status","tr")}
+      <th class="tr" style="padding-right:14px">VD</th>
     </tr></thead><tbody>${rows}</tbody></table></div>${selTk?renderDetail():""}</div>`;
 }
 
@@ -329,7 +665,10 @@ function render(){
   // ── INPUT + IMPORT AREA ──
   h+=`<div class="cd" style="padding:16px 20px;margin-bottom:20px">
     <div class="ir">
-      <input id="ci" placeholder="Enter company name — e.g. Volvo, Ericsson, H&M…" onkeydown="if(event.key==='Enter')doAdd()">
+      <div class="ac-wrap">
+        <input id="ci" placeholder="Company name or ticker — e.g. Volvo, ERIC-B.ST, H&M…" autocomplete="off" oninput="onCiInput(event)" onkeydown="onCiKeydown(event)">
+        <div id="ac-dd" class="ac-dd" style="display:none" role="listbox" aria-label="Company suggestions"></div>
+      </div>
       <button class="bp" onclick="doAdd()">+ Scrape</button>
       <button class="bo" onclick="showImport=!showImport;render()" style="font-family:inherit;font-weight:600;font-size:12.5px">${showImport?"Cancel":"Import JSON"}</button>
       ${hasData?`<button class="bo" onclick="downloadJSON()">↓ results.json (${results.length})</button>`:""}
@@ -361,7 +700,7 @@ function render(){
   }
 
   // ── EMPTY STATE ──
-  if(!hasData&&!act.length) h+=`<div class="cd empty"><div style="font-size:32px;margin-bottom:12px;opacity:.15">⊞</div><div style="font-size:15px;font-weight:600;margin-bottom:6px">No companies yet</div><div style="font-size:13px;color:var(--t3);max-width:420px;margin:0 auto;line-height:1.5">Add companies one at a time to simulate scraping, or click <strong>Import JSON</strong> to paste your scraper output.</div></div>`;
+  if(!hasData&&!act.length) h+=`<div class="cd empty"><div style="font-size:32px;margin-bottom:12px;opacity:.15">⊞</div><div style="font-size:15px;font-weight:600;margin-bottom:6px">No companies yet</div><div style="font-size:13px;color:var(--t3);max-width:460px;margin:0 auto;line-height:1.5">Run <span class="mono" style="font-size:12px">npm run server</span> and open the dashboard from <span class="mono" style="font-size:12px">http://localhost:3000</span>, then scrape by name or ticker. Or use <strong>Import JSON</strong> to paste <span class="mono" style="font-size:12px">results.json</span>.</div></div>`;
   else if(!hasData&&act.length>0) h+=`<div class="cd" style="padding:48px 40px;text-align:center">${spin("#2563EB",20)}<div style="font-size:14px;font-weight:600;margin-top:14px">Scraping in progress…</div></div>`;
 
   // ── DATA VIEWS ──
@@ -370,13 +709,31 @@ function render(){
     else h+=renderPerf();
   }
 
-  if(results.length||jobs.length) h+=`<div style="margin-top:28px;padding-top:14px;border-top:1px solid var(--bd);display:flex;justify-content:space-between"><span class="mono" style="font-size:11px;color:var(--t3)">${results.filter(r=>r.status==="complete").length} complete · ${results.filter(r=>r.status==="partial").length} partial · ${results.filter(r=>r.status==="failed").length} failed${act.length?" · "+act.length+" running":""}</span><span style="font-size:11px;color:var(--t3)">In-memory · resets on refresh</span></div>`;
+  if(results.length||jobs.length) h+=`<div style="margin-top:28px;padding-top:14px;border-top:1px solid var(--bd);display:flex;justify-content:space-between"><span class="mono" style="font-size:11px;color:var(--t3)">${results.filter(r=>r.status==="complete").length} complete · ${results.filter(r=>r.status==="partial").length} partial · ${results.filter(r=>r.status==="failed").length} failed${act.length?" · "+act.length+" running":""}</span><span style="font-size:11px;color:var(--t3)">${API_BASE?"File mode · API at localhost:3000":"Table from output/results.json via API"}</span></div>`;
 
   document.getElementById("app").innerHTML=h;
-  const inp=document.getElementById("ci");if(inp&&document.activeElement?.tagName!=="BUTTON"&&document.activeElement?.tagName!=="TEXTAREA")inp.focus();
+  const inp=document.getElementById("ci");
+  if(inp){
+    inp.value=companyInputValue;
+    if(document.activeElement?.tagName!=="BUTTON"&&document.activeElement?.tagName!=="TEXTAREA")inp.focus();
+  }
+  paintAcDropdown();
 }
-function doAdd(){const i=document.getElementById("ci");if(i&&i.value.trim()){addCompany(i.value);i.value=""}}
-render();
+function doAdd(){
+  const i=document.getElementById("ci");
+  if(!i||!i.value.trim())return;
+  const v=i.value.trim();
+  companyInputValue="";
+  hideAc();
+  addCompany(v);
+}
+async function init(){
+  await loadResultsFromServer();
+  await loadCompaniesCatalog();
+  render();
+  document.addEventListener("mousedown",onDocMouseDown,true);
+}
+init();
 </script>
 </body>
 </html>

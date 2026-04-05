@@ -54,3 +54,11 @@ DOMAIN RESOLUTION:
 GIT DISCIPLINE:
 - Commit after every successful fix: git add -A && git commit -m "fix: [description]"
 - Never leave working code uncommitted across sessions.
+
+NON-REGRESSION (maintainer / CI hygiene):
+- Never modify src/utils/http-client.ts without running npx jest before and after the change.
+- Never change the output schema in src/types.ts without updating README.md and bumping the version in package.json.
+- Never remove a fallback stage from the pipeline without a documented reason in the PR.
+- The data/ticker.json file is a data asset — never overwrite it programmatically without a backup step.
+- All new discovery logic must have a corresponding test in tests/.
+- tsc --noEmit must pass before any commit.

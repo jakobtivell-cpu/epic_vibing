@@ -20,6 +20,7 @@ import {
 import { createLogger } from '../utils/logger';
 import { EUR_MILLIONS_TO_MSEK_APPROX } from '../config/settings';
 import { parseNumber } from './number-parse';
+import { applyRevenueMegascaleMsekGuard, isFusedYearIntegerCorruption } from './number-guards';
 import {
   classifyRevenueMapping,
   classifyEbitMapping,
@@ -1446,13 +1447,12 @@ export function extractFields(
   }
 
   // Fused text detection: discard numeric fields containing repeated year patterns
-  const fusedYearRe = /(20\d{2}){2,}/;
-  if (revenue !== null && fusedYearRe.test(String(revenue))) {
+  if (revenue !== null && isFusedYearIntegerCorruption(revenue)) {
     notes.push(`Revenue ${revenue} discarded — fused year pattern detected`);
     revenue = null;
     revProvenance = null;
   }
-  if (ebit !== null && fusedYearRe.test(String(ebit))) {
+  if (ebit !== null && isFusedYearIntegerCorruption(ebit)) {
     notes.push(`EBIT ${ebit} discarded — fused year pattern detected`);
     ebit = null;
   }
@@ -1474,15 +1474,17 @@ export function extractFields(
   }
 
   // Parent-company lines in tkr/KSEK are sometimes parsed with consolidated MSEK context → ~1000× inflation.
-  if (detectedType !== 'investment_company' && revenue !== null && revenue > 1_000_000) {
-    const corrected = Math.round(revenue / 1000);
-    log.warn(
-      `Revenue ${revenue} MSEK exceeds 1,000,000 — applying ÷1000 unit guard → ${corrected} MSEK`,
-    );
-    notes.push(
-      `Revenue unit guard: ${revenue} → ${corrected} MSEK (likely tkr/KSEK misread as MSEK)`,
-    );
-    revenue = corrected;
+  if (detectedType !== 'investment_company' && revenue !== null) {
+    const { revenue: rev2, adjusted } = applyRevenueMegascaleMsekGuard(revenue);
+    if (adjusted) {
+      log.warn(
+        `Revenue ${revenue} MSEK exceeds 1,000,000 — applying ÷1000 unit guard → ${rev2} MSEK`,
+      );
+      notes.push(
+        `Revenue unit guard: ${revenue} → ${rev2} MSEK (likely tkr/KSEK misread as MSEK)`,
+      );
+      revenue = rev2;
+    }
   }
 
   if (detectedType !== 'investment_company' && revenue === null) {

@@ -1,0 +1,41 @@
+# -----------------------------------------------------------------------------
+# Secrets (GitHub → Settings → Secrets and variables → Actions → New repository secret)
+#
+#   ANTHROPIC_API_KEY — Required. Create an API key in the Anthropic Console
+#   (https://console.anthropic.com/) under API keys, then add it here. Web search
+#   must be enabled for your organization/workspace in the Console where applicable.
+#
+#   GITHUB_TOKEN — Provided automatically in GitHub Actions. This workflow uses the
+#   default token to open issues; ensure "Workflow permissions" allows read/write
+#   for issues (Settings → Actions → General → Workflow permissions).
+# -----------------------------------------------------------------------------
+
+name: IR page health check
+
+on:
+  schedule:
+    # 1st of every month, 06:00 UTC
+    - cron: '0 6 1 * *'
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run IR health check
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/ir-health-check.mjs

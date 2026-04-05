@@ -24,4 +24,13 @@ describe('parseNumber', () => {
     expect(parseNumber('')).toBeNull();
     expect(parseNumber('abc')).toBeNull();
   });
+
+  it('parses integers that are not comma-grouped (table fragments)', () => {
+    expect(parseNumber('236681')).toBe(236681);
+    expect(parseNumber('  457509  ')).toBe(457509);
+  });
+
+  it('handles Swedish decimal comma as decimal separator when last comma has ≤2 digits after', () => {
+    expect(parseNumber('1234,5')).toBeCloseTo(1234.5);
+  });
 });

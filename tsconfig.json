@@ -15,6 +15,6 @@
     "sourceMap": true,
     "moduleResolution": "node"
   },
-  "include": ["scrape.ts", "src/**/*.ts", "tests/**/*.ts"],
+  "include": ["scrape.ts", "server.ts", "src/**/*.ts", "tests/**/*.ts"],
   "exclude": ["node_modules", "dist", "downloads", "output"]
 }

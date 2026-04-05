@@ -1,4 +1,4 @@
-import { resolveUrl, toAbsoluteHttpUrl } from '../src/utils/url-helpers';
+import { resolveUrl, toAbsoluteHttpUrl, isSameSite, getPath } from '../src/utils/url-helpers';
 
 describe('resolveUrl', () => {
   it('removes encoded-quote path segments and collapses doubled slashes (Alfa Laval–style hrefs)', () => {
@@ -28,5 +28,32 @@ describe('toAbsoluteHttpUrl', () => {
   it('preserves existing schemes and normalizes trailing slash', () => {
     expect(toAbsoluteHttpUrl('https://www.essity.com/')).toBe('https://www.essity.com');
     expect(toAbsoluteHttpUrl('http://legacy.example/')).toBe('http://legacy.example');
+  });
+});
+
+describe('isSameSite', () => {
+  it('returns true for same host', () => {
+    expect(
+      isSameSite('https://www.ericsson.com/en/investors', 'https://www.ericsson.com/assets/x.pdf'),
+    ).toBe(true);
+  });
+
+  it('returns true for parent vs subdomain', () => {
+    expect(isSameSite('https://investors.hexagon.com/', 'https://hexagon.com/')).toBe(true);
+    expect(isSameSite('https://hexagon.com/', 'https://api.hexagon.com/v1')).toBe(true);
+  });
+
+  it('returns false for unrelated hosts', () => {
+    expect(isSameSite('https://www.seb.se/', 'https://www.groupeseb.com/')).toBe(false);
+  });
+
+  it('returns false for invalid URLs', () => {
+    expect(isSameSite('not-a-url', 'https://a.com/')).toBe(false);
+  });
+});
+
+describe('getPath', () => {
+  it('returns lowercased pathname', () => {
+    expect(getPath('https://Example.COM/InVeStOrs/')).toBe('/investors/');
   });
 });

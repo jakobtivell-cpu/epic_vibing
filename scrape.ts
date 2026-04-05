@@ -40,7 +40,7 @@ const program = new Command();
 program
   .name('scrape')
   .description('Scrape annual report data from any Swedish Large Cap company')
-  .version('2.0.0')
+  .version('2.1.0')
   .option(
     '--company <names>',
     'Comma-separated company names (e.g. "Sandvik,SEB,Hexagon")',
@@ -70,7 +70,7 @@ async function main(): Promise<void> {
     setSlowMode(true);
   }
 
-  log.info('Swedish Large Cap Annual Report Scraper v2.0 — generic engine');
+  log.info('Swedish Large Cap Annual Report Scraper v2.1 — generic engine');
 
   // Load ticker map (never fails — logs a warning if missing)
   loadTickerMap();

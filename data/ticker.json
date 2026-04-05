@@ -66,8 +66,16 @@
         "candidateDomains": ["https://www.alfalaval.com"]
     },
     "LUMI.ST": "Lundin Mining Corporation",
-    "INDU-A.ST": "AB Industrivärden (publ)",
-    "INDU-C.ST": "AB Industrivärden (publ)",
+    "INDU-A.ST": {
+        "name": "AB Industrivärden (publ)",
+        "orgNumber": "556043-4200",
+        "candidateDomains": ["https://www.industrivarden.se"]
+    },
+    "INDU-C.ST": {
+        "name": "AB Industrivärden (publ)",
+        "orgNumber": "556043-4200",
+        "candidateDomains": ["https://www.industrivarden.se"]
+    },
     "TELIA.ST": "Telia Company AB (publ)",
     "LUG.ST": "Lundin Gold Inc.",
     "8TRA.ST": "Traton SE",

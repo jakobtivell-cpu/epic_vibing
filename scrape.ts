@@ -48,7 +48,12 @@ program
   )
   .option('--force', 'Re-download and reprocess everything, ignoring cache', false)
   .option('--slow', 'Set base delay to 8s for all domains (polite mode)', false)
-  .option('--verbose', 'Enable debug-level logging', false);
+  .option('--verbose', 'Enable debug-level logging', false)
+  .option(
+    '--llm-challenger',
+    'When OPENAI_API_KEY is set, force the LLM challenger pass for PDF extractions (still requires PDF text)',
+    false,
+  );
 
 async function main(): Promise<void> {
   program.parse();
@@ -107,6 +112,7 @@ async function main(): Promise<void> {
 
   const results = await runPipeline(runConfig.companies, runConfig.force, {
     sequential: runSequential,
+    llmChallengerForce: Boolean(opts.llmChallenger),
   });
 
   if (companies.length === 1 || !isDefaultLargeCapBatch) {

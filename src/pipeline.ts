@@ -55,6 +55,7 @@ import {
   crossValidateFiscalYear,
 } from './validation';
 import { createLogger } from './utils/logger';
+import { runChallengerTrack } from './challenger';
 
 const log = createLogger('pipeline');
 const CURRENT_YEAR = new Date().getFullYear();
@@ -104,6 +105,11 @@ function createPool(concurrency: number) {
 export interface RunPipelineOptions {
   /** When true and more than one company, run one at a time (rate-limit friendly). */
   sequential?: boolean;
+  /**
+   * When true and `OPENAI_API_KEY` is set, run the LLM challenger even if the gate would skip
+   * (still requires PDF text on the primary path).
+   */
+  llmChallengerForce?: boolean;
 }
 
 export async function runPipeline(
@@ -116,7 +122,7 @@ export async function runPipeline(
   }
 
   if (companies.length === 1) {
-    const result = await processCompany(companies[0], force);
+    const result = await processCompany(companies[0], force, options);
     return [result];
   }
 
@@ -126,7 +132,7 @@ export async function runPipeline(
       const company = companies[i];
       log.info(`Processing ${company.name} [${i + 1}/${companies.length}]`);
       try {
-        results.push(await processCompany(company, force));
+        results.push(await processCompany(company, force, options));
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         log.error(`[${company.name}] Fatal error: ${message}`);
@@ -141,7 +147,7 @@ export async function runPipeline(
     pool.run(async () => {
       log.info(`Processing ${company.name} [${i + 1}/${companies.length}]`);
       try {
-        return await processCompany(company, force);
+        return await processCompany(company, force, options);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         log.error(`[${company.name}] Fatal error: ${message}`);
@@ -205,6 +211,8 @@ interface PdfExtractionSuccess {
   discoveryFiscalYear: number | null;
   notes: string[];
   contentCheck: ReturnType<typeof verifyAnnualReportContent>;
+  pdfPageCount: number;
+  suspiciouslyShortPdf: boolean;
 }
 
 interface PdfExtractionFailure {
@@ -400,6 +408,8 @@ async function tryPdfCandidates(
       discoveryFiscalYear,
       notes,
       contentCheck: gateResult.contentCheck!,
+      pdfPageCount: pdfText.pageCount,
+      suspiciouslyShortPdf: pdfText.suspiciouslyShort,
     };
   }
 
@@ -427,6 +437,10 @@ interface PipelineState {
   fiscalYear: number | null;
   extractionResult: StageResult<ExtractedData>;
   notes: string[];
+  /** Provenance from the last successful PDF `extractFields` (null for IR HTML / allabolag). */
+  lastFieldExtraction: ReturnType<typeof extractFields> | null;
+  pdfPageCount: number;
+  suspiciouslyShortPdf: boolean;
 }
 
 function applyPdfSuccess(state: PipelineState, attempt: PdfExtractionSuccess, step: FallbackStep): void {
@@ -439,6 +453,9 @@ function applyPdfSuccess(state: PipelineState, attempt: PdfExtractionSuccess, st
   state.detectedCompanyType = attempt.extraction.detectedCompanyType;
   state.fiscalYear = attempt.extraction.fiscalYear;
   state.extractionResult = { status: 'success', value: attempt.extraction.data };
+  state.lastFieldExtraction = attempt.extraction;
+  state.pdfPageCount = attempt.pdfPageCount;
+  state.suspiciouslyShortPdf = attempt.suspiciouslyShortPdf;
   state.notes.push(...attempt.notes);
 }
 
@@ -486,6 +503,7 @@ function mergeSearchDiscovery(target: SearchDiscoveryResult, incoming: SearchDis
 async function processCompany(
   company: CompanyProfile,
   force: boolean,
+  pipelineOpts?: RunPipelineOptions,
 ): Promise<PipelineResult> {
   const entity = buildEntityProfile(company);
   const name = company.name;
@@ -510,6 +528,9 @@ async function processCompany(
     detectedCompanyType: null,
     fiscalYear: null,
     extractionResult: skipped,
+    lastFieldExtraction: null,
+    pdfPageCount: 0,
+    suspiciouslyShortPdf: false,
     notes: [
       `ENTITY_PROFILE: searchAnchor="${entity.searchAnchor}" ambiguity=${entity.ambiguityLevel} reportingHint=${entity.reportingModelHint} org=${entity.orgNumber ?? 'none'}`,
     ],
@@ -937,6 +958,36 @@ async function processCompany(
     for (const w of validation.warnings) state.notes.push(w);
   }
 
+  let dualTrackAdjudication: PipelineResult['dualTrackAdjudication'];
+  const pdfLikeSources: DataSource[] = ['pdf', 'playwright+pdf', 'search+pdf'];
+  if (
+    state.annualReportText &&
+    state.dataSource &&
+    pdfLikeSources.includes(state.dataSource) &&
+    validationResult.value
+  ) {
+    const rowStatus = determineStatus(validationResult.value);
+    const dt = await runChallengerTrack({
+      companyDisplayName: name,
+      legalNameForPrompt: entity.legalName,
+      ticker: company.ticker ?? null,
+      fullPdfText: state.annualReportText,
+      pageCount: Math.max(1, state.pdfPageCount || 1),
+      suspiciouslyShortPdf: state.suspiciouslyShortPdf,
+      validatedData: validationResult.value,
+      deterministicFiscalYear: state.fiscalYear,
+      fieldExtraction: state.lastFieldExtraction,
+      confidence,
+      status: rowStatus,
+      detectedCompanyType: state.detectedCompanyType,
+      forceLlm: Boolean(pipelineOpts?.llmChallengerForce),
+    });
+    if (dt) {
+      dualTrackAdjudication = dt;
+      state.notes.push('LLM dual-track adjudication attached (dualTrackAdjudication)');
+    }
+  }
+
   // Sustainability
   let sustainability: SustainabilityData;
   try {
@@ -990,6 +1041,7 @@ async function processCompany(
     cached,
     cachedAt,
     extractionNotes: state.notes,
+    ...(dualTrackAdjudication ? { dualTrackAdjudication } : {}),
     stages: {
       irDiscovery: irResult,
       reportDiscovery: reportResult,

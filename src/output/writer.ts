@@ -36,6 +36,7 @@ function toOutputRow(r: PipelineResult): Record<string, unknown> {
     cached: r.cached,
     cachedAt: r.cachedAt,
     extractionNotes: r.extractionNotes,
+    ...(r.dualTrackAdjudication ? { dualTrackAdjudication: r.dualTrackAdjudication } : {}),
   };
 }
 

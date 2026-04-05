@@ -1,7 +1,11 @@
 // ---------------------------------------------------------------------------
 // Shared types for the Swedish Large Cap annual report scraper.
-// Every module imports from here — no circular deps.
+// Core shared interfaces. `DualTrackAdjudication` lives in challenger/types (imported below).
 // ---------------------------------------------------------------------------
+
+import type { DualTrackAdjudication } from './challenger/types';
+
+export type { DualTrackAdjudication };
 
 /**
  * Classification used to select extraction heuristics (banks report differently).
@@ -90,6 +94,11 @@ export interface PipelineResult {
   cached: boolean;
   cachedAt?: string;
   extractionNotes: string[];
+  /**
+   * When `OPENAI_API_KEY` is set and the gate fires, field-level deterministic vs LLM comparison.
+   * Omitted when no API key or no PDF text on primary path.
+   */
+  dualTrackAdjudication?: DualTrackAdjudication;
   /** Internal stage tracking — excluded from output JSON. */
   stages: {
     irDiscovery: StageResult<string>;

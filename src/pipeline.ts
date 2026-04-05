@@ -32,7 +32,12 @@ import {
   SOURCE_SEARCH_DISCOVERY,
 } from './types';
 import { MAX_CANDIDATES_PER_STEP, RESULTS_PATH } from './config/settings';
-import { searchDiscovery, directPdfSearch, deriveShortNames } from './discovery/search-discovery';
+import {
+  searchDiscovery,
+  directPdfSearch,
+  deriveShortNames,
+  type SearchDiscoveryResult,
+} from './discovery/search-discovery';
 import { discoverIrPage } from './discovery/ir-finder';
 import { discoverAnnualReport } from './discovery/report-ranker';
 import { collectPublicationHubUrls } from './discovery/report-corpus';
@@ -415,6 +420,43 @@ function applyPdfSuccess(state: PipelineState, attempt: PdfExtractionSuccess, st
   state.notes.push(...attempt.notes);
 }
 
+function emptySearchDiscoveryResult(): SearchDiscoveryResult {
+  return {
+    pdfCandidates: [],
+    discoveredWebsite: null,
+    allDiscoveredDomains: [],
+    searchEngineDomains: [],
+    slugInferenceDomains: [],
+    irPageCandidates: [],
+  };
+}
+
+function originHostKey(origin: string): string {
+  try {
+    const u = new URL(origin.startsWith('http') ? origin : `https://${origin}`);
+    return u.hostname.replace(/^www\./, '').toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+function mergeSearchDiscovery(target: SearchDiscoveryResult, incoming: SearchDiscoveryResult): void {
+  const pdfSeen = new Set(target.pdfCandidates.map((c) => c.url));
+  for (const c of incoming.pdfCandidates) {
+    if (!pdfSeen.has(c.url)) {
+      target.pdfCandidates.push(c);
+      pdfSeen.add(c.url);
+    }
+  }
+  const irSeen = new Set(target.irPageCandidates);
+  for (const u of incoming.irPageCandidates) {
+    if (!irSeen.has(u)) {
+      target.irPageCandidates.push(u);
+      irSeen.add(u);
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Main company processing — 7-step bulletproof fallback chain
 // ---------------------------------------------------------------------------
@@ -456,15 +498,27 @@ async function processCompany(
   let website = company.website ?? null;
   let irPageUrl: string | null = null;
 
+  const websiteTrimmed = company.website?.trim() ?? '';
+  const hasTrustedOrigin =
+    entity.seedCandidateDomains.length > 0 || Boolean(websiteTrimmed);
+
   // =========================================================================
   // Step 1: Search engine discovery (filetype:pdf, multi-query, short names)
+  // Skipped when ticker.json seeds or a known website exist — IR runs first;
+  // search runs later only if extraction still failed (deferred block below).
   // =========================================================================
-  log.info(`[${name}] === Step 1: Search engine discovery ===`);
-  const searchResult = await searchDiscovery(
-    entity.searchAnchor,
-    company.ticker,
-    entity.seedCandidateDomains,
-  );
+  let searchResult: SearchDiscoveryResult;
+  if (hasTrustedOrigin) {
+    log.info(`[${name}] === Step 1: Search engine discovery (skipped — trusted domains/website) ===`);
+    searchResult = emptySearchDiscoveryResult();
+  } else {
+    log.info(`[${name}] === Step 1: Search engine discovery ===`);
+    searchResult = await searchDiscovery(
+      entity.searchAnchor,
+      company.ticker,
+      entity.seedCandidateDomains,
+    );
+  }
 
   if (!website && searchResult.discoveredWebsite) {
     website = searchResult.discoveredWebsite;
@@ -512,101 +566,96 @@ async function processCompany(
   // =========================================================================
   // Step 2+3: Multi-domain Cheerio + Playwright cycling (before search-guessed PDFs)
   // =========================================================================
-  if (!state.extractionResult.value && candidateDomains.length > 0) {
-    log.info(`[${name}] === Step 2+3: Multi-domain cycling (${candidateDomains.length} domains) ===`);
+  const attemptedIrHosts = new Set<string>();
 
-    for (const domain of candidateDomains) {
-      if (state.extractionResult.value) break;
+  const processDomain = async (domain: string): Promise<void> => {
+    log.info(`[${name}] --- Trying domain: ${domain} ---`);
 
-      log.info(`[${name}] --- Trying domain: ${domain} ---`);
+    const domainIrResult = await discoverIrPage(entity.searchAnchor, domain);
 
-      // Step 2: Cheerio IR discovery + report scan
-      const domainIrResult = await discoverIrPage(entity.searchAnchor, domain);
+    if (domainIrResult.status === 'success' && domainIrResult.value) {
+      const domainIrUrl = domainIrResult.value;
+      if (!irPageUrl) irPageUrl = domainIrUrl;
+      irResult = domainIrResult;
 
-      if (domainIrResult.status === 'success' && domainIrResult.value) {
-        const domainIrUrl = domainIrResult.value;
-        if (!irPageUrl) irPageUrl = domainIrUrl;
-        irResult = domainIrResult;
+      const domainReportResult = await discoverAnnualReport(entity.searchAnchor, domain, domainIrUrl);
 
-        const domainReportResult = await discoverAnnualReport(entity.searchAnchor, domain, domainIrUrl);
-
-        let mergedCandidates = [...(domainReportResult.value?.allCandidates ?? [])];
-        const hubUrls = await collectPublicationHubUrls(domain);
-        state.notes.push(`REPORT_CORPUS: ${hubUrls.length} publication hub(s) probed on ${domain}`);
-        const seenCand = new Set(mergedCandidates.map((c) => c.url));
-        for (const hub of hubUrls) {
-          if (hub.replace(/\/$/, '') === domainIrUrl.replace(/\/$/, '')) continue;
-          const extra = await discoverAnnualReport(entity.searchAnchor, domain, hub);
-          if (extra.value?.allCandidates?.length) {
-            for (const c of extra.value.allCandidates) {
-              if (!seenCand.has(c.url)) {
-                mergedCandidates.push(c);
-                seenCand.add(c.url);
-              }
+      let mergedCandidates = [...(domainReportResult.value?.allCandidates ?? [])];
+      const hubUrls = await collectPublicationHubUrls(domain);
+      state.notes.push(`REPORT_CORPUS: ${hubUrls.length} publication hub(s) probed on ${domain}`);
+      const seenCand = new Set(mergedCandidates.map((c) => c.url));
+      for (const hub of hubUrls) {
+        if (hub.replace(/\/$/, '') === domainIrUrl.replace(/\/$/, '')) continue;
+        const extra = await discoverAnnualReport(entity.searchAnchor, domain, hub);
+        if (extra.value?.allCandidates?.length) {
+          for (const c of extra.value.allCandidates) {
+            if (!seenCand.has(c.url)) {
+              mergedCandidates.push(c);
+              seenCand.add(c.url);
             }
           }
         }
-        mergedCandidates = filterAndRankReportCandidatesForEntity(mergedCandidates, entity);
+      }
+      mergedCandidates = filterAndRankReportCandidatesForEntity(mergedCandidates, entity);
 
-        if (mergedCandidates.length > 0) {
-          reportResult = domainReportResult;
+      if (mergedCandidates.length > 0) {
+        reportResult = domainReportResult;
 
-          const irHigh = mergedCandidates.filter((c) => c.score >= 10);
-          const irLow = mergedCandidates.filter((c) => c.score < 10);
+        const irHigh = mergedCandidates.filter((c) => c.score >= 10);
+        const irLow = mergedCandidates.filter((c) => c.score < 10);
 
-          if (irHigh.length > 0) {
-            const cheerioAttempt = await tryPdfCandidates(
-              irHigh, entity, force, 'cheerio',
-              MAX_CANDIDATES_PER_STEP, shortNames,
-              CIRCUIT_PER_HOST,
-            );
+        if (irHigh.length > 0) {
+          const cheerioAttempt = await tryPdfCandidates(
+            irHigh, entity, force, 'cheerio',
+            MAX_CANDIDATES_PER_STEP, shortNames,
+            CIRCUIT_PER_HOST,
+          );
 
-            if (cheerioAttempt.success) {
-              applyPdfSuccess(state, cheerioAttempt, 'cheerio');
-              break;
-            }
-            state.notes.push(...cheerioAttempt.notes);
+          if (cheerioAttempt.success) {
+            applyPdfSuccess(state, cheerioAttempt, 'cheerio');
+            return;
           }
-
-          if (!state.extractionResult.value && irLow.length > 0) {
-            const cheerioLowAttempt = await tryPdfCandidates(
-              irLow, entity, force, 'cheerio',
-              MAX_CANDIDATES_PER_STEP, shortNames,
-              CIRCUIT_PER_HOST,
-            );
-
-            if (cheerioLowAttempt.success) {
-              applyPdfSuccess(state, cheerioLowAttempt, 'cheerio');
-              break;
-            }
-            state.notes.push(...cheerioLowAttempt.notes);
-          }
+          state.notes.push(...cheerioAttempt.notes);
         }
 
-        // Step 3: Playwright on this domain's IR page
-        if (!state.extractionResult.value) {
-          log.info(`[${name}] Playwright crawl on: ${domainIrUrl}`);
-          const playwrightCandidates = await tryPlaywrightFallback(entity.searchAnchor, domainIrUrl);
+        if (!state.extractionResult.value && irLow.length > 0) {
+          const cheerioLowAttempt = await tryPdfCandidates(
+            irLow, entity, force, 'cheerio',
+            MAX_CANDIDATES_PER_STEP, shortNames,
+            CIRCUIT_PER_HOST,
+          );
 
-          if (playwrightCandidates.length > 0) {
-            const rankedPw = filterAndRankReportCandidatesForEntity(playwrightCandidates, entity);
-            const pwAttempt = await tryPdfCandidates(
-              rankedPw, entity, force, 'playwright',
-              MAX_CANDIDATES_PER_STEP, shortNames,
-              CIRCUIT_PER_HOST,
-            );
+          if (cheerioLowAttempt.success) {
+            applyPdfSuccess(state, cheerioLowAttempt, 'cheerio');
+            return;
+          }
+          state.notes.push(...cheerioLowAttempt.notes);
+        }
+      }
 
-            if (pwAttempt.success) {
-              applyPdfSuccess(state, pwAttempt, 'playwright');
-              break;
-            }
+      if (!state.extractionResult.value) {
+        log.info(`[${name}] Playwright crawl on: ${domainIrUrl}`);
+        const playwrightCandidates = await tryPlaywrightFallback(entity.searchAnchor, domainIrUrl);
+
+        if (playwrightCandidates.length > 0) {
+          const rankedPw = filterAndRankReportCandidatesForEntity(playwrightCandidates, entity);
+          const pwAttempt = await tryPdfCandidates(
+            rankedPw, entity, force, 'playwright',
+            MAX_CANDIDATES_PER_STEP, shortNames,
+            CIRCUIT_PER_HOST,
+          );
+
+          if (pwAttempt.success) {
+            applyPdfSuccess(state, pwAttempt, 'playwright');
+          } else {
             state.notes.push(...pwAttempt.notes);
           }
         }
       }
     }
+  };
 
-    // Also try IR pages discovered by search if no IR was found on any domain
+  const runSearchIrFallbackIfNeeded = async (): Promise<void> => {
     if (!state.extractionResult.value && searchResult.irPageCandidates.length > 0 && !irPageUrl) {
       for (const candidateIr of searchResult.irPageCandidates.slice(0, 3)) {
         if (state.extractionResult.value) break;
@@ -638,6 +687,62 @@ async function processCompany(
         }
       }
     }
+  };
+
+  const runMultiDomainIr = async (domains: string[], phaseSuffix: string): Promise<void> => {
+    if (!state.extractionResult.value && domains.length > 0) {
+      log.info(
+        `[${name}] === Step 2+3: Multi-domain cycling (${domains.length} domains)${phaseSuffix} ===`,
+      );
+      for (const domain of domains) {
+        if (state.extractionResult.value) break;
+        const hk = originHostKey(domain);
+        if (!hk) continue;
+        if (attemptedIrHosts.has(hk)) continue;
+        attemptedIrHosts.add(hk);
+        await processDomain(domain);
+      }
+    }
+  };
+
+  await runMultiDomainIr(candidateDomains, '');
+  if (candidateDomains.length > 0) {
+    await runSearchIrFallbackIfNeeded();
+  }
+
+  if (!state.extractionResult.value && hasTrustedOrigin) {
+    log.info(`[${name}] === Step 1: Search engine discovery (deferred) ===`);
+    const deferred = await searchDiscovery(
+      entity.searchAnchor,
+      company.ticker,
+      entity.seedCandidateDomains,
+    );
+    mergeSearchDiscovery(searchResult, deferred);
+
+    if (!website && deferred.discoveredWebsite) {
+      website = deferred.discoveredWebsite;
+      log.info(`[${name}] Discovered website: ${website}`);
+    }
+
+    for (const d of deferred.searchEngineDomains ?? []) {
+      pushDomain(d);
+    }
+    for (const d of deferred.slugInferenceDomains ?? []) {
+      pushDomain(d);
+    }
+    for (const d of deferred.allDiscoveredDomains) {
+      pushDomain(d);
+    }
+    if (website) {
+      pushDomain(website);
+    }
+
+    const newDomains = candidateDomains.filter((d) => {
+      const h = originHostKey(d);
+      return h && !attemptedIrHosts.has(h);
+    });
+    await runMultiDomainIr(newDomains, ' — after search discovery');
+    await runSearchIrFallbackIfNeeded();
   }
 
   // =========================================================================

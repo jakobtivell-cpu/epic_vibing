@@ -5,8 +5,9 @@
 // Usage:
 //   npx ts-node scrape.ts --company "Sandvik"
 //   npx ts-node scrape.ts --company "Sandvik,SEB,Hexagon" --force
-//   npx ts-node scrape.ts --ticker "SEB-A.ST,VOLV-B.ST"
-//   npx ts-node scrape.ts --ticker "INVE-A.ST,INVE-B.ST"   # deduped → 1 run
+//   npx ts-node scrape.ts --ticker "VOLV-B.ST"
+//   npx ts-node scrape.ts --ticker "ALFA.ST,ESSITY-B.ST,HM-B.ST"   # comma-separated → sequential, merge results.json
+//   npx ts-node scrape.ts --ticker "INVE-A.ST,INVE-B.ST"   # same legal name → deduped → 1 run
 //   npx ts-node scrape.ts --company "Volvo" --slow
 // ---------------------------------------------------------------------------
 
@@ -70,11 +71,23 @@ async function main(): Promise<void> {
   ensureDir(OUTPUT_DIR);
   ensureDir(CACHE_DIR);
 
+  const companyOpt = typeof opts.company === 'string' ? opts.company.trim() : '';
+  const tickerOpt = typeof opts.ticker === 'string' ? opts.ticker.trim() : '';
+
   const companies = buildCompanyList(opts);
 
   if (companies.length === 0) {
     log.error('No companies to process. Provide --company or --ticker.');
     process.exit(1);
+  }
+
+  const isDefaultLargeCapBatch = companyOpt.length === 0 && tickerOpt.length === 0;
+  const runSequential = companies.length > 1 && !isDefaultLargeCapBatch;
+
+  if (runSequential) {
+    log.info(
+      `Running ${companies.length} companies sequentially (explicit --company / --ticker list)`,
+    );
   }
 
   log.info(`Processing ${companies.length} company/companies: ${companies.map((c) => c.name).join(', ')}`);
@@ -92,9 +105,11 @@ async function main(): Promise<void> {
     slow: opts.slow,
   };
 
-  const results = await runPipeline(runConfig.companies, runConfig.force);
+  const results = await runPipeline(runConfig.companies, runConfig.force, {
+    sequential: runSequential,
+  });
 
-  if (companies.length === 1) {
+  if (companies.length === 1 || !isDefaultLargeCapBatch) {
     mergeResults(results);
   } else {
     writeResults(results);
@@ -115,7 +130,7 @@ function buildCompanyList(opts: Record<string, unknown>): CompanyProfile[] {
   const profiles: CompanyProfile[] = [];
 
   const companyOpt = typeof opts.company === 'string' ? opts.company.trim() : '';
-  const tickerOpt = typeof opts.ticker === 'string' ? opts.ticker.trim() : '';
+  const tickerOptRaw = typeof opts.ticker === 'string' ? opts.ticker.trim() : '';
 
   // --company flag: raw names, no ticker resolution
   if (companyOpt.length > 0) {
@@ -130,9 +145,9 @@ function buildCompanyList(opts: Record<string, unknown>): CompanyProfile[] {
   }
 
   const tickerSource =
-    tickerOpt.length > 0 ? tickerOpt : companyOpt.length > 0 ? '' : DEFAULT_LARGE_CAP_TICKERS;
+    tickerOptRaw.length > 0 ? tickerOptRaw : companyOpt.length > 0 ? '' : DEFAULT_LARGE_CAP_TICKERS;
 
-  if (tickerSource.length > 0 && tickerOpt.length === 0 && companyOpt.length === 0) {
+  if (tickerSource.length > 0 && tickerOptRaw.length === 0 && companyOpt.length === 0) {
     log.info('No --company/--ticker — using default Large Cap set (10 tickers)');
   }
 
@@ -142,6 +157,10 @@ function buildCompanyList(opts: Record<string, unknown>): CompanyProfile[] {
       .split(',')
       .map((t) => t.trim())
       .filter((t) => t.length > 0);
+
+    if (tickerOptRaw.length > 0 && tickers.length > 1) {
+      log.info(`--ticker: ${tickers.length} symbols → resolve each and queue for sequential run`);
+    }
 
     for (const rawTicker of tickers) {
       const legalName = resolveTicker(rawTicker);

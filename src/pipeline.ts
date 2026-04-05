@@ -101,13 +101,39 @@ function createPool(concurrency: number) {
 // Public API
 // ---------------------------------------------------------------------------
 
+export interface RunPipelineOptions {
+  /** When true and more than one company, run one at a time (rate-limit friendly). */
+  sequential?: boolean;
+}
+
 export async function runPipeline(
   companies: CompanyProfile[],
   force: boolean,
+  options?: RunPipelineOptions,
 ): Promise<PipelineResult[]> {
+  if (companies.length === 0) {
+    return [];
+  }
+
   if (companies.length === 1) {
     const result = await processCompany(companies[0], force);
     return [result];
+  }
+
+  if (options?.sequential) {
+    const results: PipelineResult[] = [];
+    for (let i = 0; i < companies.length; i++) {
+      const company = companies[i];
+      log.info(`Processing ${company.name} [${i + 1}/${companies.length}]`);
+      try {
+        results.push(await processCompany(company, force));
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        log.error(`[${company.name}] Fatal error: ${message}`);
+        results.push(buildFailedResult(company, message));
+      }
+    }
+    return results;
   }
 
   const pool = createPool(Math.min(companies.length, 10));

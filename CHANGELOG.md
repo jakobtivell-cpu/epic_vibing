@@ -1,10 +1,10 @@
 # Changelog
 
-All notable changes to this project are documented here. The format is informal; versions follow [Semantic Versioning](https://semver.org/).
+Changes are grouped by area. Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [2.1.0] — 2026-04-05
 
-Current maintenance / handoff release: documentation alignment, regression tests, extraction guards, and version metadata.
+Release **2.1.0** ships documentation aligned with the live pipeline, regression tests around parsing and URLs, extraction guards for fused years and megascale revenue, version metadata, and handoff artifacts.
 
 ### Discovery
 

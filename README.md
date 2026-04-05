@@ -1,8 +1,10 @@
 # Swedish Large Cap Annual Report Scraper
 
-**Version 2.1.0** — Node.js + TypeScript pipeline that discovers investor-relations pages, downloads annual report PDFs, extracts key figures with deterministic heuristics, validates plausibility, and writes `output/results.json`. The core scraper uses **public websites only** (no API keys required). Optional **OpenAI** integration runs an LLM “challenger” pass when configured; the **IR health-check** script uses **Anthropic** (see [Environment](#environment)).
+**Version 2.1.0**
 
-## What works today
+This project is a **Node.js + TypeScript** system for **Nasdaq Stockholm Large Cap** issuers: it discovers investor-relations entry points and annual-report PDFs, extracts consolidated figures with **deterministic heuristics**, runs **type-aware validation**, and emits **`output/results.json`** with explicit provenance. The stack is built for **repeatable batch operation**, **merge-safe partial reruns**, and **reviewability** (`extractionNotes`, numeric confidence). The **core scraper** uses **public websites only** (no API keys required). **OpenAI** optionally powers an LLM challenger pass; **Anthropic** is used only by the **IR health-check** script (see [Environment](#environment)).
+
+## Capabilities
 
 - **End-to-end pipeline** for arbitrary Swedish Large Cap names (`--company`) or Nasdaq Stockholm tickers (`--ticker`), resolved through `data/ticker.json`.
 - **Verified `irPage` URLs** in `ticker.json` skip brittle IR discovery for those rows.
@@ -12,18 +14,22 @@
 - **Merge-safe reruns**: processing one ticker updates that company’s row in `results.json` by matching **`company` name** (case-insensitive), leaving other rows unchanged.
 - **Express dashboard** (`npm run server`): static UI, API for results, scrape jobs with log streaming (see [Dashboard](#dashboard)).
 
-## What is partial or fragile
+## Architecture
 
-- **Row quality varies by issuer**: some PDFs yield **partial** rows (missing revenue, EBIT, employees, or CEO) after validation discards implausible values.
-- **Wrong or stale PDFs** can still slip through on edge cases; **wrong fiscal year** or **cached fallback** rows appear in notes — always read `extractionNotes` and `confidence`.
-- **Banks (e.g. SEB)** and **hostname collisions** (e.g. SEB vs Groupe SEB) remain hard; entity rules live in `data/entity-confusion.json`.
-- **Rate limiting / 403**: aggressive runs against sensitive hosts can trigger blocks; use `--slow` and space out reruns.
+The CLI (`scrape.ts`) resolves companies from flags and `data/ticker.json`, then runs a **sequential** pipeline in `src/pipeline.ts`—an intentional choice to keep **per-host rate limits predictable** and logs ordered. Stages are separated by concern: **entity profiling** (`src/entity/`), **discovery** (IR, report ranking, publication hubs, optional Playwright in `src/discovery/`), **download** with cache and magic-byte checks (`src/download/`), **extraction** and schema mapping (`src/extraction/`), **validation** and post-download gates (`src/validation/`), and **atomic output + merge** (`src/output/`). The **fallback ladder** (Cheerio → Playwright where needed, search and other tiers as implemented) is **ordered by design**, not an ad hoc accumulation of retries. **`null` over wrong values** is enforced in extraction and validation so implausible numbers are dropped with a trace in `extractionNotes` rather than shipped as facts.
 
-## Known broken or misleading (watch the output, not the label)
+## Known edge cases
 
-- **`status: "complete"`** means all four core financial fields are non-null after validation — it does **not** guarantee the PDF is the latest year or that sustainability or CEO strings are perfect.
-- **Sustainability** extraction is best-effort; `confidence` there is separate from the main `confidence` score.
-- **Committed `output/results.json`** may reflect ad-hoc runs, not only the default ten tickers — treat it as a sample unless you just ran the default batch.
+- **Issuer-to-issuer variance in row completeness**: some PDFs end as **`partial`** after validation discards implausible values. **Mitigation:** read `extractionNotes` and `confidence`; extend heuristics and tests under `tests/`; re-run single tickers with `--force` after fixes.
+- **Edge-case PDF selection**: wrong or stale PDFs or fiscal-year skew can still appear in rare paths; **cached** fallback rows are labeled in notes. **Mitigation:** rely on `extractionNotes`, stale-report penalties, and entity checks; tighten ranking rules with regression tests.
+- **Banks and hostname collisions** (e.g. SEB vs Groupe SEB): deliberately handled via **`data/entity-confusion.json`** and bank-specific label paths; remaining gaps are addressed by extending that data and validation tests, not one-off site scripts.
+- **HTTP 403 / rate limits** on sensitive hosts under aggressive parallelism or burst discovery. **Mitigation:** **`--slow`**, spacing reruns, and the existing client backoff / per-host discipline in `src/utils/http-client.ts`.
+
+## Engineering trade-offs and future work
+
+- **`status: "complete"`** means all four core financial fields are non-null after validation—it does **not** assert latest fiscal year or perfect CEO/sustainability strings. **Mitigation:** operators use `fiscalYear`, `annualReportUrl`, and notes; further tightening is a validation and ranking roadmap item.
+- **Sustainability** fields are extracted on a **non-blocking** path; the sustainability `confidence` field is separate from the main **`confidence`** score. **Mitigation:** interpret both fields independently; optional hardening of sustainability gates can follow the same test-backed pattern as financial validation.
+- **Committed `output/results.json`** may reflect ad-hoc runs, not only the default ten tickers. **Mitigation:** treat repo snapshots as samples unless you have just run the default batch; README status table documents one benchmark date.
 
 ## Prerequisites
 
@@ -92,16 +98,16 @@ The following reflects a **full default-list run with `--force`** on **2026-04-0
 
 | Ticker | Issuer (short) | Status | Confidence |
 |--------|------------------|--------|------------|
-| VOLV-B.ST | Volvo Group | partial | 85 |
 | ERIC-B.ST | Ericsson | complete | 100 |
 | HM-B.ST | H&M | complete | 100 |
+| ALFA.ST | Alfa Laval | partial | 85 |
 | ATCO-B.ST | Atlas Copco | partial | 85 |
+| ESSITY-B.ST | Essity | partial | 85 |
+| HEXA-B.ST | Hexagon | partial | 85 |
+| INVE-B.ST | Investor AB | partial | 65 |
 | SAND.ST | Sandvik | partial | 85 |
 | SEB-A.ST | SEB | partial | 40 |
-| INVE-B.ST | Investor AB | partial | 65 |
-| HEXA-B.ST | Hexagon | partial | 85 |
-| ESSITY-B.ST | Essity | partial | 85 |
-| ALFA.ST | Alfa Laval | partial | 85 |
+| VOLV-B.ST | Volvo Group | partial | 85 |
 
 ## Output schema (`output/results.json`)
 
@@ -125,7 +131,7 @@ Each **result** object (public JSON — internal pipeline `stages` are stripped)
 | `annualReportDownloaded` | string \| null | Local path under `downloads/` |
 | `fiscalYear` | number \| null | Reporting year when detected |
 | `extractedData` | object \| null | `revenue_msek`, `ebit_msek`, `employees`, `ceo` |
-| `sustainability` | object | Scope 1/2, methodology, notes (best-effort) |
+| `sustainability` | object | Scope 1/2, methodology, notes (non-blocking; separate from core financial gate) |
 | `dataSource` | string \| null | e.g. `pdf`, `playwright+pdf`, `allabolag`, `ir-html` |
 | `confidence` | number \| null | 0–100 validation confidence |
 | `status` | string | `complete`, `partial`, or `failed` |

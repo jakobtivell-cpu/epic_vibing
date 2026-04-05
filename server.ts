@@ -10,6 +10,8 @@ import express, { Request, Response } from 'express';
 
 const LOG_LINE_RE = /^\d{4}-\d{2}-\d{2}T/;
 const MAX_CONCURRENT = 3;
+const MAX_JOBS_IN_MEMORY = 50;
+const JOB_TTL_MS = 2 * 60 * 60 * 1000;
 
 const ROOT = path.resolve(__dirname);
 const DASHBOARD_HTML = path.join(ROOT, 'app', 'swedish-largecap-dashboard.html');
@@ -44,6 +46,8 @@ type JobStatus = 'running' | 'done' | 'failed';
 
 interface Job {
   id: string;
+  /** When the job row was created (used only for map eviction). */
+  createdAt: number;
   status: JobStatus;
   exitCode: number | null;
   logs: string[];
@@ -53,6 +57,27 @@ interface Job {
 }
 
 const jobs = new Map<string, Job>();
+
+/** Drop TTL-expired rows, then oldest rows until there is room for one new job (max MAX_JOBS_IN_MEMORY). */
+function evictJobsBeforeInsert(): void {
+  const now = Date.now();
+  const cutoff = now - JOB_TTL_MS;
+  for (const [id, j] of [...jobs.entries()]) {
+    if (j.createdAt < cutoff) {
+      jobs.delete(id);
+    }
+  }
+  if (jobs.size < MAX_JOBS_IN_MEMORY) {
+    return;
+  }
+  const entries = [...jobs.entries()].sort((a, b) => a[1].createdAt - b[1].createdAt);
+  const targetBeforeAdd = MAX_JOBS_IN_MEMORY - 1;
+  let i = 0;
+  while (jobs.size > targetBeforeAdd && i < entries.length) {
+    jobs.delete(entries[i][0]);
+    i++;
+  }
+}
 
 function runningCount(): number {
   let n = 0;
@@ -88,14 +113,16 @@ function createLineSplitter(
       buf = parts.pop() ?? '';
       for (const part of parts) {
         const line = part.replace(/\r$/, '');
-        if (LOG_LINE_RE.test(line)) onCompleteLine(line);
+        if (line.length === 0) continue;
+        onCompleteLine(LOG_LINE_RE.test(line) ? line : `[raw] ${line}`);
       }
     },
     flush() {
       if (!buf) return;
       const line = buf.replace(/\r$/, '');
       buf = '';
-      if (LOG_LINE_RE.test(line)) onCompleteLine(line);
+      if (line.length === 0) return;
+      onCompleteLine(LOG_LINE_RE.test(line) ? line : `[raw] ${line}`);
     },
   };
 }
@@ -144,6 +171,7 @@ function attachProcessStreams(job: Job, proc: ChildProcess): void {
 function spawnScrape(args: { ticker?: string; company?: string; force?: boolean }): Job {
   const job: Job = {
     id: newJobId(),
+    createdAt: Date.now(),
     status: 'running',
     exitCode: null,
     logs: [],
@@ -168,6 +196,7 @@ function spawnScrape(args: { ticker?: string; company?: string; force?: boolean 
 
   job.proc = proc;
   attachProcessStreams(job, proc);
+  evictJobsBeforeInsert();
   jobs.set(job.id, job);
   return job;
 }

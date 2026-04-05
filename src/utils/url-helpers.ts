@@ -2,6 +2,23 @@
 // URL resolution helpers — safe handling of relative/absolute URLs.
 // ---------------------------------------------------------------------------
 
+/**
+ * Turn a hostname, host/path, or http(s) URL into an absolute URL string
+ * suitable for fetch/axios. Bare hosts (e.g. example.com) become https://example.com.
+ * A single trailing slash on the path is stripped (root URLs become scheme://host).
+ */
+export function toAbsoluteHttpUrl(raw: string): string | null {
+  const t = raw.trim();
+  if (!t) return null;
+  try {
+    const u = new URL(/^https?:\/\//i.test(t) ? t : `https://${t}`);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    return u.href.replace(/\/$/, '');
+  } catch {
+    return null;
+  }
+}
+
 /** Path segments that are empty or only ASCII / percent-encoded quotes (bad hrefs). */
 function isGarbagePathSegment(segment: string): boolean {
   const t = segment.trim();

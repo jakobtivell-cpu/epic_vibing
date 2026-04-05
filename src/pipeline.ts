@@ -55,6 +55,7 @@ import {
   crossValidateFiscalYear,
 } from './validation';
 import { createLogger } from './utils/logger';
+import { toAbsoluteHttpUrl } from './utils/url-helpers';
 import { runChallengerTrack } from './challenger';
 
 const log = createLogger('pipeline');
@@ -573,12 +574,14 @@ async function processCompany(
   const seenHosts = new Set<string>();
   const pushDomain = (url: string | null | undefined) => {
     if (!url || typeof url !== 'string') return;
+    const absolute = toAbsoluteHttpUrl(url);
+    if (!absolute) return;
     try {
-      const u = new URL(url.startsWith('http') ? url : `https://${url}`);
+      const u = new URL(absolute);
       const h = u.hostname.replace(/^www\./, '').toLowerCase();
       if (seenHosts.has(h)) return;
       seenHosts.add(h);
-      candidateDomains.push(url.replace(/\/$/, ''));
+      candidateDomains.push(absolute);
     } catch {
       /* skip */
     }

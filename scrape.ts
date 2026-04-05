@@ -175,7 +175,7 @@ function buildCompanyList(opts: Record<string, unknown>): CompanyProfile[] {
       const candidateDomains = resolveCandidateDomains(rawTicker) ?? undefined;
       if (legalName) {
         log.info(
-          `Ticker ${rawTicker} → "${legalName}" (${canonicalTicker})${orgNumber ? ` org: ${orgNumber}` : ''}`,
+          `Ticker ${rawTicker} → "${legalName}" (${canonicalTicker})${orgNumber ? ` org: ${orgNumber}` : ''}${candidateDomains?.length ? ` candidateDomains: ${candidateDomains.join(', ')}` : ''}`,
         );
         profiles.push({
           name: legalName,

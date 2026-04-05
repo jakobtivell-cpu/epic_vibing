@@ -10,6 +10,7 @@
 import * as fs from 'fs';
 import { join } from 'path';
 import { createLogger } from '../utils/logger';
+import { toAbsoluteHttpUrl } from '../utils/url-helpers';
 
 const log = createLogger('ticker-map');
 
@@ -62,7 +63,10 @@ export function loadTickerMap(): void {
           ...(typeof o.orgNumber === 'string' ? { orgNumber: o.orgNumber } : {}),
           ...(Array.isArray(o.candidateDomains)
             ? {
-                candidateDomains: o.candidateDomains.filter((x): x is string => typeof x === 'string'),
+                candidateDomains: o.candidateDomains
+                  .filter((x): x is string => typeof x === 'string')
+                  .map((s) => toAbsoluteHttpUrl(s))
+                  .filter((x): x is string => x !== null),
               }
             : {}),
         };

@@ -14,6 +14,7 @@ import * as cheerio from 'cheerio';
 import { ReportCandidate, SOURCE_SEARCH_DISCOVERY } from '../types';
 import { fetchPage, headCheck } from '../utils/http-client';
 import { createLogger } from '../utils/logger';
+import { toAbsoluteHttpUrl } from '../utils/url-helpers';
 
 const log = createLogger('search-discovery');
 
@@ -498,7 +499,8 @@ function buildDirectPdfUrls(shortNames: string[], websites: string[]): ReportCan
   const years = [RECENT_FISCAL_YEAR, CURRENT_YEAR];
 
   for (const website of websites) {
-    const base = website.replace(/\/$/, '');
+    const base = toAbsoluteHttpUrl(website);
+    if (!base) continue;
 
     for (const name of shortNames) {
       const slug = companySlugHyphen(name);
@@ -558,11 +560,13 @@ function dedupeOriginsByHost(urls: string[]): string[] {
   const out: string[] = [];
   for (const raw of urls) {
     try {
-      const u = new URL(raw.startsWith('http') ? raw : `https://${raw}`);
+      const abs = toAbsoluteHttpUrl(raw);
+      if (!abs) continue;
+      const u = new URL(abs);
       const h = u.hostname.replace(/^www\./, '').toLowerCase();
       if (seen.has(h)) continue;
       seen.add(h);
-      out.push(raw.replace(/\/$/, ''));
+      out.push(abs);
     } catch {
       /* skip */
     }

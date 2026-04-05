@@ -180,7 +180,7 @@ function spawnScrape(args: { ticker?: string; company?: string; force?: boolean 
     proc: null,
   };
 
-  const argv = ['ts-node', 'scrape.ts'];
+  const argv = ['dist/scrape.js'];
   if (args.ticker) {
     argv.push('--ticker', args.ticker);
   } else if (args.company) {
@@ -188,7 +188,7 @@ function spawnScrape(args: { ticker?: string; company?: string; force?: boolean 
   }
   if (args.force) argv.push('--force');
 
-  const proc = spawn('npx', argv, {
+  const proc = spawn('node', argv, {
     cwd: ROOT,
     env: process.env,
     shell: process.platform === 'win32',

@@ -42,6 +42,23 @@ function collapseAmpersandBrands(name: string): string {
   return out.trim();
 }
 
+/** e.g. "H&M" from "H&M Hennes & Mauritz" — standalone PDF anchors for ampersand brands. */
+function extractAmpersandBrandFragments(name: string): string[] {
+  const re = /\b[\wåäöÅÄÖ]{1,20}&[\wåäöÅÄÖ]{1,20}\b/g;
+  const out: string[] = [];
+  const seen = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(name)) !== null) {
+    const frag = m[0].trim();
+    if (frag.length < 2) continue;
+    const key = frag.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(frag);
+  }
+  return out;
+}
+
 function regionHasDistinctiveToken(region: string, tokens?: string[]): boolean {
   if (!tokens?.length) return false;
   return tokens.some((t) => t.length >= 5 && region.includes(t.toLowerCase()));
@@ -108,6 +125,19 @@ export function buildEntityCheckTerms(entity: EntityProfile): EntityCheckTerm[] 
     add(collapsedFull, 'legal:collapsed-full');
   }
 
+  for (const frag of extractAmpersandBrandFragments(legal)) {
+    add(frag, 'legal:ampersand-fragment');
+  }
+  for (const frag of extractAmpersandBrandFragments(stripped)) {
+    add(frag, 'legal:ampersand-fragment');
+  }
+  for (const frag of extractAmpersandBrandFragments(collapsedStrip)) {
+    add(frag, 'legal:ampersand-fragment');
+  }
+  for (const frag of extractAmpersandBrandFragments(collapsedFull)) {
+    add(frag, 'legal:ampersand-fragment');
+  }
+
   const display = entity.displayName.trim();
   if (display.toLowerCase() !== legal.toLowerCase()) {
     add(display, 'display:name');
@@ -162,6 +192,8 @@ export function buildEntityCheckTerms(entity: EntityProfile): EntityCheckTerm[] 
 function weakNeedleAllowed(region: string, needleLower: string, entity: EntityProfile): boolean {
   if (needleLower.length >= 5) return true;
   if (entity.ambiguityLevel !== 'high') return true;
+  // Ampersand trade marks ("H&M") are structurally distinctive — no co-occurrence rule.
+  if (needleLower.includes('&')) return true;
   return regionHasDistinctiveToken(region, entity.distinctiveTokens);
 }
 

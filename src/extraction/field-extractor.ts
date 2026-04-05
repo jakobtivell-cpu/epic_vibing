@@ -310,37 +310,90 @@ function detectUnitContext(text: string): UnitContext | null {
   return null;
 }
 
+/** Parsed BSEK-style revenue from narrative / infographic text (not tables). */
+interface NarrativeBsekHit {
+  msek: number;
+  matchedLabel: string;
+  rawSnippet: string;
+}
+
+function isPlausibleBsekBillions(val: number): boolean {
+  return !isNaN(val) && val >= 1 && val <= 2_000;
+}
+
+const NARRATIVE_REVENUE_BAD_CONTEXT =
+  /since\s+\d{4}|by\s+20\d{2}|over\s+the\s+(past|last)|cumulative|divested|spun\s+off|acquired|combined|target|ambition|goal|increase\b.*\bto\b/i;
+
 /**
- * Scan narrative text for BSEK revenue mentions like "revenues of BSEK 168"
- * or "revenue was SEK 168 billion". Returns value in MSEK.
+ * Scan full text for total revenue stated in SEK billions: classic BSEK phrases,
+ * and Sales / Net sales infographic labels ("Sales, SEK billion" + value on same
+ * or next line). Returns MSEK. Sales-style patterns are tried first.
  */
-function findBsekNarrativeRevenue(text: string): number | null {
-  // Only match patterns that clearly state annual/total revenue in BSEK,
-  // not cumulative "since YYYY" or partial figures.
-  const patterns: RegExp[] = [
-    /(?:group|total|the group)\s+had\s+revenues?\s+of\s+BSEK\s*(\d[\d.,]*)/gi,
-    /revenues?\s+(?:amounted|totaled|totalled)\s+to\s+BSEK\s*(\d[\d.,]*)/gi,
-    /revenues?\s+of\s+BSEK\s*(\d[\d.,]*)/gi,
-    /revenues?\s+of\s+SEK\s*(\d[\d.,]*)\s*billion/gi,
-    /had\s+revenues?\s+of\s+BSEK\s*(\d[\d.,]*)/gi,
+function findNarrativeBsekRevenueHit(text: string): NarrativeBsekHit | null {
+  type Pat = { re: RegExp; label: string };
+  const salesPatterns: Pat[] = [
+    {
+      re: /\bsales\s*,\s*SEK\s+billion[^\d]{0,50}(\d[\d.,]*)/gi,
+      label: 'Sales, SEK billion',
+    },
+    {
+      re: /\bnet\s+sales\s*,\s*SEK\s+billion[^\d]{0,50}(\d[\d.,]*)/gi,
+      label: 'Net sales, SEK billion',
+    },
+    {
+      re: /\bsales\s*,\s*SEK\s+billion\s*[\r\n]+\s*(\d[\d.,]*)/gim,
+      label: 'Sales, SEK billion',
+    },
+    {
+      re: /\bnet\s+sales\s*,\s*SEK\s+billion\s*[\r\n]+\s*(\d[\d.,]*)/gim,
+      label: 'Net sales, SEK billion',
+    },
+    {
+      re: /\bsales\s+SEK\s+billion[^\d]{0,50}(\d[\d.,]*)/gi,
+      label: 'Sales SEK billion',
+    },
   ];
 
-  for (const pattern of patterns) {
-    let match;
-    while ((match = pattern.exec(text)) !== null) {
-      // Reject if context suggests a cumulative or partial figure
-      const contextStart = Math.max(0, match.index - 80);
-      const context = text.substring(contextStart, match.index + match[0].length + 40);
-      if (/since\s+\d{4}|by\s+20\d{2}|over\s+the\s+(past|last)|cumulative|divested|spun\s+off|acquired|combined|target|ambition|goal|increase\b.*\bto\b/i.test(context)) continue;
+  const genericPatterns: Pat[] = [
+    { re: /(?:group|total|the group)\s+had\s+revenues?\s+of\s+BSEK\s*(\d[\d.,]*)/gi, label: 'revenues of BSEK' },
+    { re: /revenues?\s+(?:amounted|totaled|totalled)\s+to\s+BSEK\s*(\d[\d.,]*)/gi, label: 'revenues to BSEK' },
+    { re: /revenues?\s+of\s+BSEK\s*(\d[\d.,]*)/gi, label: 'revenues of BSEK' },
+    { re: /revenues?\s+of\s+SEK\s*(\d[\d.,]*)\s*billion/gi, label: 'revenues of SEK … billion' },
+    { re: /had\s+revenues?\s+of\s+BSEK\s*(\d[\d.,]*)/gi, label: 'had revenues of BSEK' },
+    {
+      re: /\bsales\s+(?:amounted|were|was|totalled|totaled)\s+to\s+SEK\s*(\d[\d.,]*)\s*billion/gi,
+      label: 'sales … SEK … billion',
+    },
+    {
+      re: /\bnet\s+sales\s+(?:amounted|were|was)\s+SEK\s*(\d[\d.,]*)\s*billion/gi,
+      label: 'net sales … SEK … billion',
+    },
+  ];
 
-      const raw = match[1].replace(/,/g, '');
-      const val = parseFloat(raw);
-      if (!isNaN(val) && val >= 10 && val <= 2_000) {
-        return Math.round(val * 1_000);
+  const tryPatterns = (patterns: Pat[]): NarrativeBsekHit | null => {
+    for (const { re, label } of patterns) {
+      re.lastIndex = 0;
+      let match;
+      while ((match = re.exec(text)) !== null) {
+        const contextStart = Math.max(0, match.index - 80);
+        const ctx = text.substring(contextStart, match.index + match[0].length + 40);
+        if (NARRATIVE_REVENUE_BAD_CONTEXT.test(ctx)) continue;
+
+        const raw = match[1].replace(/,/g, '');
+        const val = parseFloat(raw);
+        if (isPlausibleBsekBillions(val)) {
+          return {
+            msek: Math.round(val * 1_000),
+            matchedLabel: label,
+            rawSnippet: match[0].trim().substring(0, 160),
+          };
+        }
       }
     }
-  }
-  return null;
+    return null;
+  };
+
+  return tryPatterns(salesPatterns) ?? tryPatterns(genericPatterns);
 }
 
 function normalizeToMsek(value: number, unit: UnitContext | null): number {
@@ -484,8 +537,24 @@ const HIGHLIGHTS_PATTERNS: RegExp[] = [
   /\bfinansöversikt\b/i,
 ];
 
+/**
+ * True when the income-statement heading line is clearly parent-only (moderbolag / parent
+ * company), not consolidated — so we can skip it when a koncern/consolidated section exists.
+ */
+function incomeHeadingIsParentCompanyOnly(line: string): boolean {
+  if (/koncernens\s+och\s+moderbolaget|(?:the\s+)?group\s+and\s+(?:the\s+)?parent|consolidated\s+and\s+(?:parent|separate)/i.test(line)) {
+    return false;
+  }
+  if (/koncern(?:ens)?|consolidated|konsoliderad/i.test(line)) {
+    return false;
+  }
+  return /moderbolag|parent\s+compan|för\s+moderbolaget|the\s+parent\s+compan|parent\s+company/i.test(
+    line,
+  );
+}
+
 function findIncomeStatementSections(lines: string[]): Array<{ start: number; end: number }> {
-  const sections: Array<{ start: number; end: number }> = [];
+  const raw: Array<{ start: number; end: number; parentOnly: boolean }> = [];
 
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].length > 120) continue;
@@ -508,11 +577,13 @@ function findIncomeStatementSections(lines: string[]): Array<{ start: number; en
     }
 
     if (end - i >= 5) {
-      sections.push({ start: i, end });
+      raw.push({ start: i, end, parentOnly: incomeHeadingIsParentCompanyOnly(lines[i]) });
     }
   }
 
-  return sections;
+  const nonParent = raw.filter((s) => !s.parentOnly);
+  const picked = nonParent.length > 0 ? nonParent : raw;
+  return picked.map(({ start, end }) => ({ start, end }));
 }
 
 /**
@@ -1245,29 +1316,38 @@ export function extractFields(
       }
     }
 
-    // Cross-check: BSEK narrative mention provides an anchor when table extraction is dubious
+    // BSEK / Sales narrative (infographics, CEO letter) — fills revenue when tables fail or mispick
     {
-      const narrativeRev = findBsekNarrativeRevenue(text);
-      if (narrativeRev !== null) {
+      const hit = findNarrativeBsekRevenueHit(text);
+      if (hit !== null) {
         if (revenue === null) {
-          log.info(`Revenue from BSEK narrative: ${narrativeRev} MSEK`);
-          revenue = narrativeRev;
+          log.info(`Revenue from narrative (${hit.matchedLabel}): ${hit.msek} MSEK`);
+          revenue = hit.msek;
+          revProvenance = {
+            matchedLabel: hit.matchedLabel,
+            rawSnippet: hit.rawSnippet,
+            lineIndex: 0,
+            context: 'highlights',
+          };
+          notes.push(`Revenue from narrative (${hit.matchedLabel}): ${hit.msek} MSEK`);
         } else if (revenue < 10_000) {
-          // Table-extracted value is suspiciously low — narrative is likely more reliable
-          if (narrativeRev > revenue * 3) {
+          if (hit.msek > revenue * 3) {
             log.warn(
-              `Revenue ${revenue} MSEK implausibly low — BSEK narrative gives ${narrativeRev} MSEK, using that`,
+              `Revenue ${revenue} MSEK implausibly low — narrative (${hit.matchedLabel}) gives ${hit.msek} MSEK, using that`,
             );
-            notes.push(`Revenue corrected from ${revenue} to ${narrativeRev} MSEK via BSEK narrative cross-check`);
-            revenue = narrativeRev;
+            notes.push(
+              `Revenue corrected from ${revenue} to ${hit.msek} MSEK via narrative cross-check (${hit.matchedLabel})`,
+            );
+            revenue = hit.msek;
+            revProvenance = {
+              matchedLabel: hit.matchedLabel,
+              rawSnippet: hit.rawSnippet,
+              lineIndex: 0,
+              context: 'highlights',
+            };
           }
         }
       }
-    }
-
-    if (revenue === null) {
-      notes.push(`Revenue not found for ${companyName}`);
-      log.warn(`Revenue not found for ${companyName}`);
     }
   }
 
@@ -1370,10 +1450,44 @@ export function extractFields(
   if (revenue !== null && fusedYearRe.test(String(revenue))) {
     notes.push(`Revenue ${revenue} discarded — fused year pattern detected`);
     revenue = null;
+    revProvenance = null;
   }
   if (ebit !== null && fusedYearRe.test(String(ebit))) {
     notes.push(`EBIT ${ebit} discarded — fused year pattern detected`);
     ebit = null;
+  }
+
+  // After discarding bogus table revenue, retry Sales / BSEK narrative (same patterns as above)
+  if (detectedType !== 'investment_company' && revenue === null) {
+    const hit = findNarrativeBsekRevenueHit(text);
+    if (hit !== null) {
+      revenue = hit.msek;
+      revProvenance = {
+        matchedLabel: hit.matchedLabel,
+        rawSnippet: hit.rawSnippet,
+        lineIndex: 0,
+        context: 'highlights',
+      };
+      notes.push(`Revenue from narrative after fused-year discard (${hit.matchedLabel}): ${hit.msek} MSEK`);
+      log.info(`Revenue from narrative (post-discard): ${hit.msek} MSEK`);
+    }
+  }
+
+  // Parent-company lines in tkr/KSEK are sometimes parsed with consolidated MSEK context → ~1000× inflation.
+  if (detectedType !== 'investment_company' && revenue !== null && revenue > 1_000_000) {
+    const corrected = Math.round(revenue / 1000);
+    log.warn(
+      `Revenue ${revenue} MSEK exceeds 1,000,000 — applying ÷1000 unit guard → ${corrected} MSEK`,
+    );
+    notes.push(
+      `Revenue unit guard: ${revenue} → ${corrected} MSEK (likely tkr/KSEK misread as MSEK)`,
+    );
+    revenue = corrected;
+  }
+
+  if (detectedType !== 'investment_company' && revenue === null) {
+    notes.push(`Revenue not found for ${companyName}`);
+    log.warn(`Revenue not found for ${companyName}`);
   }
 
   // Explicit assignment-schema mapping (native label → revenue_msek / ebit_msek)

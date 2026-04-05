@@ -1,5 +1,11 @@
 # Swedish Large Cap Annual Report Scraper
 
+Call one scrape
+npx ts-node scrape.ts --ticker "ALFA.ST" --force
+
+Call subswequent scrapes
+npx ts-node scrape.ts --ticker "ALFA.ST,ESSITY-B.ST,SAND.ST" --force
+
 A Node.js + TypeScript pipeline that discovers, downloads, and extracts structured financial data from the annual reports of Swedish Large Cap companies. Given a list of company profiles (name, ticker, website), it autonomously finds each company's Investor Relations page, locates the most recent annual report PDF, downloads it, extracts key financial metrics from the raw text, validates the results, and writes everything to a structured JSON file. No API keys, no paid services, no manual intervention under normal conditions.
 
 ## Assignment Scope

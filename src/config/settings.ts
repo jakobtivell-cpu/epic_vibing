@@ -34,9 +34,12 @@ export const EUR_MILLIONS_TO_MSEK_APPROX = 11.25;
 /** Maximum PDF candidates to try per fallback step before advancing. */
 export const MAX_CANDIDATES_PER_STEP = 5;
 
-/** User-Agent string sent with every request. */
+/**
+ * Browser-like User-Agent — corporate CDNs often block generic/bot strings.
+ * Used for HTML and HEAD; binary downloads add further Accept / Referer headers.
+ */
 export const USER_AGENT =
-  'Mozilla/5.0 (compatible; AcademicScraper/1.0; +student-project)';
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
 /** Directory where downloaded PDFs are cached. */
 export const DOWNLOADS_DIR = path.resolve(__dirname, '../../downloads');

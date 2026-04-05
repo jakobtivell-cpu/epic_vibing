@@ -12,6 +12,10 @@ export interface LabelSet {
 
 export const INDUSTRIAL_LABELS: LabelSet = {
   revenue: [
+    // Prefer longer phrases before bare "sales" (infographics / key figures)
+    'sales, sek billion',
+    'net sales, sek billion',
+    'sales sek billion',
     'net sales',
     'net revenue',
     'total revenue',

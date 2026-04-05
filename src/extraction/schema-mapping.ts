@@ -30,6 +30,9 @@ const INDUSTRIAL_REV_EXACT = [
   'revenue',
   'omsättning',
   'total revenue',
+  'sales, sek billion',
+  'net sales, sek billion',
+  'sales sek billion',
 ];
 
 /**

@@ -7,7 +7,8 @@
   },
   "main": "scrape.ts",
   "scripts": {
-    "start": "npx ts-node server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
     "server": "ts-node server.ts",
     "start:server": "ts-node server.ts",
     "typecheck": "tsc --noEmit",

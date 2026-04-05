@@ -13,7 +13,8 @@ const MAX_CONCURRENT = 3;
 const MAX_JOBS_IN_MEMORY = 50;
 const JOB_TTL_MS = 2 * 60 * 60 * 1000;
 
-const ROOT = path.resolve(__dirname);
+/** Project root: `server.ts` lives at repo root; compiled `dist/server.js` must resolve one level up. */
+const ROOT = path.resolve(__dirname, path.basename(__dirname) === 'dist' ? '..' : '.');
 const DASHBOARD_HTML = path.join(ROOT, 'app', 'swedish-largecap-dashboard.html');
 const RESULTS_JSON = path.join(ROOT, 'output', 'results.json');
 const TICKER_JSON = path.join(ROOT, 'data', 'ticker.json');

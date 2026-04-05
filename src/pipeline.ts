@@ -2,9 +2,10 @@
 // Pipeline orchestrator — bulletproof 7-step fallback chain per company.
 //
 // Steps (applied identically to every company):
-//   1. Search engine discovery (Bing/DDG with filetype:pdf, multi-query)
-//   2. Multi-domain Cheerio crawl (for each candidate domain)
+//   1. Search engine discovery (domains + PDF URL list only — no download yet)
+//   2. Multi-domain Cheerio crawl (IR page → report ranker → real PDFs first)
 //   3. Multi-domain Playwright crawl (for each domain with IR page)
+//   1b. Search-guessed PDF URLs (only after IR crawl fails — avoids rate limits)
 //   4. Direct PDF search (reverse discovery — Bing filetype:pdf + URL patterns)
 //   5. IR page HTML key figures extraction (medium confidence)
 //   6. Allabolag.se fallback (org number + multi-variant name search)
@@ -180,6 +181,33 @@ interface PdfExtractionFailure {
   notes: string[];
 }
 
+/** Optional circuit breaking for PDF download storms (search-guessed URLs, rate limits). */
+interface TryPdfCircuitOptions {
+  /** After this many download failures on a host, skip remaining candidates on that host. */
+  maxFailuresPerHost?: number;
+  /** After this many consecutive 403/404-class failures on a host, skip that host. */
+  consecutiveForbiddenAbortPerHost?: number;
+}
+
+function pdfUrlHostKey(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+  } catch {
+    return '_invalid_';
+  }
+}
+
+function isForbiddenOrNotFoundError(message: string | undefined): boolean {
+  if (!message) return false;
+  const m = message.toLowerCase();
+  return (
+    /\b403\b/.test(m) ||
+    /\b404\b/.test(m) ||
+    /status code 403/.test(m) ||
+    /status code 404/.test(m)
+  );
+}
+
 async function tryPdfCandidates(
   candidates: ReportCandidate[],
   entity: EntityProfile,
@@ -187,6 +215,7 @@ async function tryPdfCandidates(
   stepName: FallbackStep,
   maxAttempts: number = MAX_CANDIDATES_PER_STEP,
   shortNames: string[],
+  circuit?: TryPdfCircuitOptions,
 ): Promise<PdfExtractionSuccess | PdfExtractionFailure> {
   const notes: string[] = [];
   const triedUrls = new Set<string>();
@@ -199,21 +228,73 @@ async function tryPdfCandidates(
     distinctiveTokens: entity.distinctiveTokens,
   };
 
-  for (let i = 0; i < Math.min(ranked.length, maxAttempts); i++) {
-    const candidate = ranked[i];
+  const hostFailureCount = new Map<string, number>();
+  const hostConsecutiveForbidden = new Map<string, number>();
+  const hostFullySkipped = new Set<string>();
+
+  let downloadAttempts = 0;
+  let displayIndex = 0;
+
+  for (const candidate of ranked) {
+    if (downloadAttempts >= maxAttempts) break;
+
     if (triedUrls.has(candidate.url)) continue;
     triedUrls.add(candidate.url);
 
+    const host = pdfUrlHostKey(candidate.url);
+    if (hostFullySkipped.has(host)) continue;
+
+    const fails = hostFailureCount.get(host) ?? 0;
+    if (circuit?.maxFailuresPerHost != null && fails >= circuit.maxFailuresPerHost) {
+      if (!hostFullySkipped.has(host)) {
+        hostFullySkipped.add(host);
+        notes.push(
+          `${stepName}: skipping remaining URLs on ${host} (${fails} failures ≥ ${circuit.maxFailuresPerHost})`,
+        );
+      }
+      continue;
+    }
+
+    downloadAttempts++;
+    displayIndex++;
     const discoveryFiscalYear = extractYearFromCandidate(candidate);
 
-    log.info(`[${entity.displayName}] Trying candidate #${i + 1} (${stepName}): ${candidate.url}`);
+    log.info(`[${entity.displayName}] Trying candidate #${displayIndex} (${stepName}): ${candidate.url}`);
 
     const downloadResult = await downloadPdf(candidate.url, slug, discoveryFiscalYear, force);
     if (downloadResult.status !== 'success' || !downloadResult.value) {
-      log.warn(`[${entity.displayName}] Download failed for candidate #${i + 1}`);
-      notes.push(`Download failed for ${stepName} candidate #${i + 1}: ${candidate.url}`);
+      log.warn(`[${entity.displayName}] Download failed for candidate #${displayIndex}`);
+      notes.push(`Download failed for ${stepName} candidate #${displayIndex}: ${candidate.url}`);
+
+      const errMsg = downloadResult.error;
+      const nextFails = fails + 1;
+      hostFailureCount.set(host, nextFails);
+
+      if (isForbiddenOrNotFoundError(errMsg)) {
+        const streak = (hostConsecutiveForbidden.get(host) ?? 0) + 1;
+        hostConsecutiveForbidden.set(host, streak);
+        const abortAt = circuit?.consecutiveForbiddenAbortPerHost;
+        if (abortAt != null && streak >= abortAt) {
+          hostFullySkipped.add(host);
+          notes.push(
+            `${stepName}: ${streak} consecutive 403/404 on ${host} — skipping further guesses on this host`,
+          );
+        }
+      } else {
+        hostConsecutiveForbidden.set(host, 0);
+      }
+
+      if (circuit?.maxFailuresPerHost != null && nextFails >= circuit.maxFailuresPerHost) {
+        hostFullySkipped.add(host);
+        notes.push(
+          `${stepName}: ${nextFails} failures on ${host} — skipping remaining candidates on this host`,
+        );
+      }
+
       continue;
     }
+
+    hostConsecutiveForbidden.set(host, 0);
 
     const pdfText = await extractTextFromPdf(downloadResult.value, {
       ticker: slug,
@@ -221,22 +302,22 @@ async function tryPdfCandidates(
     });
 
     if (!pdfText.text) {
-      log.warn(`[${entity.displayName}] Text extraction failed for candidate #${i + 1}`);
-      notes.push(`Text extraction failed for ${stepName} candidate #${i + 1}`);
+      log.warn(`[${entity.displayName}] Text extraction failed for candidate #${displayIndex}`);
+      notes.push(`Text extraction failed for ${stepName} candidate #${displayIndex}`);
       continue;
     }
 
     const gateResult = applyQualityGates(pdfText.text, verifyName);
     if (!gateResult.passed) {
-      log.warn(`[${entity.displayName}] Quality gate rejected candidate #${i + 1}: ${gateResult.reason}`);
-      notes.push(`Rejected ${stepName} candidate #${i + 1} "${candidate.url}" — ${gateResult.reason}`);
+      log.warn(`[${entity.displayName}] Quality gate rejected candidate #${displayIndex}: ${gateResult.reason}`);
+      notes.push(`Rejected ${stepName} candidate #${displayIndex} "${candidate.url}" — ${gateResult.reason}`);
       continue;
     }
 
     const entityCheck = verifyEntityInPdf(pdfText.text, verifyName, shortNames, entityOpts);
     if (!entityCheck.passed) {
-      log.warn(`[${entity.displayName}] Entity check FAILED for candidate #${i + 1} — likely wrong company's report`);
-      notes.push(`Rejected ${stepName} candidate #${i + 1} "${candidate.url}" — entity check failed (wrong company)`);
+      log.warn(`[${entity.displayName}] Entity check FAILED for candidate #${displayIndex} — likely wrong company's report`);
+      notes.push(`Rejected ${stepName} candidate #${displayIndex} "${candidate.url}" — entity check failed (wrong company)`);
       continue;
     }
 
@@ -258,8 +339,8 @@ async function tryPdfCandidates(
 
     const rev = extraction.data.revenue_msek;
     if (rev !== null && rev > 5_000_000) {
-      log.warn(`[${entity.displayName}] Revenue ${rev} MSEK implausible — rejecting candidate #${i + 1}`);
-      notes.push(`Rejected ${stepName} candidate #${i + 1} — revenue ${rev} MSEK implausible`);
+      log.warn(`[${entity.displayName}] Revenue ${rev} MSEK implausible — rejecting candidate #${displayIndex}`);
+      notes.push(`Rejected ${stepName} candidate #${displayIndex} — revenue ${rev} MSEK implausible`);
       continue;
     }
     if (
@@ -268,8 +349,8 @@ async function tryPdfCandidates(
       entity.reportingModelHint !== 'bank' &&
       extraction.detectedCompanyType !== 'bank'
     ) {
-      log.warn(`[${entity.displayName}] Revenue ${rev} MSEK implausible — rejecting candidate #${i + 1}`);
-      notes.push(`Rejected ${stepName} candidate #${i + 1} — revenue ${rev} MSEK implausible`);
+      log.warn(`[${entity.displayName}] Revenue ${rev} MSEK implausible — rejecting candidate #${displayIndex}`);
+      notes.push(`Rejected ${stepName} candidate #${displayIndex} — revenue ${rev} MSEK implausible`);
       continue;
     }
 
@@ -422,20 +503,14 @@ async function processCompany(
     pushDomain(d);
   }
 
-  if (searchResult.pdfCandidates.length > 0) {
-    const searchAttempt = await tryPdfCandidates(
-      searchResult.pdfCandidates, entity, force, 'search',
-      MAX_CANDIDATES_PER_STEP, shortNames,
-    );
-    if (searchAttempt.success) {
-      applyPdfSuccess(state, searchAttempt, 'search');
-    } else {
-      state.notes.push(...searchAttempt.notes);
-    }
-  }
+  const CIRCUIT_PER_HOST = { maxFailuresPerHost: 3 as const };
+  const CIRCUIT_SEARCH_GUESSES = {
+    maxFailuresPerHost: 3 as const,
+    consecutiveForbiddenAbortPerHost: 2 as const,
+  };
 
   // =========================================================================
-  // Step 2+3: Multi-domain Cheerio + Playwright cycling
+  // Step 2+3: Multi-domain Cheerio + Playwright cycling (before search-guessed PDFs)
   // =========================================================================
   if (!state.extractionResult.value && candidateDomains.length > 0) {
     log.info(`[${name}] === Step 2+3: Multi-domain cycling (${candidateDomains.length} domains) ===`);
@@ -476,16 +551,36 @@ async function processCompany(
         if (mergedCandidates.length > 0) {
           reportResult = domainReportResult;
 
-          const cheerioAttempt = await tryPdfCandidates(
-            mergedCandidates, entity, force, 'cheerio',
-            MAX_CANDIDATES_PER_STEP, shortNames,
-          );
+          const irHigh = mergedCandidates.filter((c) => c.score >= 10);
+          const irLow = mergedCandidates.filter((c) => c.score < 10);
 
-          if (cheerioAttempt.success) {
-            applyPdfSuccess(state, cheerioAttempt, 'cheerio');
-            break;
+          if (irHigh.length > 0) {
+            const cheerioAttempt = await tryPdfCandidates(
+              irHigh, entity, force, 'cheerio',
+              MAX_CANDIDATES_PER_STEP, shortNames,
+              CIRCUIT_PER_HOST,
+            );
+
+            if (cheerioAttempt.success) {
+              applyPdfSuccess(state, cheerioAttempt, 'cheerio');
+              break;
+            }
+            state.notes.push(...cheerioAttempt.notes);
           }
-          state.notes.push(...cheerioAttempt.notes);
+
+          if (!state.extractionResult.value && irLow.length > 0) {
+            const cheerioLowAttempt = await tryPdfCandidates(
+              irLow, entity, force, 'cheerio',
+              MAX_CANDIDATES_PER_STEP, shortNames,
+              CIRCUIT_PER_HOST,
+            );
+
+            if (cheerioLowAttempt.success) {
+              applyPdfSuccess(state, cheerioLowAttempt, 'cheerio');
+              break;
+            }
+            state.notes.push(...cheerioLowAttempt.notes);
+          }
         }
 
         // Step 3: Playwright on this domain's IR page
@@ -498,6 +593,7 @@ async function processCompany(
             const pwAttempt = await tryPdfCandidates(
               rankedPw, entity, force, 'playwright',
               MAX_CANDIDATES_PER_STEP, shortNames,
+              CIRCUIT_PER_HOST,
             );
 
             if (pwAttempt.success) {
@@ -531,6 +627,7 @@ async function processCompany(
           const attempt = await tryPdfCandidates(
             rankedSearch, entity, force, 'cheerio',
             MAX_CANDIDATES_PER_STEP, shortNames,
+            CIRCUIT_PER_HOST,
           );
 
           if (attempt.success) {
@@ -540,6 +637,23 @@ async function processCompany(
           }
         }
       }
+    }
+  }
+
+  // =========================================================================
+  // Step 1b: Search-guessed PDF URLs (after IR crawl — avoids burning rate limits first)
+  // =========================================================================
+  if (!state.extractionResult.value && searchResult.pdfCandidates.length > 0) {
+    log.info(`[${name}] === Step 1b: Search PDF candidates (after IR crawl) ===`);
+    const searchAttempt = await tryPdfCandidates(
+      searchResult.pdfCandidates, entity, force, 'search',
+      MAX_CANDIDATES_PER_STEP, shortNames,
+      CIRCUIT_SEARCH_GUESSES,
+    );
+    if (searchAttempt.success) {
+      applyPdfSuccess(state, searchAttempt, 'search');
+    } else {
+      state.notes.push(...searchAttempt.notes);
     }
   }
 
@@ -557,6 +671,7 @@ async function processCompany(
       const directAttempt = await tryPdfCandidates(
         rankedDirect, entity, force, 'direct-pdf-search',
         MAX_CANDIDATES_PER_STEP, shortNames,
+        CIRCUIT_SEARCH_GUESSES,
       );
 
       if (directAttempt.success) {

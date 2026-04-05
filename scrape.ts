@@ -26,6 +26,8 @@ import {
   resolveOrgNumber,
   resolveCandidateDomains,
   resolveIrPage,
+  resolveIsin,
+  resolveIrEmail,
   normalizeTickerForLookup,
 } from './src/data/ticker-map';
 import { runPipeline } from './src/pipeline';
@@ -175,9 +177,11 @@ function buildCompanyList(opts: Record<string, unknown>): CompanyProfile[] {
       const orgNumber = resolveOrgNumber(rawTicker) ?? undefined;
       const candidateDomains = resolveCandidateDomains(rawTicker) ?? undefined;
       const irPage = resolveIrPage(rawTicker) ?? undefined;
+      const isin = resolveIsin(rawTicker) ?? undefined;
+      const irEmail = resolveIrEmail(rawTicker) ?? undefined;
       if (legalName) {
         log.info(
-          `Ticker ${rawTicker} → "${legalName}" (${canonicalTicker})${orgNumber ? ` org: ${orgNumber}` : ''}${candidateDomains?.length ? ` candidateDomains: ${candidateDomains.join(', ')}` : ''}${irPage ? ` irPage: ${irPage}` : ''}`,
+          `Ticker ${rawTicker} → "${legalName}" (${canonicalTicker})${orgNumber ? ` org: ${orgNumber}` : ''}${isin ? ` isin: ${isin}` : ''}${candidateDomains?.length ? ` candidateDomains: ${candidateDomains.join(', ')}` : ''}${irPage ? ` irPage: ${irPage}` : ''}${irEmail ? ` irEmail: ${irEmail}` : ''}`,
         );
         profiles.push({
           name: legalName,
@@ -186,6 +190,8 @@ function buildCompanyList(opts: Record<string, unknown>): CompanyProfile[] {
           orgNumber,
           ...(candidateDomains?.length ? { candidateDomains } : {}),
           ...(irPage ? { irPage } : {}),
+          ...(isin ? { isin } : {}),
+          ...(irEmail ? { irEmail } : {}),
         });
       } else {
         log.warn(`Ticker ${rawTicker} not found in ticker map — using as company search name`);

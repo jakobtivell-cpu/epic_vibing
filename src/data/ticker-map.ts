@@ -23,6 +23,8 @@ interface TickerEntry {
   candidateDomains?: string[];
   /** Verified IR page URL — pipeline skips heuristic IR discovery when set. */
   irPage?: string;
+  isin?: string;
+  irEmail?: string;
 }
 
 /** Raw map: ticker symbol → canonical legal entity name. */
@@ -75,6 +77,10 @@ export function loadTickerMap(): void {
               }
             : {}),
           ...(irNormalized ? { irPage: irNormalized } : {}),
+          ...(typeof o.isin === 'string' && o.isin.trim() ? { isin: o.isin.trim() } : {}),
+          ...(typeof o.irEmail === 'string' && o.irEmail.trim()
+            ? { irEmail: o.irEmail.trim() }
+            : {}),
         };
       }
     }
@@ -113,6 +119,16 @@ export function resolveCandidateDomains(ticker: string): string[] | null {
 export function resolveIrPage(ticker: string): string | null {
   const entry = resolveTickerEntry(ticker);
   return entry?.irPage ?? null;
+}
+
+export function resolveIsin(ticker: string): string | null {
+  const entry = resolveTickerEntry(ticker);
+  return entry?.isin ?? null;
+}
+
+export function resolveIrEmail(ticker: string): string | null {
+  const entry = resolveTickerEntry(ticker);
+  return entry?.irEmail ?? null;
 }
 
 /**

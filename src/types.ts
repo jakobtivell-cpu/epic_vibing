@@ -36,6 +36,10 @@ export interface CompanyProfile {
    * Verified investor-relations page URL from data/ticker.json — skips IR discovery when set.
    */
   irPage?: string;
+  /** ISIN from ticker.json when present (e.g. for cross-checks or future tooling). */
+  isin?: string;
+  /** IR contact email from ticker.json when present. */
+  irEmail?: string;
   /** Extra strings that may appear in filings (brands, local names) — used for PDF entity check. */
   knownAliases?: string[];
 }

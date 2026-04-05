@@ -334,50 +334,6 @@ function applyPdfSuccess(state: PipelineState, attempt: PdfExtractionSuccess, st
   state.notes.push(...attempt.notes);
 }
 
-/**
- * Sort candidate domains in-place so the most relevant ones come first.
- * Prioritises: .se TLDs, hostname matching a short name, and penalises
- * domains that redirected to a foreign TLD (e.g. seb.com → groupeseb.com/fr).
- */
-function sortDomainsByRelevance(domains: string[], shortNames: string[]): void {
-  const snLower = shortNames.map((s) => s.toLowerCase());
-
-  domains.sort((a, b) => {
-    const scoreA = domainRelevanceScore(a, snLower);
-    const scoreB = domainRelevanceScore(b, snLower);
-    return scoreB - scoreA;
-  });
-}
-
-function domainRelevanceScore(url: string, shortNamesLower: string[]): number {
-  let score = 0;
-  try {
-    const u = new URL(url);
-    const hostname = u.hostname.toLowerCase().replace(/^www\./, '');
-    const tld = hostname.split('.').pop() ?? '';
-
-    // Swedish TLD bonus
-    if (tld === 'se') score += 10;
-    // Swedish-adjacent TLDs
-    if (tld === 'com') score += 2;
-    // Penalise non-English/Swedish paths (e.g. /fr, /de)
-    if (/^\/(fr|de|es|it|pt|ja|zh|ko)\b/i.test(u.pathname)) score -= 15;
-
-    // Hostname matches a short name exactly or as prefix
-    for (const sn of shortNamesLower) {
-      const snSlug = sn.replace(/[^a-z0-9]/g, '');
-      if (hostname.startsWith(snSlug + '.') || hostname.startsWith(snSlug + 'group.')) {
-        score += 8;
-        break;
-      }
-      if (hostname.includes(snSlug)) {
-        score += 3;
-      }
-    }
-  } catch { /* skip */ }
-  return score;
-}
-
 // ---------------------------------------------------------------------------
 // Main company processing — 7-step bulletproof fallback chain
 // ---------------------------------------------------------------------------
@@ -418,7 +374,6 @@ async function processCompany(
   let confidence: number | null = null;
   let website = company.website ?? null;
   let irPageUrl: string | null = null;
-  const candidateDomains: string[] = [...entity.seedCandidateDomains];
 
   // =========================================================================
   // Step 1: Search engine discovery (filetype:pdf, multi-query, short names)
@@ -431,18 +386,37 @@ async function processCompany(
     log.info(`[${name}] Discovered website: ${website}`);
   }
 
-  // Collect all discovered domains for multi-domain cycling
-  for (const domain of searchResult.allDiscoveredDomains) {
-    if (!candidateDomains.includes(domain)) {
-      candidateDomains.push(domain);
+  // Domain order: ticker.json seeds → primary discovered website → search-tier → slug-tier → other discovery (deduped by host)
+  const candidateDomains: string[] = [];
+  const seenHosts = new Set<string>();
+  const pushDomain = (url: string | null | undefined) => {
+    if (!url || typeof url !== 'string') return;
+    try {
+      const u = new URL(url.startsWith('http') ? url : `https://${url}`);
+      const h = u.hostname.replace(/^www\./, '').toLowerCase();
+      if (seenHosts.has(h)) return;
+      seenHosts.add(h);
+      candidateDomains.push(url.replace(/\/$/, ''));
+    } catch {
+      /* skip */
     }
-  }
-  if (website && !candidateDomains.includes(website)) {
-    candidateDomains.unshift(website);
-  }
+  };
 
-  // Sort domains: prefer .se TLDs and domains matching company short names
-  sortDomainsByRelevance(candidateDomains, shortNames);
+  for (const d of entity.seedCandidateDomains) {
+    pushDomain(d);
+  }
+  if (website) {
+    pushDomain(website);
+  }
+  for (const d of searchResult.searchEngineDomains ?? []) {
+    pushDomain(d);
+  }
+  for (const d of searchResult.slugInferenceDomains ?? []) {
+    pushDomain(d);
+  }
+  for (const d of searchResult.allDiscoveredDomains) {
+    pushDomain(d);
+  }
 
   if (searchResult.pdfCandidates.length > 0) {
     const searchAttempt = await tryPdfCandidates(

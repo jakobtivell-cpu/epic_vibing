@@ -11,22 +11,46 @@
         "name": "Atlas Copco AB (publ)",
         "candidateDomains": ["https://www.atcogroup.com", "https://www.atlascopco.com"]
     },
-    "VOLV-A.ST": { "name": "AB Volvo (publ)", "orgNumber": "556012-5790" },
-    "VOLV-B.ST": { "name": "AB Volvo (publ)", "orgNumber": "556012-5790" },
+    "VOLV-A.ST": {
+        "name": "AB Volvo (publ)",
+        "orgNumber": "556012-5790",
+        "candidateDomains": ["https://www.volvogroup.com"]
+    },
+    "VOLV-B.ST": {
+        "name": "AB Volvo (publ)",
+        "orgNumber": "556012-5790",
+        "candidateDomains": ["https://www.volvogroup.com"]
+    },
     "NDA-SE.ST": "Nordea Bank Abp",
-    "SAND.ST": "Sandvik AB (publ)",
+    "SAND.ST": {
+        "name": "Sandvik AB (publ)",
+        "orgNumber": "556098-4739",
+        "candidateDomains": ["https://www.home.sandvik"]
+    },
     "NOKIA-SEK.ST": "Nokia Oyj",
     "DNBO.ST": "DNB Bank ASA",
     "ASSA-B.ST": "ASSA ABLOY AB (publ)",
     "SWED-A.ST": "Swedbank AB (publ)",
-    "ERIC-A.ST": "Telefonaktiebolaget LM Ericsson (publ)",
-    "ERIC-B.ST": "Telefonaktiebolaget LM Ericsson (publ)",
+    "ERIC-A.ST": {
+        "name": "Telefonaktiebolaget LM Ericsson (publ)",
+        "orgNumber": "556016-0680",
+        "candidateDomains": ["https://www.ericsson.com"]
+    },
+    "ERIC-B.ST": {
+        "name": "Telefonaktiebolaget LM Ericsson (publ)",
+        "orgNumber": "556016-0680",
+        "candidateDomains": ["https://www.ericsson.com"]
+    },
     "KOGO.ST": "Kongsberg Gruppen ASA",
     "SAAB-B.ST": "Saab AB (publ)",
     "SEB-A.ST": { "name": "Skandinaviska Enskilda Banken AB (publ)", "orgNumber": "502032-9081" },
     "SEB-C.ST": { "name": "Skandinaviska Enskilda Banken AB (publ)", "orgNumber": "502032-9081" },
     "EQT.ST": "EQT AB (publ)",
-    "HM-B.ST": "H & M Hennes & Mauritz AB (publ)",
+    "HM-B.ST": {
+        "name": "H & M Hennes & Mauritz AB (publ)",
+        "orgNumber": "556042-7220",
+        "candidateDomains": ["https://hmgroup.com"]
+    },
     "EPI-A.ST": "Epiroc AB (publ)",
     "EPI-B.ST": "Epiroc AB (publ)",
     "SAMPO-SEK.ST": "Sampo Oyj",
@@ -36,15 +60,27 @@
         "name": "Hexagon AB (publ)",
         "candidateDomains": ["https://hexagon.com", "https://investors.hexagon.com"]
     },
-    "ALFA.ST": { "name": "Alfa Laval AB (publ)", "orgNumber": "556587-8054" },
+    "ALFA.ST": {
+        "name": "Alfa Laval AB (publ)",
+        "orgNumber": "556587-8054",
+        "candidateDomains": ["https://www.alfalaval.com"]
+    },
     "LUMI.ST": "Lundin Mining Corporation",
     "INDU-A.ST": "AB Industrivärden (publ)",
     "INDU-C.ST": "AB Industrivärden (publ)",
     "TELIA.ST": "Telia Company AB (publ)",
     "LUG.ST": "Lundin Gold Inc.",
     "8TRA.ST": "Traton SE",
-    "ESSITY-A.ST": "Essity AB (publ)",
-    "ESSITY-B.ST": "Essity AB (publ)",
+    "ESSITY-A.ST": {
+        "name": "Essity AB (publ)",
+        "orgNumber": "556325-5511",
+        "candidateDomains": ["https://www.essity.com"]
+    },
+    "ESSITY-B.ST": {
+        "name": "Essity AB (publ)",
+        "orgNumber": "556325-5511",
+        "candidateDomains": ["https://www.essity.com"]
+    },
     "BOL.ST": "Boliden AB (publ)",
     "SOBI.ST": "Swedish Orphan Biovitrum AB (publ)",
     "TEL2-A.ST": "Tele2 AB (publ)",

@@ -24,6 +24,7 @@ import {
   resolveTicker,
   resolveOrgNumber,
   resolveCandidateDomains,
+  normalizeTickerForLookup,
 } from './src/data/ticker-map';
 import { runPipeline } from './src/pipeline';
 import { writeResults, mergeResults, writeRunSummary, printRunSummary } from './src/output';
@@ -144,22 +145,24 @@ function buildCompanyList(opts: Record<string, unknown>): CompanyProfile[] {
 
     for (const rawTicker of tickers) {
       const legalName = resolveTicker(rawTicker);
+      const canonicalTicker = normalizeTickerForLookup(rawTicker);
       const orgNumber = resolveOrgNumber(rawTicker) ?? undefined;
       const candidateDomains = resolveCandidateDomains(rawTicker) ?? undefined;
       if (legalName) {
-        log.info(`Ticker ${rawTicker} → "${legalName}"${orgNumber ? ` (org: ${orgNumber})` : ''}`);
+        log.info(
+          `Ticker ${rawTicker} → "${legalName}" (${canonicalTicker})${orgNumber ? ` org: ${orgNumber}` : ''}`,
+        );
         profiles.push({
           name: legalName,
-          ticker: rawTicker,
+          ticker: canonicalTicker,
           legalName,
           orgNumber,
           ...(candidateDomains?.length ? { candidateDomains } : {}),
         });
       } else {
-        log.warn(`Ticker ${rawTicker} not found in ticker map — using as company name`);
+        log.warn(`Ticker ${rawTicker} not found in ticker map — using as company search name`);
         profiles.push({
-          name: rawTicker.replace(/\.ST$/i, '').replace(/-[A-Z]$/i, ''),
-          ticker: rawTicker,
+          name: rawTicker.trim(),
         });
       }
     }

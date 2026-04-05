@@ -25,6 +25,13 @@ export interface SearchDiscoveryResult {
   discoveredWebsite: string | null;
   /** All candidate domains discovered (for multi-domain cycling). */
   allDiscoveredDomains: string[];
+  /**
+   * Domains inferred from search ("official website", IR) — pipeline merges these
+   * after ticker.json seeds, before slug-HEAD guesses.
+   */
+  searchEngineDomains: string[];
+  /** Domains that responded to HEAD on brand-derived URL guesses. */
+  slugInferenceDomains: string[];
   irPageCandidates: string[];
 }
 
@@ -75,7 +82,7 @@ export function deriveShortNames(companyName: string, ticker?: string): string[]
 }
 
 // ---------------------------------------------------------------------------
-// Company domain inference — construct likely website URLs from short names
+// Company domain inference — brand slugs from legal/display name (not ticker noise)
 // ---------------------------------------------------------------------------
 
 function companySlug(name: string): string {
@@ -94,28 +101,95 @@ function companySlugHyphen(name: string): string {
     .replace(/(^-|-$)/g, '');
 }
 
-function buildLikelyDomains(shortNames: string[]): string[] {
-  const candidates = new Set<string>();
+const DOMAIN_STOPWORDS = new Set([
+  'ab', 'publ', 'the', 'and', 'och', 'ltd', 'plc', 'oyj', 'asa', 'inc', 'group', 'gruppen',
+  'telefonaktiebolaget', 'aktiebolaget', 'svenska', 'corporation', 'company', 'holding',
+]);
 
-  for (const name of shortNames) {
-    const slug = companySlug(name);
-    const slugHyphen = companySlugHyphen(name);
+/**
+ * Distinctive brand tokens for domain trust and URL guessing — derived from the
+ * company / legal name, not from Nasdaq ticker slugs (avoids eric.se, ericb.com).
+ */
+export function extractBrandSlugsForDomains(companyOrLegalName: string): string[] {
+  const slugs = new Set<string>();
+  const raw = companyOrLegalName.trim();
+  if (!raw) return [];
 
-    if (slug.length < 2) continue;
+  const lower = raw.toLowerCase();
 
-    candidates.add(`https://www.${slug}.com`);
-    candidates.add(`https://www.${slug}.se`);
-    candidates.add(`https://${slug}.com`);
-    candidates.add(`https://${slug}.se`);
-    candidates.add(`https://www.${slug}group.com`);
-    candidates.add(`https://www.${slug}group.se`);
+  if (/h\s*&\s*m|hennes\s*&\s*mauritz|\bhennes\b.*\bmauritz\b/i.test(raw)) {
+    slugs.add('hm');
+    slugs.add('hmgroup');
+    slugs.add('hennes');
+  }
+  if (/\bericsson\b/i.test(raw)) slugs.add('ericsson');
+  if (/\bvolvo\b/i.test(raw)) {
+    slugs.add('volvo');
+    slugs.add('volvogroup');
+  }
+  if (/\bessity\b/i.test(raw)) slugs.add('essity');
+  if (/\bhexagon\b/i.test(raw)) slugs.add('hexagon');
+  if (/\bsandvik\b/i.test(raw)) slugs.add('sandvik');
+  if (/\batlas\s+copco\b/i.test(lower)) {
+    slugs.add('atlascopco');
+    slugs.add('atcogroup');
+  }
+  if (/\bsecuritas\b/i.test(raw)) slugs.add('securitas');
+  if (/\balfa\s+laval\b/i.test(lower)) slugs.add('alfalaval');
+  if (/\binvestor\s+ab\b/i.test(lower)) slugs.add('investorab');
 
-    if (slugHyphen !== slug) {
-      candidates.add(`https://www.${slugHyphen}.com`);
-      candidates.add(`https://www.${slugHyphen}.se`);
-    }
+  const stripped = raw
+    .replace(PAREN_SUFFIX, ' ')
+    .replace(LEGAL_SUFFIXES, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  for (const word of stripped.split(/\s+/)) {
+    const w = word.replace(/[^a-zA-ZÅÄÖåäö0-9]/g, '').toLowerCase();
+    if (w.length < 4 || DOMAIN_STOPWORDS.has(w)) continue;
+    slugs.add(w);
   }
 
+  if (slugs.size === 0) {
+    const m = raw.match(/[A-Za-zÅÄÖåäö]{4,}/g);
+    if (m) for (const x of m) slugs.add(x.toLowerCase());
+  }
+
+  return [...slugs];
+}
+
+/** Add Nasdaq ticker root for banks only — matches groupeseb.com (SEB) without enabling eric.se for Ericsson. */
+export function mergeBankTickerSlugForTrust(companyName: string, ticker: string | undefined, slugs: string[]): string[] {
+  const out = new Set(slugs);
+  if (!ticker || !/bank|banken|bankaktiebolag/i.test(companyName)) return [...out];
+  const tb = ticker.replace(/\.ST$/i, '').replace(/-[A-Z]$/i, '').toLowerCase();
+  if (tb.length >= 2 && tb.length <= 5) out.add(tb);
+  return [...out];
+}
+
+/** Host must visibly relate to at least one brand slug (blocks telepathy.com for H&M, eric.se for Ericsson). */
+export function hostnameMatchesBrandTrust(hostname: string, brandSlugs: string[]): boolean {
+  const h = hostname.toLowerCase().replace(/^www\./, '');
+  if (brandSlugs.length === 0) return true;
+  return brandSlugs.some((slug) => slug.length >= 2 && h.includes(slug));
+}
+
+function buildLikelyUrlsFromBrandSlugs(brandSlugs: string[]): string[] {
+  const candidates = new Set<string>();
+  for (const slugRaw of brandSlugs) {
+    const slug = companySlug(slugRaw);
+    const slugHyphen = companySlugHyphen(slugRaw);
+    if (slug.length < 2) continue;
+
+    // Only www.{slug}.{com,se} per brand — avoids parallel bursts to the same host family (rate limits).
+    candidates.add(`https://www.${slug}.com/`);
+    candidates.add(`https://www.${slug}.se/`);
+
+    if (slugHyphen !== slug && slugHyphen.length >= 2) {
+      candidates.add(`https://www.${slugHyphen}.com/`);
+      candidates.add(`https://www.${slugHyphen}.se/`);
+    }
+  }
   return [...candidates];
 }
 
@@ -124,51 +198,59 @@ interface DomainCheckResult {
   allResolvedDomains: string[];
 }
 
-async function discoverWebsites(shortNames: string[], companyName: string): Promise<DomainCheckResult> {
-  const domains = buildLikelyDomains(shortNames);
-  log.info(`[${companyName}] Trying ${domains.length} likely domains`);
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function headCheckTrustedOrigins(
+  urls: string[],
+  companyName: string,
+  brandSlugs: string[],
+): Promise<DomainCheckResult> {
+  log.info(`[${companyName}] HEAD-checking ${urls.length} brand-derived origins (sequential)`);
 
   let primaryWebsite: string | null = null;
   const allResolved: string[] = [];
 
-  // Check all domains (not just first hit) so we collect all candidates
-  const results = await Promise.allSettled(
-    domains.map(async (domain) => {
-      try {
-        const result = await headCheck(domain, 8_000);
-        if (result.exists) {
-          const finalUrl = result.finalUrl ?? domain;
-          return finalUrl;
-        }
-      } catch { /* ignore */ }
-      return null;
-    }),
-  );
-
-  for (const r of results) {
-    if (r.status === 'fulfilled' && r.value) {
-      const url = r.value;
-      // Deduplicate by hostname
-      try {
-        const hostname = new URL(url).hostname.replace(/^www\./, '');
-        if (!allResolved.some((u) => new URL(u).hostname.replace(/^www\./, '') === hostname)) {
-          allResolved.push(url);
-          if (!primaryWebsite) primaryWebsite = url;
-        }
-      } catch {
-        allResolved.push(url);
-        if (!primaryWebsite) primaryWebsite = url;
+  for (const domain of urls) {
+    let url: string | null = null;
+    try {
+      const result = await headCheck(domain, 8_000);
+      if (result.exists) {
+        url = result.finalUrl ?? domain;
       }
+    } catch {
+      /* ignore */
+    }
+    await sleepMs(350);
+
+    if (!url) continue;
+    try {
+      const hostname = new URL(url).hostname.replace(/^www\./, '');
+      if (!hostnameMatchesBrandTrust(hostname, brandSlugs)) {
+        log.debug(`[${companyName}] Rejecting unrelated host from slug guess: ${hostname}`);
+        continue;
+      }
+      if (!allResolved.some((u) => new URL(u).hostname.replace(/^www\./, '') === hostname)) {
+        allResolved.push(url.replace(/\/$/, '') || url);
+        if (!primaryWebsite) primaryWebsite = url.replace(/\/$/, '') || url;
+      }
+    } catch {
+      allResolved.push(url);
+      if (!primaryWebsite) primaryWebsite = url;
     }
   }
 
   if (primaryWebsite) {
-    log.info(`[${companyName}] Found website(s): ${allResolved.join(', ')}`);
-  } else {
-    log.info(`[${companyName}] No website found via domain inference`);
+    log.info(`[${companyName}] Slug-based website(s): ${allResolved.join(', ')}`);
   }
 
   return { primaryWebsite, allResolvedDomains: allResolved };
+}
+
+interface ScoredOrigin {
+  url: string;
+  score: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -254,6 +336,83 @@ async function queryBing(query: string): Promise<SearchResult[]> {
   } catch {
     return [];
   }
+}
+
+/** Shorter label for search engines — avoids timeouts on very long legal names. */
+function searchQueryLabel(fullName: string): string {
+  let s = fullName
+    .replace(PAREN_SUFFIX, ' ')
+    .replace(/\s*\(publ\)\s*/gi, ' ')
+    .replace(/^\s*telefonaktiebolaget\s+/i, '')
+    .replace(/^\s*aktiebolaget\s+/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (s.length <= 52) return s;
+  return `${s.slice(0, 49).trim()}…`;
+}
+
+async function discoverCorporateDomainsFromSearch(
+  companyName: string,
+  brandSlugs: string[],
+): Promise<string[]> {
+  const label = searchQueryLabel(companyName);
+  const queries = [
+    `${label} official website sweden`,
+    `${label} corporate website`,
+    `${label} investor relations`,
+  ];
+
+  const scored: ScoredOrigin[] = [];
+  const seenHost = new Set<string>();
+
+  for (const query of queries) {
+    const results = await querySearchEngine(query);
+    for (const r of results) {
+      if (/\.pdf(\?|$)/i.test(r.url)) continue;
+      let hostname = '';
+      let originUrl: string;
+      try {
+        const u = new URL(r.url);
+        hostname = u.hostname.replace(/^www\./, '').toLowerCase();
+        if (PORTAL_DOMAINS.test(hostname)) continue;
+        if (/allabolag|avanza|nasdaq|bloomberg|wikipedia|reuters|ft\.com|di\.se/i.test(hostname)) {
+          continue;
+        }
+        if (!hostnameMatchesBrandTrust(hostname, brandSlugs)) continue;
+        originUrl = `${u.protocol}//${u.hostname}/`;
+      } catch {
+        continue;
+      }
+
+      if (seenHost.has(hostname)) continue;
+
+      try {
+        const head = await headCheck(originUrl, 8_000);
+        if (!head.exists) continue;
+        const final = (head.finalUrl ?? originUrl).replace(/\/$/, '');
+        seenHost.add(hostname);
+
+        let score = 0;
+        for (const s of brandSlugs) {
+          if (hostname.includes(s)) score += Math.min(s.length, 12);
+        }
+        const blob = `${r.url} ${r.title} ${r.snippet}`.toLowerCase();
+        if (/investor|investerare|ir\b|financial\s+reports/i.test(blob)) score += 8;
+        if (/official|corporate|homepage|hemsida/i.test(blob)) score += 4;
+
+        scored.push({ url: final, score });
+      } catch {
+        /* skip */
+      }
+    }
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  const ordered = scored.map((s) => s.url);
+  if (ordered.length > 0) {
+    log.info(`[${companyName}] Search discovered corporate site(s): ${ordered.join(', ')}`);
+  }
+  return ordered;
 }
 
 // ---------------------------------------------------------------------------
@@ -385,6 +544,41 @@ function buildDirectPdfUrls(shortNames: string[], websites: string[]): ReportCan
 // Main entry point — Step 1 discovery
 // ---------------------------------------------------------------------------
 
+function dedupeOriginsByHost(urls: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of urls) {
+    try {
+      const u = new URL(raw.startsWith('http') ? raw : `https://${raw}`);
+      const h = u.hostname.replace(/^www\./, '').toLowerCase();
+      if (seen.has(h)) continue;
+      seen.add(h);
+      out.push(raw.replace(/\/$/, ''));
+    } catch {
+      /* skip */
+    }
+  }
+  return out;
+}
+
+function appendTrustedOrigin(
+  list: string[],
+  hostSeen: Set<string>,
+  originLike: string,
+  brandSlugs: string[],
+): void {
+  try {
+    const u = new URL(originLike);
+    const h = u.hostname.replace(/^www\./, '').toLowerCase();
+    if (hostSeen.has(h)) return;
+    if (!hostnameMatchesBrandTrust(h, brandSlugs)) return;
+    hostSeen.add(h);
+    list.push(`${u.protocol}//${u.hostname}`.replace(/\/$/, ''));
+  } catch {
+    /* skip */
+  }
+}
+
 /**
  * @param companyName  Primary search term (legal name or user-supplied name)
  * @param ticker       Optional raw ticker symbol (e.g. "SEB-A.ST")
@@ -395,18 +589,42 @@ export async function searchDiscovery(
 ): Promise<SearchDiscoveryResult> {
   log.info(`[${companyName}] Starting search-engine-based discovery${ticker ? ` (ticker: ${ticker})` : ''}`);
 
+  const brandSlugs = mergeBankTickerSlugForTrust(
+    companyName,
+    ticker,
+    extractBrandSlugsForDomains(companyName),
+  );
+  log.info(`[${companyName}] Brand slugs for domain trust: ${brandSlugs.join(', ')}`);
+
   const shortNames = deriveShortNames(companyName, ticker);
   log.info(`[${companyName}] Derived short names: ${shortNames.join(', ')}`);
+
+  const searchEngineDomains = dedupeOriginsByHost(
+    await discoverCorporateDomainsFromSearch(companyName, brandSlugs),
+  );
+
+  const slugGuessUrls = buildLikelyUrlsFromBrandSlugs(brandSlugs);
+  const slugResult = await headCheckTrustedOrigins(slugGuessUrls, companyName, brandSlugs);
+  const slugInferenceDomains = dedupeOriginsByHost(slugResult.allResolvedDomains);
+
+  let discoveredWebsite = searchEngineDomains[0] ?? slugResult.primaryWebsite ?? null;
+
+  const allDiscoveredDomains = dedupeOriginsByHost([...searchEngineDomains, ...slugInferenceDomains]);
+  const hostSeen = new Set<string>();
+  for (const raw of allDiscoveredDomains) {
+    try {
+      const h = new URL(raw.startsWith('http') ? raw : `https://${raw}`)
+        .hostname.replace(/^www\./, '')
+        .toLowerCase();
+      hostSeen.add(h);
+    } catch {
+      /* skip */
+    }
+  }
 
   const pdfCandidates: ReportCandidate[] = [];
   const irPageCandidates: string[] = [];
   const seenUrls = new Set<string>();
-  const allDiscoveredDomains: string[] = [];
-
-  // Phase A: Discover websites via domain inference using ALL short names
-  const domainResult = await discoverWebsites(shortNames, companyName);
-  let discoveredWebsite = domainResult.primaryWebsite;
-  allDiscoveredDomains.push(...domainResult.allResolvedDomains);
 
   // Phase B: Search engine queries with filetype:pdf and short-name variants
   const queries: string[] = [];
@@ -423,21 +641,16 @@ export async function searchDiscovery(
       if (seenUrls.has(r.url)) continue;
       seenUrls.add(r.url);
 
-      // Collect all non-portal domains for multi-domain cycling
       if (!r.url.endsWith('.pdf')) {
         try {
           const u = new URL(r.url);
-          const hostname = u.hostname.replace(/^www\./, '');
+          const hostname = u.hostname.replace(/^www\./, '').toLowerCase();
           if (!PORTAL_DOMAINS.test(hostname) && !/allabolag|avanza|nasdaq|bloomberg/i.test(hostname)) {
-            const domainUrl = `https://www.${hostname}`;
-            if (!allDiscoveredDomains.some((d) => {
-              try { return new URL(d).hostname.replace(/^www\./, '') === hostname; } catch { return false; }
-            })) {
-              allDiscoveredDomains.push(domainUrl);
-            }
-            if (!discoveredWebsite) {
-              discoveredWebsite = domainUrl;
-              log.info(`[${companyName}] Discovered website from search: ${discoveredWebsite}`);
+            const domainUrl = `https://${u.hostname}/`;
+            appendTrustedOrigin(allDiscoveredDomains, hostSeen, domainUrl, brandSlugs);
+            if (!discoveredWebsite && hostnameMatchesBrandTrust(hostname, brandSlugs)) {
+              discoveredWebsite = domainUrl.replace(/\/$/, '');
+              log.info(`[${companyName}] Discovered website from PDF/IR search: ${discoveredWebsite}`);
             }
           }
         } catch { /* skip */ }
@@ -472,13 +685,22 @@ export async function searchDiscovery(
 
   pdfCandidates.sort((a, b) => b.score - a.score);
 
-  log.info(`[${companyName}] Search discovery: ${pdfCandidates.length} PDF candidates, ${irPageCandidates.length} IR pages, website: ${discoveredWebsite ?? 'unknown'}, domains: ${allDiscoveredDomains.length}`);
+  log.info(
+    `[${companyName}] Search discovery: ${pdfCandidates.length} PDF candidates, ${irPageCandidates.length} IR pages, website: ${discoveredWebsite ?? 'unknown'}, domains: ${allDiscoveredDomains.length}`,
+  );
 
   for (const c of pdfCandidates.slice(0, 5)) {
     log.info(`[${companyName}]   ${c.score}pts — "${c.text}" — ${c.url}`);
   }
 
-  return { pdfCandidates, discoveredWebsite, allDiscoveredDomains, irPageCandidates };
+  return {
+    pdfCandidates,
+    discoveredWebsite,
+    allDiscoveredDomains,
+    searchEngineDomains,
+    slugInferenceDomains,
+    irPageCandidates,
+  };
 }
 
 // ---------------------------------------------------------------------------

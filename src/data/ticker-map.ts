@@ -100,20 +100,59 @@ export function resolveCandidateDomains(ticker: string): string[] | null {
   return d && d.length > 0 ? d : null;
 }
 
+/**
+ * Normalize user ticker input to Nasdaq Stockholm style before map lookup.
+ * Examples: "VOLV B" / "VOLV-B" → "VOLV-B.ST", "SAND" → "SAND.ST".
+ * Leaves free-text company names (e.g. "Securitas", "H&M") unchanged.
+ */
+export function normalizeTickerForLookup(raw: string): string {
+  const t = raw.trim();
+  if (t.length === 0) return t;
+
+  const upper = t.toUpperCase().replace(/\s+/g, ' ');
+
+  if (/\.ST$/i.test(upper)) {
+    return upper.replace(/\s/g, '');
+  }
+
+  const spaced = upper.match(/^([A-Z0-9][A-Z0-9.&-]*)\s+([A-Z])$/);
+  if (spaced) {
+    return `${spaced[1]}-${spaced[2]}.ST`;
+  }
+
+  const hyphen = upper.match(/^([A-Z0-9][A-Z0-9.&-]*)-([A-Z])$/);
+  if (hyphen) {
+    return `${hyphen[1]}-${hyphen[2]}.ST`;
+  }
+
+  if (/^[A-Z]{2,6}$/.test(upper)) {
+    return `${upper}.ST`;
+  }
+
+  return t;
+}
+
 function resolveTickerEntry(ticker: string): TickerEntry | null {
   if (Object.keys(tickerMap).length === 0) return null;
 
-  if (tickerMap[ticker]) return tickerMap[ticker];
+  const tryKeys = new Set<string>();
+  const raw = ticker.trim();
+  if (raw.length === 0) return null;
+  tryKeys.add(raw);
+  tryKeys.add(normalizeTickerForLookup(raw));
 
-  const upper = ticker.toUpperCase();
-  for (const [k, v] of Object.entries(tickerMap)) {
-    if (k.toUpperCase() === upper) return v;
-  }
-
-  if (!upper.endsWith('.ST')) {
-    const withSuffix = upper + '.ST';
+  for (const key of tryKeys) {
+    if (!key) continue;
+    if (tickerMap[key]) return tickerMap[key];
+    const upper = key.toUpperCase();
     for (const [k, v] of Object.entries(tickerMap)) {
-      if (k.toUpperCase() === withSuffix) return v;
+      if (k.toUpperCase() === upper) return v;
+    }
+    if (!upper.endsWith('.ST')) {
+      const withSuffix = `${upper}.ST`;
+      for (const [k, v] of Object.entries(tickerMap)) {
+        if (k.toUpperCase() === withSuffix) return v;
+      }
     }
   }
 

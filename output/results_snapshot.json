@@ -1,0 +1,31 @@
+{
+  "timestamp": "2026-04-05T15:57:08.476Z",
+  "companiesProcessed": 1,
+  "complete": 0,
+  "partial": 1,
+  "failed": 0,
+  "failureBuckets": {
+    "complete": 0,
+    "partial_pdf": 0,
+    "allabolag_partial": 1,
+    "no_ir": 0,
+    "no_pdf": 0,
+    "download_failed": 0,
+    "extraction_failed": 0,
+    "validation_failed": 0,
+    "failed_other": 0
+  },
+  "companies": [
+    {
+      "company": "Alfa Laval AB (publ)",
+      "ticker": "ALFA.ST",
+      "status": "partial",
+      "confidence": 30,
+      "dataSource": "allabolag",
+      "fieldsExtracted": 2,
+      "failureClass": "allabolag_partial",
+      "failedAtStage": null,
+      "errorSummary": null
+    }
+  ]
+}

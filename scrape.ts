@@ -25,6 +25,7 @@ import {
   resolveTicker,
   resolveOrgNumber,
   resolveCandidateDomains,
+  resolveIrPage,
   normalizeTickerForLookup,
 } from './src/data/ticker-map';
 import { runPipeline } from './src/pipeline';
@@ -173,9 +174,10 @@ function buildCompanyList(opts: Record<string, unknown>): CompanyProfile[] {
       const canonicalTicker = normalizeTickerForLookup(rawTicker);
       const orgNumber = resolveOrgNumber(rawTicker) ?? undefined;
       const candidateDomains = resolveCandidateDomains(rawTicker) ?? undefined;
+      const irPage = resolveIrPage(rawTicker) ?? undefined;
       if (legalName) {
         log.info(
-          `Ticker ${rawTicker} → "${legalName}" (${canonicalTicker})${orgNumber ? ` org: ${orgNumber}` : ''}${candidateDomains?.length ? ` candidateDomains: ${candidateDomains.join(', ')}` : ''}`,
+          `Ticker ${rawTicker} → "${legalName}" (${canonicalTicker})${orgNumber ? ` org: ${orgNumber}` : ''}${candidateDomains?.length ? ` candidateDomains: ${candidateDomains.join(', ')}` : ''}${irPage ? ` irPage: ${irPage}` : ''}`,
         );
         profiles.push({
           name: legalName,
@@ -183,6 +185,7 @@ function buildCompanyList(opts: Record<string, unknown>): CompanyProfile[] {
           legalName,
           orgNumber,
           ...(candidateDomains?.length ? { candidateDomains } : {}),
+          ...(irPage ? { irPage } : {}),
         });
       } else {
         log.warn(`Ticker ${rawTicker} not found in ticker map — using as company search name`);

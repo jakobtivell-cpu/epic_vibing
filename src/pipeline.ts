@@ -544,7 +544,9 @@ async function processCompany(
 
   const websiteTrimmed = company.website?.trim() ?? '';
   const hasTrustedOrigin =
-    entity.seedCandidateDomains.length > 0 || Boolean(websiteTrimmed);
+    entity.seedCandidateDomains.length > 0 ||
+    Boolean(websiteTrimmed) ||
+    Boolean(entity.seedIrPage);
 
   // =========================================================================
   // Step 1: Search engine discovery (filetype:pdf, multi-query, short names)
@@ -614,6 +616,130 @@ async function processCompany(
   // =========================================================================
   const attemptedIrHosts = new Set<string>();
 
+  const runIrExtractionPath = async (domain: string, domainIrUrl: string): Promise<void> => {
+    if (!irPageUrl) irPageUrl = domainIrUrl;
+
+    const domainReportResult = await discoverAnnualReport(
+      entity.searchAnchor,
+      domain,
+      domainIrUrl,
+      { skipFallbackLadder: true },
+    );
+
+    let mergedCandidates = [...(domainReportResult.value?.allCandidates ?? [])];
+    const hubUrls = await collectPublicationHubUrls(domain);
+    state.notes.push(
+      `REPORT_CORPUS: ${hubUrls.length} publication hub(s) quick-probed (single-page scan only) on ${domain}`,
+    );
+    const seenCand = new Set(mergedCandidates.map((c) => c.url));
+    for (const hub of hubUrls) {
+      if (hub.replace(/\/$/, '') === domainIrUrl.replace(/\/$/, '')) continue;
+      const quick = await quickScanPdfCandidatesOnPage(entity.searchAnchor, hub);
+      for (const c of quick) {
+        if (!seenCand.has(c.url)) {
+          mergedCandidates.push(c);
+          seenCand.add(c.url);
+        }
+      }
+    }
+    mergedCandidates = filterAndRankReportCandidatesForEntity(mergedCandidates, entity);
+
+    if (mergedCandidates.length > 0) {
+      reportResult = domainReportResult;
+
+      const irHigh = mergedCandidates.filter((c) => c.score >= 10);
+      const irLow = mergedCandidates.filter((c) => c.score < 10);
+
+      if (irHigh.length > 0) {
+        const cheerioAttempt = await tryPdfCandidates(
+          irHigh, entity, force, 'cheerio',
+          MAX_CANDIDATES_PER_STEP, shortNames,
+          CIRCUIT_PER_HOST,
+        );
+
+        if (cheerioAttempt.success) {
+          applyPdfSuccess(state, cheerioAttempt, 'cheerio');
+          return;
+        }
+        state.notes.push(...cheerioAttempt.notes);
+      }
+
+      if (!state.extractionResult.value && irLow.length > 0) {
+        const cheerioLowAttempt = await tryPdfCandidates(
+          irLow, entity, force, 'cheerio',
+          MAX_CANDIDATES_PER_STEP, shortNames,
+          CIRCUIT_PER_HOST,
+        );
+
+        if (cheerioLowAttempt.success) {
+          applyPdfSuccess(state, cheerioLowAttempt, 'cheerio');
+          return;
+        }
+        state.notes.push(...cheerioLowAttempt.notes);
+      }
+    }
+
+    if (!state.extractionResult.value) {
+      log.info(`[${name}] Playwright crawl on: ${domainIrUrl}`);
+      const playwrightCandidates = await tryPlaywrightFallback(entity.searchAnchor, domainIrUrl);
+
+      if (playwrightCandidates.length > 0) {
+        const rankedPw = filterAndRankReportCandidatesForEntity(playwrightCandidates, entity);
+        const pwAttempt = await tryPdfCandidates(
+          rankedPw, entity, force, 'playwright',
+          MAX_CANDIDATES_PER_STEP, shortNames,
+          CIRCUIT_PER_HOST,
+        );
+
+        if (pwAttempt.success) {
+          applyPdfSuccess(state, pwAttempt, 'playwright');
+        } else {
+          state.notes.push(...pwAttempt.notes);
+        }
+      }
+    }
+
+    if (!state.extractionResult.value) {
+      log.info(`[${name}] Cheerio deep fallback (full ladder once) on primary IR: ${domainIrUrl}`);
+      const deepReport = await discoverAnnualReport(entity.searchAnchor, domain, domainIrUrl);
+      if (deepReport.value?.allCandidates?.length) {
+        reportResult = deepReport.status === 'success' ? deepReport : reportResult;
+        const rankedDeep = filterAndRankReportCandidatesForEntity(
+          deepReport.value.allCandidates,
+          entity,
+        );
+        const irHighDeep = rankedDeep.filter((c) => c.score >= 10);
+        const irLowDeep = rankedDeep.filter((c) => c.score < 10);
+
+        if (irHighDeep.length > 0) {
+          const cheerioDeep = await tryPdfCandidates(
+            irHighDeep, entity, force, 'cheerio',
+            MAX_CANDIDATES_PER_STEP, shortNames,
+            CIRCUIT_PER_HOST,
+          );
+          if (cheerioDeep.success) {
+            applyPdfSuccess(state, cheerioDeep, 'cheerio');
+            return;
+          }
+          state.notes.push(...cheerioDeep.notes);
+        }
+
+        if (!state.extractionResult.value && irLowDeep.length > 0) {
+          const cheerioLowDeep = await tryPdfCandidates(
+            irLowDeep, entity, force, 'cheerio',
+            MAX_CANDIDATES_PER_STEP, shortNames,
+            CIRCUIT_PER_HOST,
+          );
+          if (cheerioLowDeep.success) {
+            applyPdfSuccess(state, cheerioLowDeep, 'cheerio');
+            return;
+          }
+          state.notes.push(...cheerioLowDeep.notes);
+        }
+      }
+    }
+  };
+
   const processDomain = async (domain: string): Promise<void> => {
     log.info(`[${name}] --- Trying domain: ${domain} ---`);
 
@@ -623,126 +749,7 @@ async function processCompany(
       const domainIrUrl = domainIrResult.value;
       if (!irPageUrl) irPageUrl = domainIrUrl;
       irResult = domainIrResult;
-
-      const domainReportResult = await discoverAnnualReport(
-        entity.searchAnchor,
-        domain,
-        domainIrUrl,
-        { skipFallbackLadder: true },
-      );
-
-      let mergedCandidates = [...(domainReportResult.value?.allCandidates ?? [])];
-      const hubUrls = await collectPublicationHubUrls(domain);
-      state.notes.push(
-        `REPORT_CORPUS: ${hubUrls.length} publication hub(s) quick-probed (single-page scan only) on ${domain}`,
-      );
-      const seenCand = new Set(mergedCandidates.map((c) => c.url));
-      for (const hub of hubUrls) {
-        if (hub.replace(/\/$/, '') === domainIrUrl.replace(/\/$/, '')) continue;
-        const quick = await quickScanPdfCandidatesOnPage(entity.searchAnchor, hub);
-        for (const c of quick) {
-          if (!seenCand.has(c.url)) {
-            mergedCandidates.push(c);
-            seenCand.add(c.url);
-          }
-        }
-      }
-      mergedCandidates = filterAndRankReportCandidatesForEntity(mergedCandidates, entity);
-
-      if (mergedCandidates.length > 0) {
-        reportResult = domainReportResult;
-
-        const irHigh = mergedCandidates.filter((c) => c.score >= 10);
-        const irLow = mergedCandidates.filter((c) => c.score < 10);
-
-        if (irHigh.length > 0) {
-          const cheerioAttempt = await tryPdfCandidates(
-            irHigh, entity, force, 'cheerio',
-            MAX_CANDIDATES_PER_STEP, shortNames,
-            CIRCUIT_PER_HOST,
-          );
-
-          if (cheerioAttempt.success) {
-            applyPdfSuccess(state, cheerioAttempt, 'cheerio');
-            return;
-          }
-          state.notes.push(...cheerioAttempt.notes);
-        }
-
-        if (!state.extractionResult.value && irLow.length > 0) {
-          const cheerioLowAttempt = await tryPdfCandidates(
-            irLow, entity, force, 'cheerio',
-            MAX_CANDIDATES_PER_STEP, shortNames,
-            CIRCUIT_PER_HOST,
-          );
-
-          if (cheerioLowAttempt.success) {
-            applyPdfSuccess(state, cheerioLowAttempt, 'cheerio');
-            return;
-          }
-          state.notes.push(...cheerioLowAttempt.notes);
-        }
-      }
-
-      if (!state.extractionResult.value) {
-        log.info(`[${name}] Playwright crawl on: ${domainIrUrl}`);
-        const playwrightCandidates = await tryPlaywrightFallback(entity.searchAnchor, domainIrUrl);
-
-        if (playwrightCandidates.length > 0) {
-          const rankedPw = filterAndRankReportCandidatesForEntity(playwrightCandidates, entity);
-          const pwAttempt = await tryPdfCandidates(
-            rankedPw, entity, force, 'playwright',
-            MAX_CANDIDATES_PER_STEP, shortNames,
-            CIRCUIT_PER_HOST,
-          );
-
-          if (pwAttempt.success) {
-            applyPdfSuccess(state, pwAttempt, 'playwright');
-          } else {
-            state.notes.push(...pwAttempt.notes);
-          }
-        }
-      }
-
-      if (!state.extractionResult.value) {
-        log.info(`[${name}] Cheerio deep fallback (full ladder once) on primary IR: ${domainIrUrl}`);
-        const deepReport = await discoverAnnualReport(entity.searchAnchor, domain, domainIrUrl);
-        if (deepReport.value?.allCandidates?.length) {
-          reportResult = deepReport.status === 'success' ? deepReport : reportResult;
-          const rankedDeep = filterAndRankReportCandidatesForEntity(
-            deepReport.value.allCandidates,
-            entity,
-          );
-          const irHighDeep = rankedDeep.filter((c) => c.score >= 10);
-          const irLowDeep = rankedDeep.filter((c) => c.score < 10);
-
-          if (irHighDeep.length > 0) {
-            const cheerioDeep = await tryPdfCandidates(
-              irHighDeep, entity, force, 'cheerio',
-              MAX_CANDIDATES_PER_STEP, shortNames,
-              CIRCUIT_PER_HOST,
-            );
-            if (cheerioDeep.success) {
-              applyPdfSuccess(state, cheerioDeep, 'cheerio');
-              return;
-            }
-            state.notes.push(...cheerioDeep.notes);
-          }
-
-          if (!state.extractionResult.value && irLowDeep.length > 0) {
-            const cheerioLowDeep = await tryPdfCandidates(
-              irLowDeep, entity, force, 'cheerio',
-              MAX_CANDIDATES_PER_STEP, shortNames,
-              CIRCUIT_PER_HOST,
-            );
-            if (cheerioLowDeep.success) {
-              applyPdfSuccess(state, cheerioLowDeep, 'cheerio');
-              return;
-            }
-            state.notes.push(...cheerioLowDeep.notes);
-          }
-        }
-      }
+      await runIrExtractionPath(domain, domainIrUrl);
     }
   };
 
@@ -795,6 +802,24 @@ async function processCompany(
       }
     }
   };
+
+  const seededIr = entity.seedIrPage;
+  if (seededIr && !state.extractionResult.value) {
+    let domainBase: string;
+    try {
+      domainBase = new URL(seededIr).origin;
+    } catch {
+      domainBase = seededIr;
+    }
+    const seedHk = originHostKey(seededIr);
+    if (seedHk) {
+      attemptedIrHosts.add(seedHk);
+    }
+    log.info(`[${name}] --- Ticker irPage seed (skip IR discovery): ${seededIr} ---`);
+    if (!irPageUrl) irPageUrl = seededIr;
+    irResult = { status: 'success', value: seededIr, durationMs: 0 };
+    await runIrExtractionPath(domainBase, seededIr);
+  }
 
   await runMultiDomainIr(candidateDomains, '');
   if (candidateDomains.length > 0) {

@@ -32,6 +32,10 @@ export interface CompanyProfile {
   orgNumber?: string;
   /** Multiple candidate domains to try for IR discovery (populated at runtime). */
   candidateDomains?: string[];
+  /**
+   * Verified investor-relations page URL from data/ticker.json — skips IR discovery when set.
+   */
+  irPage?: string;
   /** Extra strings that may appear in filings (brands, local names) — used for PDF entity check. */
   knownAliases?: string[];
 }

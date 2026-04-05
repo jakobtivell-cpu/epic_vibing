@@ -9,6 +9,7 @@ import { join } from 'path';
 import { CompanyProfile } from '../types';
 import { createLogger } from '../utils/logger';
 import { deriveShortNames } from '../discovery/search-discovery';
+import { toAbsoluteHttpUrl } from '../utils/url-helpers';
 
 const log = createLogger('entity-profile');
 
@@ -39,6 +40,8 @@ export interface EntityProfile {
   hostnameRejectRules: HostnameRejectRule[];
   /** Merged candidate domains from CompanyProfile */
   seedCandidateDomains: string[];
+  /** Normalized ticker.json IR page URL — skips heuristic IR discovery when set. */
+  seedIrPage: string | null;
   /** Optional extra match strings from CompanyProfile (brands, alternate names). */
   knownAliases: string[];
 }
@@ -120,6 +123,33 @@ function reportingHintFromLegal(legal: string): ReportingModelHint {
   return 'unspecified';
 }
 
+function hostKeyLoose(urlLike: string): string | null {
+  try {
+    const u = new URL(/^https?:\/\//i.test(urlLike) ? urlLike : `https://${urlLike}`);
+    return u.hostname.replace(/^www\./, '').toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+/** Prepend IR origin to candidate domains when that host is not already listed. */
+function mergeDomainsWithIrPage(domains: string[], irPageAbs: string | null): string[] {
+  const out = [...domains];
+  if (!irPageAbs) return out;
+  try {
+    const origin = new URL(irPageAbs).origin;
+    const hk = hostKeyLoose(origin);
+    if (!hk) return out;
+    const existing = new Set(
+      out.map((d) => hostKeyLoose(d)).filter((k): k is string => k !== null),
+    );
+    if (!existing.has(hk)) out.unshift(origin);
+  } catch {
+    /* ignore */
+  }
+  return out;
+}
+
 /**
  * Build a canonical entity profile from CLI/ticker-resolved CompanyProfile.
  */
@@ -139,11 +169,17 @@ export function buildEntityProfile(company: CompanyProfile): EntityProfile {
   const distinctiveTokens = distinctiveTokensFromLegal(legalName);
   const ambiguityLevel = computeAmbiguity(legalName, company.ticker);
   const hostnameRejectRules = loadHostnameRejectRules();
-  const seedCandidateDomains = [...(company.candidateDomains ?? [])];
+  const seedIrPage = company.irPage?.trim()
+    ? toAbsoluteHttpUrl(company.irPage.trim()) ?? null
+    : null;
+  const seedCandidateDomains = mergeDomainsWithIrPage(
+    [...(company.candidateDomains ?? [])],
+    seedIrPage,
+  );
   const knownAliases = [...(company.knownAliases ?? [])].map((s) => s.trim()).filter(Boolean);
 
   log.info(
-    `[entity] searchAnchor="${searchAnchor}" ambiguity=${ambiguityLevel} tokens=[${distinctiveTokens.slice(0, 5).join(', ')}]`,
+    `[entity] searchAnchor="${searchAnchor}" ambiguity=${ambiguityLevel} tokens=[${distinctiveTokens.slice(0, 5).join(', ')}]${seedIrPage ? ` irPageSeed=yes` : ''}`,
   );
 
   return {
@@ -159,6 +195,7 @@ export function buildEntityProfile(company: CompanyProfile): EntityProfile {
     reportingModelHint: reportingHintFromLegal(legalName),
     hostnameRejectRules,
     seedCandidateDomains,
+    seedIrPage,
     knownAliases,
   };
 }

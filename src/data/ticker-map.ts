@@ -21,6 +21,8 @@ interface TickerEntry {
   orgNumber?: string;
   /** Extra origins to try when the primary website / IR discovery fails (full URLs with scheme). */
   candidateDomains?: string[];
+  /** Verified IR page URL — pipeline skips heuristic IR discovery when set. */
+  irPage?: string;
 }
 
 /** Raw map: ticker symbol → canonical legal entity name. */
@@ -58,6 +60,9 @@ export function loadTickerMap(): void {
         tickerMap[key] = { name: val };
       } else if (typeof val === 'object' && val !== null && 'name' in val) {
         const o = val as Record<string, unknown>;
+        const irRaw = o.irPage;
+        const irNormalized =
+          typeof irRaw === 'string' && irRaw.trim() ? toAbsoluteHttpUrl(irRaw.trim()) : undefined;
         tickerMap[key] = {
           name: String(o.name),
           ...(typeof o.orgNumber === 'string' ? { orgNumber: o.orgNumber } : {}),
@@ -69,6 +74,7 @@ export function loadTickerMap(): void {
                   .filter((x): x is string => x !== null),
               }
             : {}),
+          ...(irNormalized ? { irPage: irNormalized } : {}),
         };
       }
     }
@@ -102,6 +108,11 @@ export function resolveCandidateDomains(ticker: string): string[] | null {
   const entry = resolveTickerEntry(ticker);
   const d = entry?.candidateDomains;
   return d && d.length > 0 ? d : null;
+}
+
+export function resolveIrPage(ticker: string): string | null {
+  const entry = resolveTickerEntry(ticker);
+  return entry?.irPage ?? null;
 }
 
 /**

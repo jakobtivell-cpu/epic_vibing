@@ -76,7 +76,11 @@
         "orgNumber": "556043-4200",
         "candidateDomains": ["https://www.industrivarden.se"]
     },
-    "TELIA.ST": "Telia Company AB (publ)",
+    "TELIA.ST": {
+        "name": "Telia Company AB (publ)",
+        "orgNumber": "556103-4249",
+        "candidateDomains": ["teliacompany.com"]
+    },
     "LUG.ST": "Lundin Gold Inc.",
     "8TRA.ST": "Traton SE",
     "ESSITY-A.ST": {

@@ -28,8 +28,6 @@ input:focus,textarea:focus{outline:none}
 .bp:hover{opacity:.85}
 .bo{padding:10px 16px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);font-size:12.5px;font-weight:600;color:var(--t2);cursor:pointer;white-space:nowrap;font-family:'DM Mono',monospace}
 .bo:hover{border-color:var(--t3);color:var(--tx)}
-.qb{padding:4px 12px;border-radius:6px;border:1px solid var(--bd);background:var(--bg);color:var(--t2);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit}
-.qb:hover{background:var(--sf);border-color:var(--t3)}
 table{width:100%;border-collapse:collapse}
 th{padding:10px 12px;font-size:9.5px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;background:var(--sf);border-bottom:1px solid var(--bd);white-space:nowrap}
 td{padding:11px 12px;border-bottom:1px solid var(--bl);font-size:12px}
@@ -71,10 +69,6 @@ tbody tr.sel{background:var(--sf)}
 .pm{display:flex;align-items:baseline;gap:3px}
 .pm .n{font-size:22px;font-weight:700;letter-spacing:-.5px}
 .pm .u{font-size:12px;color:var(--t3)}
-/* JSON import */
-.json-area{width:100%;min-height:80px;max-height:200px;padding:10px 14px;border-radius:8px;border:1px solid var(--bd);background:var(--sf);font-size:12px;color:var(--tx);font-family:'DM Mono',monospace;resize:vertical}
-.import-ok{border-color:var(--green);background:#F0FDF4}
-.import-err{border-color:var(--rose);background:#FEF2F2}
 /* Company autocomplete */
 .ac-wrap{flex:1;min-width:0;position:relative}
 .ac-dd{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:40;background:var(--bg);border:1px solid var(--bd);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.08);max-height:260px;overflow-y:auto;animation:fadeUp .15s ease}
@@ -102,18 +96,10 @@ const SMAP={Volvo:"Industrials",Ericsson:"Technology","H&M":"Consumer","Atlas Co
 const SC={Industrials:"#2563EB",Technology:"#7C3AED",Consumer:"#D97706",Financials:"#059669"};
 const SBG={Industrials:"#EFF6FF",Technology:"#F5F3FF",Consumer:"#FFFBEB",Financials:"#ECFDF5"};
 
-// Quick-add presets (same as typing the company name — calls POST /api/scrape)
-const MOCK={
-volvo:{company:"Volvo",ticker:"VOLV B",website:"https://www.volvogroup.com",irPage:"https://www.volvogroup.com/en/investors.html",annualReportUrl:"https://www.volvogroup.com/.../AR-2025.pdf",annualReportDownloaded:"downloads/volv_b_2025.pdf",fiscalYear:2025,extractedData:{revenue_msek:457509,ebit_msek:44379,employees:98844,ceo:"Martin Lundstedt"},sustainability:{scope1_co2_tonnes:25,scope2_co2_tonnes:50,methodology:"market-based",confidence:"low"},dataSource:"pdf",confidence:100,status:"complete",extractionNotes:["Annual report includes sustainability content"]},
-ericsson:{company:"Ericsson",ticker:"ERIC B",website:"https://www.ericsson.com",irPage:"https://www.ericsson.com/en/investors",annualReportUrl:"https://www.ericsson.com/.../ar-2025.pdf",annualReportDownloaded:"downloads/eric_b_2025.pdf",fiscalYear:2025,extractedData:{revenue_msek:236681,ebit_msek:38634,employees:89425,ceo:"Börje Ekholm"},sustainability:{scope1_co2_tonnes:204,scope2_co2_tonnes:50,methodology:"market-based",confidence:"low"},dataSource:"pdf",confidence:100,status:"complete",extractionNotes:[]},
-"h&m":{company:"H&M",ticker:"HM B",website:"https://hmgroup.com",irPage:"https://hmgroup.com/investors/",annualReportUrl:"https://hmgroup.com/.../HM-AR-2025.pdf",annualReportDownloaded:"downloads/hm_b_2025.pdf",fiscalYear:2025,extractedData:{revenue_msek:228285,ebit_msek:18395,employees:94744,ceo:"Daniel Erver"},sustainability:{scope1_co2_tonnes:201,scope2_co2_tonnes:203,methodology:"market-based",confidence:"low"},dataSource:"pdf",confidence:100,status:"complete",extractionNotes:[]},
-sandvik:{company:"Sandvik",ticker:"SAND",website:"https://www.home.sandvik",irPage:"https://www.home.sandvik/en/investors",annualReportUrl:null,annualReportDownloaded:null,fiscalYear:null,extractedData:{revenue_msek:null,ebit_msek:null,employees:null,ceo:null},sustainability:{scope1_co2_tonnes:null,scope2_co2_tonnes:null},dataSource:"pdf",confidence:35,status:"failed",extractionNotes:["No income statement found","Revenue not extracted","EBIT not extracted"]},
-};
-
 // ── STATE ──
-let results=[];   // Full result objects (from import or simulated scrape)
+let results=[];   // Full result objects (from API)
 let jobs=[];      // Active/completed scrape jobs: {id,name,status,logs[]}
-let view="table",selTk=null,showLogs=false,showImport=false,importMsg="";
+let view="table",selTk=null,showLogs=false,inlineStatusMsg="";
 
 /** API origin: same host when served from Express; localhost when opening this file from disk. */
 const API_BASE = (typeof window !== "undefined" && window.location.protocol === "file:")
@@ -211,61 +197,6 @@ const chk=()=>`<svg width="11" height="11" viewBox="0 0 16 16"><path d="M3 8.5l3
 const xx=()=>`<svg width="11" height="11" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="var(--rose)" stroke-width="2.5" stroke-linecap="round"/></svg>`;
 const avt=c=>`<div class="av" style="background:${SBG[sec(c)]};color:${SC[sec(c)]}">${esc(c.company.charAt(0))}</div>`;
 function bars(items,vFn,lFn,cFn){const mx=Math.max(...items.map(vFn),1);return items.map(c=>`<div class="bar-r"><div class="bar-l">${esc(c._n||c.company)}</div><div class="bar-t"><div class="bar-f" style="width:${(vFn(c)/mx)*100}%;background:${cFn(c)};opacity:.6"></div></div><div class="bar-v">${lFn(c)}</div></div>`).join("")}
-
-// ── IMPORT JSON ──
-function importJSON(){
-  const ta=document.getElementById("jsonInput");
-  if(!ta||!ta.value.trim()){importMsg="Paste JSON first";render();return}
-  try{
-    const raw=JSON.parse(ta.value.trim());
-    // Auto-detect format
-    if(raw.results&&Array.isArray(raw.results)){
-      // Full results.json format
-      results=raw.results.map(r=>({...r,_source:"import"}));
-      jobs=[];
-      importMsg=`✓ Imported ${results.length} companies from results.json (generated ${raw.generatedAt||"?"})`;
-    } else if(raw.companies&&Array.isArray(raw.companies)){
-      // Scrape summary format — merge into results as lightweight entries
-      raw.companies.forEach(c=>{
-        const existing=results.find(r=>r.ticker===c.ticker);
-        if(existing){
-          // Update status/confidence from summary
-          existing.confidence=c.confidence;
-          existing.status=c.status;
-          existing.dataSource=c.dataSource;
-          existing._fieldsExtracted=c.fieldsExtracted;
-          existing._failedAtStage=c.failedAtStage;
-          existing._errorSummary=c.errorSummary;
-        } else {
-          // Create stub entry from summary
-          results.push({
-            company:c.company,ticker:c.ticker,
-            website:null,irPage:null,annualReportUrl:null,annualReportDownloaded:null,
-            fiscalYear:null,
-            extractedData:null,
-            sustainability:{scope1_co2_tonnes:null,scope2_co2_tonnes:null},
-            dataSource:c.dataSource,confidence:c.confidence,status:c.status,
-            extractionNotes:c.errorSummary?[c.errorSummary]:[],
-            _fieldsExtracted:c.fieldsExtracted,
-            _failedAtStage:c.failedAtStage,
-            _errorSummary:c.errorSummary,
-            _source:"summary"
-          });
-        }
-      });
-      importMsg=`✓ Imported summary for ${raw.companies.length} companies (${raw.complete||0} ok, ${raw.partial||0} partial, ${raw.failed||0} failed)`;
-    } else if(Array.isArray(raw)){
-      // Plain array of result objects
-      results=raw.map(r=>({...r,_source:"import"}));
-      jobs=[];
-      importMsg=`✓ Imported ${results.length} companies`;
-    } else {
-      importMsg="✕ Unrecognized JSON format";render();return;
-    }
-    showImport=false;selTk=null;
-  }catch(e){importMsg="✕ Invalid JSON: "+e.message}
-  render();
-}
 
 // ── SCRAPER (POST /api/scrape + SSE /api/stream/:jobId) ──
 async function loadResultsFromServer(){
@@ -496,33 +427,33 @@ async function addCompany(name){
       body:JSON.stringify(isTicker?{ticker:trimmed}:{company:trimmed}),
     });
   }catch(e){
-    importMsg="✕ Cannot reach API: "+e.message+". Start the server with npm run server (default http://localhost:3000).";
+    inlineStatusMsg="✕ Cannot reach API: "+e.message+". Start the server with npm run server (default http://localhost:3000).";
     render();
     return;
   }
 
   if(res.status===429){
     const errBody=await res.json().catch(()=>({}));
-    importMsg="✕ "+(errBody.error||"Too many scrapes at once (max 3 concurrent jobs). Wait for one to finish.");
+    inlineStatusMsg="✕ "+(errBody.error||"Too many scrapes at once (max 3 concurrent jobs). Wait for one to finish.");
     render();
     return;
   }
 
   if(!res.ok){
     const errBody=await res.json().catch(()=>({}));
-    importMsg="✕ "+(errBody.error||("HTTP "+res.status));
+    inlineStatusMsg="✕ "+(errBody.error||("HTTP "+res.status));
     render();
     return;
   }
 
   const body=await res.json().catch(()=>({}));
   if(!body.jobId){
-    importMsg="✕ Invalid response from server (missing jobId)";
+    inlineStatusMsg="✕ Invalid response from server (missing jobId)";
     render();
     return;
   }
 
-  importMsg="";
+  inlineStatusMsg="";
   showLogs=true;
   const job={id:body.jobId,name:trimmed,status:"running",logs:[],queryKey:key,es:null,exitCode:null};
   jobs.push(job);
@@ -611,7 +542,7 @@ function renderTable(){
 
 // ── PERFORMANCE ──
 function renderPerf(){
-  if(!results.length)return`<div class="cd empty"><div style="font-size:14px;font-weight:600;margin-bottom:6px">No data yet</div><div style="font-size:12.5px;color:var(--t3)">Add companies or import JSON</div></div>`;
+  if(!results.length)return`<div class="cd empty"><div style="font-size:14px;font-weight:600;margin-bottom:6px">No data yet</div><div style="font-size:12.5px;color:var(--t3)">Add companies via scrape</div></div>`;
   const ch=(t,h)=>`<div class="cd" style="padding:22px"><h3 style="margin:0 0 14px;font-size:13px;font-weight:600">${t}</h3>${h}</div>`;
   const ok=results.filter(r=>r.status==="complete"),pt=results.filter(r=>r.status==="partial"),fl=results.filter(r=>r.status==="failed");
   const avgConf=results.filter(r=>r.confidence!=null);
@@ -662,7 +593,7 @@ function render(){
 
   let h="";
 
-  // ── INPUT + IMPORT AREA ──
+  // ── INPUT AREA ──
   h+=`<div class="cd" style="padding:16px 20px;margin-bottom:20px">
     <div class="ir">
       <div class="ac-wrap">
@@ -670,20 +601,9 @@ function render(){
         <div id="ac-dd" class="ac-dd" style="display:none" role="listbox" aria-label="Company suggestions"></div>
       </div>
       <button class="bp" onclick="doAdd()">+ Scrape</button>
-      <button class="bo" onclick="showImport=!showImport;render()" style="font-family:inherit;font-weight:600;font-size:12.5px">${showImport?"Cancel":"Import JSON"}</button>
       ${hasData?`<button class="bo" onclick="downloadJSON()">↓ results.json (${results.length})</button>`:""}
     </div>
-    ${showImport?`
-    <div style="margin-top:12px;animation:fadeUp .2s ease">
-      <div style="font-size:11.5px;color:var(--t2);margin-bottom:6px">Paste <span class="mono" style="font-size:11px">results.json</span> or <span class="mono" style="font-size:11px">scrape-summary.json</span> — format is auto-detected</div>
-      <textarea id="jsonInput" class="json-area" placeholder='{"generatedAt":"...","results":[...]}  or  {"timestamp":"...","companies":[...]}'></textarea>
-      <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
-        <button class="bp" onclick="importJSON()" style="font-size:12px;padding:8px 16px">Import</button>
-        ${importMsg?`<span style="font-size:12px;color:${importMsg.startsWith("✓")?"var(--green)":"var(--rose)"}">${esc(importMsg)}</span>`:""}
-      </div>
-    </div>`:""}
-    ${!showImport&&!hasData&&jobs.length===0?`<div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span style="font-size:11.5px;color:var(--t3);margin-right:4px">Quick add:</span>${Object.values(MOCK).map(c=>`<button class="qb" onclick="addCompany('${esc(c.company)}')">${esc(c.company)}</button>`).join("")}</div>`:""}
-    ${!showImport&&importMsg&&!showImport?`<div style="margin-top:8px;font-size:12px;color:${importMsg.startsWith("✓")?"var(--green)":"var(--rose)"}">${esc(importMsg)}</div>`:""}
+    ${inlineStatusMsg?`<div style="margin-top:8px;font-size:12px;color:${inlineStatusMsg.startsWith("✓")?"var(--green)":"var(--rose)"}">${esc(inlineStatusMsg)}</div>`:""}
   </div>`;
 
   // ── ACTIVE JOBS ──
@@ -700,7 +620,7 @@ function render(){
   }
 
   // ── EMPTY STATE ──
-  if(!hasData&&!act.length) h+=`<div class="cd empty"><div style="font-size:32px;margin-bottom:12px;opacity:.15">⊞</div><div style="font-size:15px;font-weight:600;margin-bottom:6px">No companies yet</div><div style="font-size:13px;color:var(--t3);max-width:460px;margin:0 auto;line-height:1.5">Run <span class="mono" style="font-size:12px">npm run server</span> and open the dashboard from <span class="mono" style="font-size:12px">http://localhost:3000</span>, then scrape by name or ticker. Or use <strong>Import JSON</strong> to paste <span class="mono" style="font-size:12px">results.json</span>.</div></div>`;
+  if(!hasData&&!act.length) h+=`<div class="cd empty"><div style="font-size:32px;margin-bottom:12px;opacity:.15">⊞</div><div style="font-size:15px;font-weight:600;margin-bottom:6px">No companies yet</div><div style="font-size:13px;color:var(--t3);max-width:460px;margin:0 auto;line-height:1.5">Run <span class="mono" style="font-size:12px">npm run server</span> and open the dashboard from <span class="mono" style="font-size:12px">http://localhost:3000</span>, then scrape by name or ticker.</div></div>`;
   else if(!hasData&&act.length>0) h+=`<div class="cd" style="padding:48px 40px;text-align:center">${spin("#2563EB",20)}<div style="font-size:14px;font-weight:600;margin-top:14px">Scraping in progress…</div></div>`;
 
   // ── DATA VIEWS ──
@@ -715,7 +635,7 @@ function render(){
   const inp=document.getElementById("ci");
   if(inp){
     inp.value=companyInputValue;
-    if(document.activeElement?.tagName!=="BUTTON"&&document.activeElement?.tagName!=="TEXTAREA")inp.focus();
+    if(document.activeElement?.tagName!=="BUTTON")inp.focus();
   }
   paintAcDropdown();
 }

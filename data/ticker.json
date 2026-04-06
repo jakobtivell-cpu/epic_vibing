@@ -820,7 +820,13 @@
     "VIMIAN.ST": "Vimian Group AB (publ)",
     "ATT.ST": "Attendo AB (publ)",
     "STOR-B.ST": "Storskogen Group AB (publ)",
-    "BEIA-B.ST": "Beijer Alma AB (publ)",
+    "BEIA-B.ST": {
+        "name": "Beijer Alma AB (publ)",
+        "irPage": "https://www.beijeralma.se/en/investors/",
+        "candidateDomains": [
+            "www.beijeralma.se"
+        ]
+    },
     "SYSR.ST": {
         "name": "Systemair AB (publ)",
         "irPage": "https://www.systemair.com/en/investors/",

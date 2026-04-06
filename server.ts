@@ -51,6 +51,8 @@ interface Job {
   createdAt: number;
   status: JobStatus;
   exitCode: number | null;
+  /** Set before SIGTERM so `close` reports exitCode -1 for DELETE /api/scrape/:jobId */
+  cancelRequested?: boolean;
   logs: string[];
   /** Subscribers receive each new log line after they connect (history replayed separately). */
   lineSubs: Set<(line: string) => void>;
@@ -140,9 +142,16 @@ function attachProcessStreams(job: Job, proc: ChildProcess): void {
     err.flush();
 
     job.proc = null;
-    const exitCode = code === null ? 1 : code;
-    job.exitCode = exitCode;
-    job.status = exitCode === 0 ? 'done' : 'failed';
+    let exitCode: number;
+    if (job.cancelRequested) {
+      exitCode = -1;
+      job.exitCode = -1;
+      job.status = 'failed';
+    } else {
+      exitCode = code === null ? 1 : code;
+      job.exitCode = exitCode;
+      job.status = exitCode === 0 ? 'done' : 'failed';
+    }
 
     const donePayload = JSON.stringify({ type: 'done', exitCode });
     for (const cb of [...job.lineSubs]) {
@@ -204,7 +213,7 @@ function spawnScrape(args: { ticker?: string; company?: string; force?: boolean 
 
 function cors(req: express.Request, res: express.Response, next: express.NextFunction): void {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') {
     res.sendStatus(204);
@@ -269,6 +278,34 @@ app.post('/api/scrape', (req: Request, res: Response) => {
     const msg = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: msg });
   }
+});
+
+app.delete('/api/scrape/:jobId', (req: Request, res: Response) => {
+  const job = jobs.get(req.params.jobId);
+  if (!job) {
+    res.status(404).json({ error: 'Job not found' });
+    return;
+  }
+  if (job.status !== 'running') {
+    res.status(400).json({ error: 'Job is not running' });
+    return;
+  }
+  job.cancelRequested = true;
+  if (job.proc) {
+    job.proc.kill('SIGTERM');
+  } else {
+    job.exitCode = -1;
+    job.status = 'failed';
+    const donePayload = JSON.stringify({ type: 'done', exitCode: -1 });
+    for (const cb of [...job.lineSubs]) {
+      try {
+        cb(`__DONE__${donePayload}`);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  res.json({ cancelled: true });
 });
 
 app.get('/api/stream/:jobId', (req: Request, res: Response) => {

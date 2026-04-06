@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import { randomBytes } from 'crypto';
 import { spawn, ChildProcess } from 'child_process';
 import express, { Request, Response } from 'express';
+import { RESULTS_PATH } from './src/config/settings';
 
 const LOG_LINE_RE = /^\d{4}-\d{2}-\d{2}T/;
 const MAX_CONCURRENT = 3;
@@ -16,7 +17,6 @@ const JOB_TTL_MS = 2 * 60 * 60 * 1000;
 /** Project root: `server.ts` lives at repo root; compiled `dist/server.js` must resolve one level up. */
 const ROOT = path.resolve(__dirname, path.basename(__dirname) === 'dist' ? '..' : '.');
 const DASHBOARD_HTML = path.join(ROOT, 'app', 'swedish-largecap-dashboard.html');
-const RESULTS_JSON = path.join(ROOT, 'output', 'results.json');
 const TICKER_JSON = path.join(ROOT, 'data', 'ticker.json');
 
 interface CompanyRow {
@@ -366,11 +366,11 @@ app.get('/api/stream/:jobId', (req: Request, res: Response) => {
 
 app.get('/api/results', (_req: Request, res: Response) => {
   try {
-    if (!fs.existsSync(RESULTS_JSON)) {
+    if (!fs.existsSync(RESULTS_PATH)) {
       res.json({ results: [], companyCount: 0, generatedAt: null });
       return;
     }
-    const raw = fs.readFileSync(RESULTS_JSON, 'utf8');
+    const raw = fs.readFileSync(RESULTS_PATH, 'utf8');
     const data = JSON.parse(raw) as {
       results?: unknown[];
       companyCount?: number;
@@ -382,6 +382,18 @@ app.get('/api/results', (_req: Request, res: Response) => {
       companyCount: typeof data.companyCount === 'number' ? data.companyCount : results.length,
       generatedAt: data.generatedAt ?? null,
     });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: msg });
+  }
+});
+
+app.delete('/api/results', (_req: Request, res: Response) => {
+  try {
+    const empty = { generatedAt: null, companyCount: 0, results: [] as unknown[] };
+    fs.mkdirSync(path.dirname(RESULTS_PATH), { recursive: true });
+    fs.writeFileSync(RESULTS_PATH, JSON.stringify(empty, null, 2), 'utf8');
+    res.json({ cleared: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: msg });

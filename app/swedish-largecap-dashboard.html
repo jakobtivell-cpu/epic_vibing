@@ -215,6 +215,25 @@ async function loadResultsFromServer(){
   }catch(e){console.warn("loadResultsFromServer",e)}
 }
 
+async function clearResults(){
+  try{
+    const r=await fetch(API_BASE+"/api/results",{method:"DELETE"});
+    if(!r.ok){
+      const errBody=await r.json().catch(()=>({}));
+      inlineStatusMsg="✕ "+(errBody.error||("HTTP "+r.status));
+      render();
+      return;
+    }
+    inlineStatusMsg="";
+    await loadResultsFromServer();
+    selTk=null;
+    render();
+  }catch(e){
+    inlineStatusMsg="✕ Cannot clear results: "+(e instanceof Error?e.message:String(e));
+    render();
+  }
+}
+
 async function loadCompaniesCatalog(){
   try{
     const r=await fetch(API_BASE+"/api/companies");
@@ -635,6 +654,7 @@ function render(){
         <div id="ac-dd" class="ac-dd" style="display:none" role="listbox" aria-label="Company suggestions"></div>
       </div>
       <button class="bp" onclick="doAdd()">+ Scrape</button>
+      ${hasData?`<button type="button" class="bo" onclick="clearResults()">Clear</button>`:""}
       ${hasData?`<button class="bo" onclick="downloadJSON()">↓ results.json (${results.length})</button>`:""}
     </div>
     ${inlineStatusMsg?`<div style="margin-top:8px;font-size:12px;color:${inlineStatusMsg.startsWith("✓")?"var(--green)":"var(--rose)"}">${esc(inlineStatusMsg)}</div>`:""}

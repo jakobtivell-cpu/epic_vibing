@@ -491,7 +491,10 @@
             "https://www.volvocars.com"
         ],
         "isin": "SE0016844831",
-        "irEmail": "investors@volvocars.com"
+        "irEmail": "investors@volvocars.com",
+        "entityWarnings": [
+            "Annual report published as interactive web report at investors.volvocars.com — no direct PDF available. Skip or handle manually."
+        ]
     },
     "SAGA-A.ST": {
         "name": "AB Sagax (publ)",

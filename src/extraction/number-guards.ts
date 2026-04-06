@@ -10,15 +10,27 @@ export function isFusedYearIntegerCorruption(n: number): boolean {
   return /(20\d{2}){2,}/.test(s);
 }
 
+/** Above this (MSEK field value), assume tkr/KSEK read as MSEK and apply ÷1000 once. */
+const MEGASCALE_MSEK_THRESHOLD: Record<'industrial' | 'bank' | 'investment_company', number> = {
+  // Large Cap industrials rarely exceed ~1M MSEK; 1M was too aggressive (wrong table picks were mangled).
+  industrial: 3_000_000,
+  bank: 80_000_000,
+  investment_company: 3_000_000,
+};
+
 /**
  * Parent-company lines in tkr/KSEK are sometimes parsed with consolidated MSEK context → ~1000× inflation.
- * When revenue is absurdly large in MSEK, scale down once.
+ * When revenue is absurdly large in MSEK for the reporting model, scale down once.
  */
-export function applyRevenueMegascaleMsekGuard(revenue: number): {
+export function applyRevenueMegascaleMsekGuard(
+  revenue: number,
+  companyType: 'industrial' | 'bank' | 'investment_company' = 'industrial',
+): {
   revenue: number;
   adjusted: boolean;
 } {
-  if (!Number.isFinite(revenue) || revenue <= 1_000_000) {
+  const threshold = MEGASCALE_MSEK_THRESHOLD[companyType];
+  if (!Number.isFinite(revenue) || revenue <= threshold) {
     return { revenue, adjusted: false };
   }
   return { revenue: Math.round(revenue / 1000), adjusted: true };

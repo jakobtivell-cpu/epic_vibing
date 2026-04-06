@@ -25,18 +25,18 @@ describe('income statement section selection', () => {
 });
 
 describe('revenue MSEK unit guard', () => {
-  it('scales down revenue above 1,000,000 MSEK (tkr/KSEK misread as MSEK)', () => {
+  it('scales down industrial revenue above 3,000,000 MSEK (tkr/KSEK misread as MSEK)', () => {
     const text = [
       'Koncernens resultaträkning',
       'Net sales',
-      '2138000',
+      '5000000',
       'Operating income',
       '200000',
       'Balansräkning',
     ].join('\n');
 
     const r = extractFields(text, 'EssityLike', 2025);
-    expect(r.data.revenue_msek).toBe(2138);
+    expect(r.data.revenue_msek).toBe(5000);
     expect(r.notes.some((n) => n.includes('unit guard'))).toBe(true);
   });
 });

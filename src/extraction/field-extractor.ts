@@ -477,8 +477,11 @@ const ADJUSTED_EBIT_LABELS: string[] = [
 ];
 
 const OPERATING_MARGIN_LABEL_PATTERNS: RegExp[] = [
+  /\badjusted\s+operating\s+margin\b/i,
+  /\bebita[-\s]?marginal\b/i,
   /\boperating\s+margin\b/i,
   /\brörelsemarginal\b/i,
+  /\bjusterad\s+rörelsemarginal\b/i,
   /\bebit\s+margin\b/i,
   /\brörelseresultat\s+i\s*%\b/i,
 ];
@@ -881,12 +884,7 @@ function findAllLabeledNumbers(
       afterLabel = afterLabel.replace(/^[)}\]]+/, '');
       afterLabel = stripLeadingNoteRef(afterLabel);
 
-      const searchText =
-        afterLabel + (i + 1 < lines.length ? '  ' + lines[i + 1] : '');
-
-      const cells = splitIntoCells(searchText);
-
-      const chosen = selectBestNumericFromCells(cells, lines, i, opts, pickContext);
+      const chosen = pickNumberFromLabelTail(afterLabel, lines, i, opts, pickContext);
       if (chosen !== null) {
         results.push({
           value: chosen.value,
@@ -913,6 +911,47 @@ function extractNumberTokens(text: string): string[] {
     tokens.push(m[0]);
   }
   return tokens;
+}
+
+/**
+ * Prefer numbers on the label row; only merge the following line when the tail has no usable figure
+ * (avoids pulling segment / subtotal rows into the same cell set as Intäkter / Net sales).
+ */
+function pickNumberFromLabelTail(
+  afterLabel: string,
+  lines: string[],
+  lineIndex: number,
+  opts: NumberSearchOpts,
+  pickContext?: NumberPickContext,
+): { cell: string; value: number } | null {
+  const { minValue = -Infinity, maxValue = Infinity } = opts;
+  const tail = afterLabel.trim();
+
+  let chosen = selectBestNumericFromCells(splitIntoCells(tail), lines, lineIndex, opts, pickContext);
+  if (chosen !== null) return chosen;
+
+  const directTokens = extractNumberTokens(afterLabel);
+  for (const token of directTokens) {
+    if (/^20[12]\d$/.test(token)) continue;
+    const value = parseNumber(token);
+    if (value === null) continue;
+    if (value < minValue || value > maxValue) continue;
+    return { cell: token, value };
+  }
+
+  if (lineIndex + 1 < lines.length) {
+    const merged = `${afterLabel}  ${lines[lineIndex + 1]}`;
+    chosen = selectBestNumericFromCells(
+      splitIntoCells(merged.trim()),
+      lines,
+      lineIndex,
+      opts,
+      pickContext,
+    );
+    if (chosen !== null) return chosen;
+  }
+
+  return null;
 }
 
 function scanForNumber(
@@ -950,12 +989,7 @@ function scanForNumber(
       afterLabel = afterLabel.replace(/^[)}\]]+/, '');
       afterLabel = stripLeadingNoteRef(afterLabel);
 
-      const searchText =
-        afterLabel + (i + 1 < lines.length ? '  ' + lines[i + 1] : '');
-
-      const cells = splitIntoCells(searchText);
-
-      const chosen = selectBestNumericFromCells(cells, lines, i, opts, pickContext);
+      const chosen = pickNumberFromLabelTail(afterLabel, lines, i, opts, pickContext);
       if (chosen !== null) {
         log.debug(`Found "${label}": ${chosen.value} (raw: "${chosen.cell}")`);
         return {
@@ -965,17 +999,6 @@ function scanForNumber(
           rawCell: chosen.cell,
           context: 'general',
         };
-      }
-
-      const directTokens = extractNumberTokens(afterLabel);
-      for (const token of directTokens) {
-        if (/^20[12]\d$/.test(token)) continue;
-        const value = parseNumber(token);
-        if (value === null) continue;
-        if (value < minValue || value > maxValue) continue;
-
-        log.debug(`Found "${label}": ${value} (direct-extract: "${token}")`);
-        return { value, lineIndex: i, label, rawCell: token, context: 'general' };
       }
     }
   }
@@ -1370,15 +1393,21 @@ function extractEbitFromOperatingMarginTimesRevenue(
   return null;
 }
 
+interface EbitaDeriveResult {
+  match: NumberMatch;
+  proxyWithoutAmort: boolean;
+}
+
 /**
- * Priority 4 — EBITA minus amortization of intangibles (±10 lines).
+ * EBITA strategy: subtract amortization of intangibles within ±15 lines when found;
+ * otherwise use EBITA as EBIT proxy (documented in notes).
  */
 function extractEbitFromEbitaMinusAmortization(
   lines: string[],
   opts: NumberSearchOpts,
   pick: NumberPickContext | undefined,
   scan: ScanConstraints,
-): NumberMatch | null {
+): EbitaDeriveResult | null {
   const { minValue = -Infinity, maxValue = Infinity } = opts;
 
   for (let i = 0; i < lines.length; i++) {
@@ -1395,14 +1424,14 @@ function extractEbitFromEbitaMinusAmortization(
     const cells = splitIntoCells(afterLabel.trim());
     const chosen = selectBestNumericFromCells(cells, lines, i, opts, pick);
     if (chosen === null) continue;
-    let ebitaVal = chosen.value;
+    const ebitaVal = chosen.value;
     if (ebitaVal < minValue || ebitaVal > maxValue) continue;
 
     let amortVal: number | null = null;
     let amortLine = -1;
     for (
-      let j = Math.max(0, i - 10);
-      j <= Math.min(lines.length - 1, i + 10);
+      let j = Math.max(0, i - 15);
+      j <= Math.min(lines.length - 1, i + 15);
       j++
     ) {
       if (j === i) continue;
@@ -1436,17 +1465,31 @@ function extractEbitFromEbitaMinusAmortization(
       }
     }
 
-    if (amortVal === null) continue;
+    if (amortVal === null) {
+      return {
+        match: {
+          value: ebitaVal,
+          lineIndex: i,
+          label: 'EBITA',
+          rawCell: String(chosen.cell),
+          context: 'general',
+        },
+        proxyWithoutAmort: true,
+      };
+    }
 
     const ebitRaw = ebitaVal - Math.abs(amortVal);
     if (ebitRaw < minValue || ebitRaw > maxValue) continue;
 
     return {
-      value: ebitRaw,
-      lineIndex: i,
-      label: 'EBITA − amortization intangibles',
-      rawCell: `EBITA ${ebitaVal}; amort ${amortVal} (line ${amortLine})`,
-      context: 'segment-fallback',
+      match: {
+        value: ebitRaw,
+        lineIndex: i,
+        label: 'EBITA − amortization intangibles',
+        rawCell: `EBITA ${ebitaVal}; amort ${amortVal} (line ${amortLine})`,
+        context: 'segment-fallback',
+      },
+      proxyWithoutAmort: false,
     };
   }
   return null;
@@ -1626,6 +1669,27 @@ function extractEbitWithStrategies(
     };
   }
 
+  const ebitaDerive = extractEbitFromEbitaMinusAmortization(
+    lines,
+    ebitOpts,
+    ebitPick,
+    detectedType === 'bank' ? bankScan : SCAN_DEFAULT,
+  );
+  if (ebitaDerive !== null) {
+    if (ebitaDerive.proxyWithoutAmort) {
+      extraNotes.push(
+        'EBIT estimated from EBITA — amortization not found, may be overstated',
+      );
+    } else {
+      extraNotes.push('EBIT derived from EBITA minus amortization.');
+    }
+    return {
+      msek: normalizeEbitMatchToMsek(ebitaDerive.match, lines, unitContext),
+      match: ebitaDerive.match,
+      extraNotes,
+    };
+  }
+
   if (revenue !== null) {
     match = extractEbitFromOperatingMarginTimesRevenue(
       lines,
@@ -1633,24 +1697,11 @@ function extractEbitWithStrategies(
       revProvenance,
     );
     if (match !== null) {
-      extraNotes.push('EBIT derived from operating margin × revenue — verify.');
+      extraNotes.push(
+        'EBIT derived from operating margin × revenue — verify against income statement',
+      );
       return { msek: match.value, match, extraNotes };
     }
-  }
-
-  match = extractEbitFromEbitaMinusAmortization(
-    lines,
-    ebitOpts,
-    ebitPick,
-    detectedType === 'bank' ? bankScan : SCAN_DEFAULT,
-  );
-  if (match !== null) {
-    extraNotes.push('EBIT derived from EBITA minus amortization.');
-    return {
-      msek: normalizeEbitMatchToMsek(match, lines, unitContext),
-      match,
-      extraNotes,
-    };
   }
 
   match = extractEbitFromSegmentResultsBeforeFinancial(lines, ebitOpts, unitContext);
@@ -1907,10 +1958,10 @@ export function extractFields(
 
   // Parent-company lines in tkr/KSEK are sometimes parsed with consolidated MSEK context → ~1000× inflation.
   if (detectedType !== 'investment_company' && revenue !== null) {
-    const { revenue: rev2, adjusted } = applyRevenueMegascaleMsekGuard(revenue);
+    const { revenue: rev2, adjusted } = applyRevenueMegascaleMsekGuard(revenue, detectedType);
     if (adjusted) {
       log.warn(
-        `Revenue ${revenue} MSEK exceeds 1,000,000 — applying ÷1000 unit guard → ${rev2} MSEK`,
+        `Revenue ${revenue} MSEK exceeds megascale threshold for ${detectedType} — applying ÷1000 unit guard → ${rev2} MSEK`,
       );
       notes.push(
         `Revenue unit guard: ${revenue} → ${rev2} MSEK (likely tkr/KSEK misread as MSEK)`,

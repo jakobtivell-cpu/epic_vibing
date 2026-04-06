@@ -16,6 +16,8 @@ export const INDUSTRIAL_LABELS: LabelSet = {
     'sales, sek billion',
     'net sales, sek billion',
     'sales sek billion',
+    // Sandvik and others use "Intäkter" as the primary consolidated revenue line — before generic omsättning/försäljning
+    'intäkter',
     'net sales',
     'net revenue',
     'total revenue',
@@ -28,7 +30,6 @@ export const INDUSTRIAL_LABELS: LabelSet = {
     'totala intäkter',
     'försäljning',
     'omsättning',
-    'intäkter',
   ],
   ebit: [
     // Longer phrases first (direct / consolidated EBIT — not adjusted-only variants)

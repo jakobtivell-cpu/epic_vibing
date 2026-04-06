@@ -60,7 +60,8 @@ tbody tr.sel{background:var(--sf)}
 .job-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11.5px;animation:fadeUp .3s ease}
 .spinner{animation:spin .8s linear infinite;flex-shrink:0}
 .rm{margin-left:auto;padding:2px 8px;border-radius:4px;border:1px solid var(--bd);background:transparent;font-size:10px;color:var(--t3);cursor:pointer;font-family:'DM Mono',monospace}
-.logbox{margin-top:10px;padding:10px 12px;border-radius:8px;background:#1a1a2e;max-height:180px;overflow:hidden}
+.job-wrap{margin-bottom:2px}
+.job-logbox{margin-top:6px;padding:10px 12px;border-radius:8px;background:#1a1a2e;height:180px;overflow-y:auto;overflow-x:hidden}
 .ll{font-size:11px;line-height:1.6;font-family:'DM Mono',monospace;color:#94a3b8}
 .ll.e{color:#f87171}
 .av{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
@@ -98,8 +99,8 @@ const SBG={Industrials:"#EFF6FF",Technology:"#F5F3FF",Consumer:"#FFFBEB",Financi
 
 // ── STATE ──
 let results=[];   // Full result objects (from API)
-let jobs=[];      // Active/completed scrape jobs: {id,name,status,logs[]}
-let view="table",selTk=null,showLogs=false,inlineStatusMsg="";
+let jobs=[];      // Active/completed scrape jobs: {id,name,status,logs[],logsExpanded?}
+let view="table",selTk=null,inlineStatusMsg="";
 
 /** Tab switching — use a named function so clicks always update script scope (inline handlers + top-level `let`). */
 function setMainView(v){
@@ -461,8 +462,7 @@ async function addCompany(name){
   }
 
   inlineStatusMsg="";
-  showLogs=true;
-  const job={id:body.jobId,name:trimmed,status:"running",logs:[],queryKey:key,es:null,exitCode:null,cancelled:false};
+  const job={id:body.jobId,name:trimmed,status:"running",logs:[],logsExpanded:true,queryKey:key,es:null,exitCode:null,cancelled:false};
   jobs.push(job);
   render();
   connectJobStream(job);
@@ -489,6 +489,13 @@ function removeJob(id){
   const j=jobs.find(x=>x.id===id);
   if(j&&j.es){try{j.es.close()}catch(_){};j.es=null}
   jobs=jobs.filter(x=>x.id!==id);
+  render();
+}
+
+function toggleJobLogs(id){
+  const j=jobs.find(x=>x.id===id);
+  if(!j||!j.logs.length)return;
+  j.logsExpanded=!j.logsExpanded;
   render();
 }
 function removeResult(ticker){results=results.filter(r=>r.ticker!==ticker);if(selTk===ticker)selTk=null;render()}
@@ -611,7 +618,6 @@ function renderPerf(){
 function render(){
   const act=jobs.filter(j=>j.status==="running");
   const hasData=results.length>0;
-  const allLogs=jobs.flatMap(j=>j.logs);
 
   if(!hasData&&view==="performance")view="table";
 
@@ -640,7 +646,6 @@ function render(){
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
         <div style="width:6px;height:6px;border-radius:50%;background:${act.length?"var(--amber)":"var(--green)"};${act.length?"animation:pulse 1.2s ease infinite;":""}flex-shrink:0"></div>
         <span style="font-weight:600;color:var(--tx)">scrape.ts ${act.length?"— running":"— idle"}</span>
-        <button class="rm" style="margin-left:auto" onclick="showLogs=!showLogs;render()">${showLogs?"hide logs":"show logs"}</button>
       </div>
       <div style="margin-top:4px;border-top:1px solid var(--bl);padding-top:8px">
         ${jobs.map(j=>{
@@ -651,9 +656,11 @@ function render(){
           else if(cancelled){icon='<span style="color:var(--amber);font-size:12px" aria-hidden="true">■</span>';labelColor="var(--amber)";label="Cancelled"}
           else if(j.status==="done"){icon=chk();labelColor="var(--green)";label="Done"}
           else{icon=xx();labelColor="var(--rose)";label="Failed"}
-          return`<div class="job-row">${icon}<span style="font-weight:600;color:var(--tx);min-width:90px">${esc(j.name)}</span><span style="color:${labelColor};font-weight:500">${label}</span>${a?`<button class="rm" onclick="event.stopPropagation();cancelJob('${j.id}')">Cancel</button>`:""}${!a?`<button class="rm" onclick="event.stopPropagation();removeJob('${j.id}')">remove</button>`:""}</div>`;
+          const logBtn=j.logs.length?`<button type="button" class="rm" onclick="event.stopPropagation();toggleJobLogs('${j.id}')">${j.logsExpanded?"hide logs":"show logs"}</button>`:"";
+          const logPanel=j.logsExpanded&&j.logs.length?`<div class="job-logbox" role="log" aria-live="polite">${j.logs.map(l=>`<div class="ll${l.includes("ERROR")?" e":""}">${esc(l)}</div>`).join("")}</div>`:"";
+          return`<div class="job-wrap"><div class="job-row">${icon}<span style="font-weight:600;color:var(--tx);min-width:90px">${esc(j.name)}</span><span style="color:${labelColor};font-weight:500">${label}</span>${logBtn}${a?`<button class="rm" onclick="event.stopPropagation();cancelJob('${j.id}')">Cancel</button>`:""}${!a?`<button class="rm" onclick="event.stopPropagation();removeJob('${j.id}')">remove</button>`:""}</div>${logPanel}</div>`;
         }).join("")}
-      </div>${showLogs?`<div class="logbox">${allLogs.map(l=>`<div class="ll${l.includes("ERROR")?" e":""}">${esc(l)}</div>`).join("")}</div>`:""}</div>`;
+      </div></div>`;
   }
 
   // ── EMPTY STATE ──

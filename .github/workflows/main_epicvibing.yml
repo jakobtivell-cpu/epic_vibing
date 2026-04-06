@@ -32,6 +32,24 @@ jobs:
       - name: Install Playwright Chromium for deployment artifact
         run: npx playwright install chromium --with-deps
 
+      - name: Bundle Playwright Chromium shared libraries for Azure Linux
+        run: |
+          set -euo pipefail
+          LIB_DIR="$GITHUB_WORKSPACE/playwright-linux-libs"
+          mkdir -p "$LIB_DIR"
+          mapfile -t bins < <(find node_modules/playwright-core/.local-browsers -type f \( -name chrome-headless-shell -o -path '*/chrome-linux/chrome' \) 2>/dev/null || true)
+          if [ "${#bins[@]}" -eq 0 ]; then
+            echo "::warning::No Playwright Chromium binary found under .local-browsers; skipping lib bundle"
+            exit 0
+          fi
+          for bin in "${bins[@]}"; do
+            echo "Collecting ldd dependencies for: $bin"
+            while read -r dep; do
+              [ -n "$dep" ] && [ -f "$dep" ] && cp -f "$dep" "$LIB_DIR/"
+            done < <(ldd "$bin" 2>/dev/null | awk '$3 ~ /^\// { print $3 }' || true)
+          done
+          echo "Bundled $(find "$LIB_DIR" -maxdepth 1 -type f | wc -l) shared libraries into playwright-linux-libs/"
+
       - name: Build
         run: npm run build --if-present
 
@@ -55,6 +73,7 @@ jobs:
             package-lock.json
             node_modules
             node_modules/playwright-core/.local-browsers
+            playwright-linux-libs
 
   deploy:
     runs-on: ubuntu-latest
@@ -87,7 +106,7 @@ jobs:
           az webapp config appsettings set \
             --name epicvibing \
             --resource-group "$RG" \
-            --settings PLAYWRIGHT_BROWSERS_PATH=0
+            --settings PLAYWRIGHT_BROWSERS_PATH=0 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0
 
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp

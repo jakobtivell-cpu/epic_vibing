@@ -67,6 +67,7 @@ export function shouldRunLlmChallenger(
 ): boolean {
   if (!hasApiKey) return false;
   if (!input.hasPdfText) return false;
+  if (input.status === 'timeout') return false;
   if (input.forceLlm) return true;
 
   if (input.detectedCompanyType === 'investment_company') {

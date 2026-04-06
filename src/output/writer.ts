@@ -139,9 +139,11 @@ export type FailureClass =
   | 'download_failed'
   | 'extraction_failed'
   | 'validation_failed'
-  | 'failed_other';
+  | 'failed_other'
+  | 'timeout';
 
 export function classifyFailureClass(r: PipelineResult): FailureClass {
+  if (r.status === 'timeout') return 'timeout';
   if (r.status === 'complete') return 'complete';
 
   if (r.stages) {
@@ -172,6 +174,7 @@ function tallyFailureBuckets(
     'extraction_failed',
     'validation_failed',
     'failed_other',
+    'timeout',
   ];
   const init = {} as Record<FailureClass, number>;
   for (const k of keys) init[k] = 0;
@@ -189,6 +192,7 @@ export function writeRunSummary(results: PipelineResult[]): void {
   const complete = results.filter((r) => r.status === 'complete').length;
   const partial = results.filter((r) => r.status === 'partial').length;
   const failed = results.filter((r) => r.status === 'failed').length;
+  const timedOut = results.filter((r) => r.status === 'timeout').length;
   const failureBuckets = tallyFailureBuckets(results);
 
   const perCompany = results.map((r) => {
@@ -214,6 +218,7 @@ export function writeRunSummary(results: PipelineResult[]): void {
     complete,
     partial,
     failed,
+    timedOut,
     failureBuckets,
     companies: perCompany,
   };
@@ -244,6 +249,7 @@ function statusIcon(s: ResultStatus): string {
     case 'complete': return '\u2713'; // ✓
     case 'partial':  return '\u25B3'; // △
     case 'failed':   return '\u2717'; // ✗
+    case 'timeout':  return '\u23F0'; // ⏰
   }
 }
 
@@ -288,6 +294,7 @@ export function printRunSummary(results: PipelineResult[]): void {
   const complete = results.filter((r) => r.status === 'complete').length;
   const partial = results.filter((r) => r.status === 'partial').length;
   const failed = results.filter((r) => r.status === 'failed').length;
+  const timedOut = results.filter((r) => r.status === 'timeout').length;
 
   const dblBar = '\u2550'.repeat(42); // ══════
   const sglBar = '\u2500'.repeat(42); // ──────
@@ -306,13 +313,17 @@ export function printRunSummary(results: PipelineResult[]): void {
 
     if (r.status === 'failed') {
       lines.push(`  ${icon} ${name}\u2014 ${failedAtLabel(r)}`);
+    } else if (r.status === 'timeout') {
+      lines.push(`  ${icon} ${name}\u2014 timeout (${statusDetail(r)})`);
     } else {
       lines.push(`  ${icon} ${name}\u2014 ${r.status} (${statusDetail(r)})`);
     }
   }
 
   lines.push(sglBar);
-  lines.push(`  Complete: ${complete}  |  Partial: ${partial}  |  Failed: ${failed}`);
+  lines.push(
+    `  Complete: ${complete}  |  Partial: ${partial}  |  Failed: ${failed}  |  Timed out: ${timedOut}`,
+  );
   const fb = tallyFailureBuckets(results);
   const fbStr = Object.entries(fb)
     .filter(([, n]) => n > 0)

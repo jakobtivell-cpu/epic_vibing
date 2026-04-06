@@ -78,7 +78,7 @@ export interface StageResult<T> {
 }
 
 export type DataSource = 'pdf' | 'allabolag' | 'playwright+pdf' | 'search+pdf' | 'ir-html';
-export type ResultStatus = 'complete' | 'partial' | 'failed';
+export type ResultStatus = 'complete' | 'partial' | 'failed' | 'timeout';
 
 /** Which fallback step produced the final result. */
 export type FallbackStep = 'search' | 'cheerio' | 'playwright' | 'direct-pdf-search' | 'ir-html' | 'allabolag' | 'cached' | 'none';

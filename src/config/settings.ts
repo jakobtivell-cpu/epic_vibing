@@ -76,3 +76,6 @@ export const RUN_SUMMARY_PATH = path.join(OUTPUT_DIR, 'run_summary.json');
 
 /** Directory where extracted PDF text is cached for debugging. */
 export const CACHE_DIR = path.join(PROJECT_ROOT, 'cache');
+
+/** After SIGTERM, wait this long before SIGKILL on a per-company pipeline child (see --timeout-per-company). */
+export const TIMEOUT_CHILD_SIGKILL_GRACE_MS = 5_000;

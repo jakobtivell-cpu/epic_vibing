@@ -9,16 +9,18 @@
 //   npx ts-node scrape.ts --ticker "ALFA.ST,ESSITY-B.ST,HM-B.ST"   # comma-separated → sequential, merge results.json
 //   npx ts-node scrape.ts --ticker "INVE-A.ST,INVE-B.ST"   # same legal name → deduped → 1 run
 //   npx ts-node scrape.ts --company "Volvo" --slow
+//   npx ts-node scrape.ts --batch-file data/overnight-batch.json --timeout-per-company 420000 --force
 // ---------------------------------------------------------------------------
 
 import { Command } from 'commander';
 import * as fs from 'fs';
+import * as path from 'path';
 import {
   DOWNLOADS_DIR,
   OUTPUT_DIR,
   CACHE_DIR,
 } from './src/config';
-import { CompanyProfile, RunConfig } from './src/types';
+import { CompanyProfile, PipelineResult, RunConfig } from './src/types';
 import { createLogger, setLogLevel, setSlowMode } from './src/utils';
 import {
   loadTickerMap,
@@ -30,7 +32,7 @@ import {
   resolveIrEmail,
   normalizeTickerForLookup,
 } from './src/data/ticker-map';
-import { runPipeline } from './src/pipeline';
+import { runCompaniesWithOptionalChildTimeout } from './src/cli/child-runner';
 import { writeResults, mergeResults, writeRunSummary, printRunSummary } from './src/output';
 
 const log = createLogger('cli');
@@ -56,6 +58,21 @@ program
     '--llm-challenger',
     'When OPENAI_API_KEY is set, force the LLM challenger pass for PDF extractions (still requires PDF text)',
     false,
+  )
+  .option(
+    '--timeout-per-company <ms>',
+    'Max wall-clock milliseconds per company (runs pipeline in a subprocess; SIGTERM then SIGKILL after 5s)',
+    (v: string) => {
+      const n = parseInt(v, 10);
+      if (!Number.isFinite(n) || n <= 0) {
+        throw new Error('--timeout-per-company must be a positive integer');
+      }
+      return n;
+    },
+  )
+  .option(
+    '--batch-file <path>',
+    'JSON file: array of ticker strings (e.g. ["TELIA.ST"]). Runs each company sequentially and mergeResults after each.',
   );
 
 async function main(): Promise<void> {
@@ -81,16 +98,22 @@ async function main(): Promise<void> {
 
   const companyOpt = typeof opts.company === 'string' ? opts.company.trim() : '';
   const tickerOpt = typeof opts.ticker === 'string' ? opts.ticker.trim() : '';
+  const batchFileOpt =
+    typeof opts.batchFile === 'string' ? opts.batchFile.trim() : '';
 
   const companies = buildCompanyList(opts);
 
   if (companies.length === 0) {
-    log.error('No companies to process. Provide --company or --ticker.');
+    log.error('No companies to process. Provide --company, --ticker, or --batch-file.');
     process.exit(1);
   }
 
-  const isDefaultLargeCapBatch = companyOpt.length === 0 && tickerOpt.length === 0;
+  const isDefaultLargeCapBatch =
+    companyOpt.length === 0 && tickerOpt.length === 0 && batchFileOpt.length === 0;
   const runSequential = companies.length > 1 && !isDefaultLargeCapBatch;
+  const timeoutPerCompanyMs =
+    typeof opts.timeoutPerCompany === 'number' ? opts.timeoutPerCompany : undefined;
+  const useBatchMergeEach = batchFileOpt.length > 0;
 
   if (runSequential) {
     log.info(
@@ -113,10 +136,36 @@ async function main(): Promise<void> {
     slow: opts.slow,
   };
 
-  const results = await runPipeline(runConfig.companies, runConfig.force, {
+  const pipelineOpts = {
     sequential: runSequential,
     llmChallengerForce: Boolean(opts.llmChallenger),
-  });
+  };
+
+  if (useBatchMergeEach) {
+    const accumulated: PipelineResult[] = [];
+    for (let i = 0; i < companies.length; i++) {
+      const c = companies[i];
+      log.info(`Batch file: ${c.name} [${i + 1}/${companies.length}]`);
+      const one = await runCompaniesWithOptionalChildTimeout(
+        [c],
+        runConfig.force,
+        { sequential: false, llmChallengerForce: pipelineOpts.llmChallengerForce },
+        timeoutPerCompanyMs,
+      );
+      accumulated.push(one[0]);
+      mergeResults(one);
+    }
+    writeRunSummary(accumulated);
+    printRunSummary(accumulated);
+    return;
+  }
+
+  const results = await runCompaniesWithOptionalChildTimeout(
+    runConfig.companies,
+    runConfig.force,
+    pipelineOpts,
+    timeoutPerCompanyMs,
+  );
 
   if (companies.length === 1 || !isDefaultLargeCapBatch) {
     mergeResults(results);
@@ -135,11 +184,34 @@ const DEFAULT_LARGE_CAP_TICKERS =
 // Build the company list from CLI flags, resolving tickers and deduplicating
 // ---------------------------------------------------------------------------
 
+function parseBatchTickerFile(filePath: string): string[] {
+  const raw = fs.readFileSync(filePath, 'utf-8');
+  const data = JSON.parse(raw) as unknown;
+  if (!Array.isArray(data) || !data.every((x) => typeof x === 'string')) {
+    throw new Error('--batch-file must contain a JSON array of ticker strings');
+  }
+  return data.map((x) => x.trim()).filter((x) => x.length > 0);
+}
+
 function buildCompanyList(opts: Record<string, unknown>): CompanyProfile[] {
   const profiles: CompanyProfile[] = [];
 
   const companyOpt = typeof opts.company === 'string' ? opts.company.trim() : '';
   const tickerOptRaw = typeof opts.ticker === 'string' ? opts.ticker.trim() : '';
+  const batchFileOpt =
+    typeof opts.batchFile === 'string' ? opts.batchFile.trim() : '';
+
+  let batchTickers: string[] = [];
+  if (batchFileOpt.length > 0) {
+    const resolved = path.isAbsolute(batchFileOpt)
+      ? batchFileOpt
+      : path.join(process.cwd(), batchFileOpt);
+    if (!fs.existsSync(resolved)) {
+      throw new Error(`--batch-file not found: ${resolved}`);
+    }
+    batchTickers = parseBatchTickerFile(resolved);
+    log.info(`--batch-file: ${batchTickers.length} ticker(s) from ${resolved}`);
+  }
 
   // --company flag: raw names, no ticker resolution
   if (companyOpt.length > 0) {
@@ -154,24 +226,45 @@ function buildCompanyList(opts: Record<string, unknown>): CompanyProfile[] {
   }
 
   const tickerSource =
-    tickerOptRaw.length > 0 ? tickerOptRaw : companyOpt.length > 0 ? '' : DEFAULT_LARGE_CAP_TICKERS;
+    tickerOptRaw.length > 0
+      ? tickerOptRaw
+      : companyOpt.length > 0
+        ? ''
+        : batchTickers.length > 0
+          ? ''
+          : DEFAULT_LARGE_CAP_TICKERS;
 
-  if (tickerSource.length > 0 && tickerOptRaw.length === 0 && companyOpt.length === 0) {
+  if (
+    tickerSource.length > 0 &&
+    tickerOptRaw.length === 0 &&
+    companyOpt.length === 0 &&
+    batchTickers.length === 0
+  ) {
     log.info('No --company/--ticker — using default Large Cap set (10 tickers)');
   }
 
-  // --ticker flag (or default set): resolve each ticker to a legal name
+  const tickerSymbols: string[] = [];
   if (tickerSource.length > 0) {
-    const tickers = tickerSource
-      .split(',')
-      .map((t) => t.trim())
-      .filter((t) => t.length > 0);
+    tickerSymbols.push(
+      ...tickerSource
+        .split(',')
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0),
+    );
+  }
+  for (const t of batchTickers) {
+    if (!tickerSymbols.some((x) => x.toLowerCase() === t.toLowerCase())) {
+      tickerSymbols.push(t);
+    }
+  }
 
-    if (tickerOptRaw.length > 0 && tickers.length > 1) {
-      log.info(`--ticker: ${tickers.length} symbols → resolve each and queue for sequential run`);
+  // --ticker flag, --batch-file, and/or default set: resolve each ticker to a legal name
+  if (tickerSymbols.length > 0) {
+    if (tickerOptRaw.length > 0 && tickerSymbols.length > 1) {
+      log.info(`--ticker: ${tickerSymbols.length} symbols → resolve each and queue for sequential run`);
     }
 
-    for (const rawTicker of tickers) {
+    for (const rawTicker of tickerSymbols) {
       const legalName = resolveTicker(rawTicker);
       const canonicalTicker = normalizeTickerForLookup(rawTicker);
       const orgNumber = resolveOrgNumber(rawTicker) ?? undefined;

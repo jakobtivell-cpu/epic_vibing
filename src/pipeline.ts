@@ -1040,7 +1040,7 @@ async function processCompany(
   let cachedAt: string | undefined;
   if (state.fallbackStep === 'none') {
     const previous = loadPreviousResult(name);
-    if (previous && previous.status !== 'failed') {
+    if (previous && isEligibleForGoodResultCache(previous)) {
       log.info(`[${name}] All steps exhausted — preserving last known good result`);
       cached = true;
       cachedAt = new Date().toISOString();
@@ -1134,7 +1134,12 @@ function loadPreviousResult(companyName: string): PipelineResult | null {
   }
 }
 
-function buildFailedResult(company: CompanyProfile, error: string): PipelineResult {
+/** Only complete / partial rows may be reused when a new run exhausts all steps. */
+function isEligibleForGoodResultCache(r: PipelineResult): boolean {
+  return r.status === 'complete' || r.status === 'partial';
+}
+
+export function buildFailedResult(company: CompanyProfile, error: string): PipelineResult {
   const skipped: StageResult<never> = { status: 'failed', value: null, error };
   return {
     company: company.name,
@@ -1153,6 +1158,40 @@ function buildFailedResult(company: CompanyProfile, error: string): PipelineResu
     detectedCompanyType: null,
     cached: false,
     extractionNotes: [error],
+    stages: {
+      irDiscovery: skipped,
+      reportDiscovery: skipped,
+      download: skipped,
+      extraction: skipped,
+      validation: skipped,
+    },
+  };
+}
+
+export function buildTimeoutResult(company: CompanyProfile, ms: number): PipelineResult {
+  const skipped: StageResult<never> = {
+    status: 'skipped',
+    value: null,
+    error: 'Skipped because a prior stage did not succeed',
+  };
+  const note = `Pipeline timed out after ${ms}ms`;
+  return {
+    company: company.name,
+    ticker: company.ticker ?? null,
+    website: company.website ?? null,
+    irPage: null,
+    annualReportUrl: null,
+    annualReportDownloaded: null,
+    fiscalYear: null,
+    extractedData: null,
+    sustainability: nullSustainability('Pipeline timed out'),
+    dataSource: null,
+    confidence: 0,
+    status: 'timeout',
+    fallbackStepReached: 'none',
+    detectedCompanyType: null,
+    cached: false,
+    extractionNotes: [note],
     stages: {
       irDiscovery: skipped,
       reportDiscovery: skipped,

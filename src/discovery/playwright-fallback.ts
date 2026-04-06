@@ -182,8 +182,13 @@ export async function tryPlaywrightFallback(
   let browser: any = null;
   try {
     try {
-      browser = await chromium.launch({ channel: 'chrome', headless: true });
+      if (process.platform === 'darwin' || process.platform === 'win32') {
+        browser = await chromium.launch({ channel: 'chrome', headless: true });
+      }
     } catch {
+      /* use bundled Chromium below */
+    }
+    if (!browser) {
       browser = await chromium.launch({ headless: true });
     }
     const context = await browser.newContext({

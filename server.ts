@@ -5,7 +5,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import { randomBytes } from 'crypto';
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, spawnSync, ChildProcess } from 'child_process';
 import express, { Request, Response } from 'express';
 import { RESULTS_PATH } from './src/config/settings';
 
@@ -415,6 +415,49 @@ app.get('/api/status/:jobId', (req: Request, res: Response) => {
 });
 
 const PORT = Number(process.env.PORT) || 3000;
+function ensurePlaywrightChromiumInstalled(): void {
+  try {
+    // @ts-ignore — playwright is an optional dependency
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const pw = require('playwright');
+    const chromium = pw?.chromium as { executablePath: () => string } | undefined;
+    if (!chromium) {
+      console.info('[INFO] Playwright chromium API unavailable — skipping startup browser check');
+      return;
+    }
+
+    const executablePath = chromium.executablePath();
+    if (executablePath && fs.existsSync(executablePath)) {
+      console.info(`[INFO] Playwright Chromium already installed at ${executablePath}`);
+      return;
+    }
+
+    console.info(
+      '[INFO] Playwright Chromium executable missing — running "npx playwright install chromium"',
+    );
+    const install = spawnSync('npx', ['playwright', 'install', 'chromium'], {
+      cwd: ROOT,
+      env: process.env,
+      shell: process.platform === 'win32',
+      stdio: 'pipe',
+      encoding: 'utf8',
+    });
+
+    if (install.status === 0) {
+      console.info('[INFO] Playwright Chromium install completed successfully');
+    } else {
+      const details = (install.stderr || install.stdout || '').toString().trim();
+      console.info(
+        `[INFO] Playwright Chromium install failed (code: ${install.status ?? 'null'})${details ? `: ${details}` : ''}`,
+      );
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.info(`[INFO] Playwright startup check skipped: ${msg}`);
+  }
+}
+
+ensurePlaywrightChromiumInstalled();
 app.listen(PORT, () => {
   console.log(`Dashboard server http://localhost:${PORT}/`);
 });

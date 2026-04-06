@@ -460,6 +460,39 @@ const EBIT_EXCLUSIONS: RegExp[] = [
   /\bexcluding\s/i,
 ];
 
+/** Exclusions for adjusted-EBIT pass — still block EBITDA / PBT, but allow adjusted / underlying labels. */
+const EBIT_EXCLUSIONS_ADJUSTED_PASS: RegExp[] = [
+  /\bebitda\b/i,
+  /\bresultat\s+före\s+skatt\b/i,
+  /\bprofit\s+before\s+tax\b/i,
+];
+
+const ADJUSTED_EBIT_LABELS: string[] = [
+  'ebit ex. items affecting comparability',
+  'ebit före jämförelsestörande poster',
+  'justerat rörelseresultat',
+  'underlying operating profit',
+  'adjusted ebit',
+  'kärnresultat',
+];
+
+const OPERATING_MARGIN_LABEL_PATTERNS: RegExp[] = [
+  /\boperating\s+margin\b/i,
+  /\brörelsemarginal\b/i,
+  /\bebit\s+margin\b/i,
+  /\brörelseresultat\s+i\s*%\b/i,
+];
+
+const SEGMENT_EBIT_BEFORE_FIN_RE =
+  /\brörelseresultat\s+före\s+finansiella(?:\s+poster)?\b|\boperating\s+profit\s+before\s+financial\s+items?\b/i;
+
+const AMORT_INTANGIBLE_LINE_RES: RegExp[] = [
+  /\bamortization\s+of\s+intangible\s+assets\b/i,
+  /\bamortisation\s+of\s+intangible\s+assets\b/i,
+  /\bavskrivningar\s+på\s+immateriella\s+tillgångar\b/i,
+  /\bavskrivning\s+på\s+immateriella\b/i,
+];
+
 // ---------------------------------------------------------------------------
 // Labeled-number finder — section-aware with consolidated statement priority
 // ---------------------------------------------------------------------------
@@ -568,7 +601,7 @@ function findIncomeStatementSections(lines: string[]): Array<{ start: number; en
     if (!isHeading) continue;
 
     let end = Math.min(i + 80, lines.length);
-    for (let j = i + 3; j < end; j++) {
+    for (let j = i + 1; j < end; j++) {
       if (lines[j].length > 120) continue;
       const isBoundary = SECTION_BOUNDARY_PATTERNS.some((p) => p.test(lines[j]));
       if (isBoundary) {
@@ -614,6 +647,16 @@ function isInSegmentSection(lineIndex: number, lines: string[]): boolean {
   return false;
 }
 
+/** Segment "rörelseresultat före finansiella …" title row that borrows the next line — not consolidated EBIT. */
+function isGhostSegmentEbitHeaderMatch(m: NumberMatch, lines: string[]): boolean {
+  const line = lines[m.lineIndex];
+  return (
+    SEGMENT_EBIT_BEFORE_FIN_RE.test(line) &&
+    extractNumberTokens(line).length === 0 &&
+    isInSegmentSection(m.lineIndex, lines)
+  );
+}
+
 /**
  * Find a labeled number within a set of lines. Two-pass: strict table-like rows
  * first, then any reasonable line.
@@ -651,6 +694,12 @@ function findFinancialNumber(
       const result = findLabeledNumber(sectionLines, labels, opts, pick, scan);
       if (result !== null) {
         result.lineIndex += section.start;
+        if (isGhostSegmentEbitHeaderMatch(result, lines)) {
+          log.debug(
+            `Skipping ghost segment EBIT header row at line ${result.lineIndex} inside income-statement window`,
+          );
+          continue;
+        }
         result.context = 'income-statement';
         result.sectionRange = section;
         log.debug(
@@ -697,13 +746,18 @@ function findFinancialNumber(
     return nonSegmentMatch;
   }
 
-  // Last resort: return any match (even from segment sections)
-  if (allMatches.length > 0) {
-    allMatches[0].context = 'segment-fallback';
+  // Last resort: return any match (even from segment sections), but not a segment
+  // "rörelseresultat före finansiella …" header row that only borrows the next line's number
+  // (handled explicitly by extractEbitFromSegmentResultsBeforeFinancial).
+  const fallbackPool = allMatches.filter(
+    (m) => !isGhostSegmentEbitHeaderMatch(m, lines) && !isInSegmentSection(m.lineIndex, lines),
+  );
+  if (fallbackPool.length > 0) {
+    fallbackPool[0].context = 'segment-fallback';
     log.debug(
-      `Using segment-section value ${allMatches[0].value} as last resort (line ${allMatches[0].lineIndex})`,
+      `Using segment-section value ${fallbackPool[0].value} as last resort (line ${fallbackPool[0].lineIndex})`,
     );
-    return allMatches[0];
+    return fallbackPool[0];
   }
 
   return null;
@@ -812,6 +866,10 @@ function findAllLabeledNumbers(
       const labelIdx = lineLower.indexOf(labelLower);
       if (labelIdx < 0 || labelIdx > maxLabelOffset) continue;
 
+      if (labelLower === 'ebit' && lineLower.charAt(labelIdx + label.length) === 'a') {
+        continue;
+      }
+
       if (labelIdx >= 6) {
         const before = lineLower.substring(Math.max(0, labelIdx - 6), labelIdx).trim();
         if (/\bother$/.test(before)) continue;
@@ -876,6 +934,10 @@ function scanForNumber(
       const labelIdx = lineLower.indexOf(labelLower);
       if (labelIdx < 0) continue;
       if (labelIdx > constraints.maxLabelOffset) continue;
+
+      if (labelLower === 'ebit' && lineLower.charAt(labelIdx + label.length) === 'a') {
+        continue;
+      }
 
       if (labelIdx >= 6) {
         const before = lineLower.substring(Math.max(0, labelIdx - 6), labelIdx).trim();
@@ -1235,6 +1297,375 @@ function numMatchToProvenance(m: NumberMatch): FieldProvenance {
   };
 }
 
+function isRevenueHighConfidenceForMarginDerivation(
+  revenue: number | null,
+  revProv: FieldProvenance | null,
+): boolean {
+  if (revenue === null || revProv === null) return false;
+  const ml = revProv.matchedLabel.toLowerCase();
+  if (ml.includes('allabolag')) return false;
+  if (
+    /sales,?\s+sek billion|net sales,?\s+sek billion|sales sek billion|revenues?\s+of\s+bsek|revenues?\s+to\s+bsek|had\s+revenues?\s+of\s+bsek|narrative/i.test(
+      ml,
+    )
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function parsePercentageFromLineAfterLabel(line: string, labelEndIdx: number): number | null {
+  const tail = line.substring(Math.max(0, labelEndIdx));
+  const m = tail.match(/(\d{1,2}(?:[.,]\d+)?)\s*%/);
+  if (!m) return null;
+  const rawPct = m[1].replace(',', '.');
+  const p = parseFloat(rawPct);
+  if (!Number.isFinite(p)) return null;
+  return p;
+}
+
+/**
+ * Priority 3 — operating margin (or EBIT margin) × revenue_msek.
+ */
+function extractEbitFromOperatingMarginTimesRevenue(
+  lines: string[],
+  revenueMsek: number,
+  revProv: FieldProvenance | null,
+): NumberMatch | null {
+  if (!isRevenueHighConfidenceForMarginDerivation(revenueMsek, revProv)) return null;
+
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].length > 220) continue;
+    const line = lines[i];
+    const lineLower = line.toLowerCase();
+    let matchedPattern = '';
+    let labelEnd = -1;
+    for (const pat of OPERATING_MARGIN_LABEL_PATTERNS) {
+      const m = line.match(pat);
+      if (m && m.index !== undefined) {
+        matchedPattern = m[0];
+        labelEnd = m.index + m[0].length;
+        break;
+      }
+    }
+    if (labelEnd < 0) continue;
+
+    if (/\bebitda\b/i.test(lineLower)) continue;
+
+    const pct = parsePercentageFromLineAfterLabel(line, labelEnd);
+    if (pct === null) continue;
+    if (pct < -80 || pct > 80) continue;
+
+    const ebitMsek = Math.round((revenueMsek * pct) / 100);
+    if (!Number.isFinite(ebitMsek) || ebitMsek === 0) continue;
+
+    return {
+      value: ebitMsek,
+      lineIndex: i,
+      label: matchedPattern.trim(),
+      rawCell: `${pct}% × revenue`,
+      context: 'general',
+    };
+  }
+  return null;
+}
+
+/**
+ * Priority 4 — EBITA minus amortization of intangibles (±10 lines).
+ */
+function extractEbitFromEbitaMinusAmortization(
+  lines: string[],
+  opts: NumberSearchOpts,
+  pick: NumberPickContext | undefined,
+  scan: ScanConstraints,
+): NumberMatch | null {
+  const { minValue = -Infinity, maxValue = Infinity } = opts;
+
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].length > scan.loose.maxLineLen) continue;
+    const lineLower = lines[i].toLowerCase();
+    if (/\bebitda\b/.test(lineLower)) continue;
+    const idx = lineLower.search(/\bebita\b/);
+    if (idx < 0 || idx > scan.loose.maxLabelOffset + 20) continue;
+
+    let afterLabel = lines[i].substring(idx + 'ebita'.length);
+    afterLabel = afterLabel.replace(/^[)}\]]+/, '');
+    afterLabel = stripLeadingNoteRef(afterLabel);
+    // Do not append the next line — amortization often follows and pollutes cell picking.
+    const cells = splitIntoCells(afterLabel.trim());
+    const chosen = selectBestNumericFromCells(cells, lines, i, opts, pick);
+    if (chosen === null) continue;
+    let ebitaVal = chosen.value;
+    if (ebitaVal < minValue || ebitaVal > maxValue) continue;
+
+    let amortVal: number | null = null;
+    let amortLine = -1;
+    for (
+      let j = Math.max(0, i - 10);
+      j <= Math.min(lines.length - 1, i + 10);
+      j++
+    ) {
+      if (j === i) continue;
+      const L = lines[j];
+      let amortMatch: RegExpMatchArray | null = null;
+      for (const re of AMORT_INTANGIBLE_LINE_RES) {
+        const mm = L.match(re);
+        if (mm) {
+          amortMatch = mm;
+          break;
+        }
+      }
+      if (!amortMatch || amortMatch.index === undefined) continue;
+      const after = L.substring(amortMatch.index + amortMatch[0].length);
+      const c2 = extractNumberTokens(after);
+      for (const tok of c2) {
+        const v = parseNumber(tok);
+        if (v !== null && Math.abs(v) > 0 && Math.abs(v) < Math.abs(ebitaVal) * 2) {
+          amortVal = v;
+          amortLine = j;
+          break;
+        }
+      }
+      if (amortVal !== null) break;
+      const cells2 = splitIntoCells(after.replace(/^[:\s–—,.-]+/, ''));
+      const ch2 = selectBestNumericFromCells(cells2, lines, j, { minValue: 0, maxValue: Math.abs(ebitaVal) }, pick);
+      if (ch2 !== null) {
+        amortVal = ch2.value;
+        amortLine = j;
+        break;
+      }
+    }
+
+    if (amortVal === null) continue;
+
+    const ebitRaw = ebitaVal - Math.abs(amortVal);
+    if (ebitRaw < minValue || ebitRaw > maxValue) continue;
+
+    return {
+      value: ebitRaw,
+      lineIndex: i,
+      label: 'EBITA − amortization intangibles',
+      rawCell: `EBITA ${ebitaVal}; amort ${amortVal} (line ${amortLine})`,
+      context: 'segment-fallback',
+    };
+  }
+  return null;
+}
+
+function parseSegmentTableNumericLine(
+  line: string,
+  opts: NumberSearchOpts,
+): number | null {
+  const { minValue = -Infinity, maxValue = Infinity } = opts;
+  const ll = line.toLowerCase();
+  if (/\btotal\b|\bsumma\b|\belimination/.test(ll)) return null;
+  const tokens = extractNumberTokens(line);
+  for (let t = tokens.length - 1; t >= 0; t--) {
+    const v = parseNumber(tokens[t]);
+    if (v !== null && v >= minValue && v <= maxValue) return v;
+  }
+  return null;
+}
+
+/**
+ * Priority 5 — sum segment operating results where the block is explicitly before financial items.
+ */
+function extractEbitFromSegmentResultsBeforeFinancial(
+  lines: string[],
+  opts: NumberSearchOpts,
+  unitContext: UnitContext | null,
+): NumberMatch | null {
+  const { minValue = -Infinity, maxValue = Infinity } = opts;
+
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].length > 200) continue;
+    if (!SEGMENT_EBIT_BEFORE_FIN_RE.test(lines[i])) continue;
+    if (!isInSegmentSection(i, lines)) continue;
+
+    const headerNums = extractNumberTokens(lines[i]);
+    let sum = 0;
+    let count = 0;
+    let headerLineIdx = i;
+
+    if (headerNums.length > 0) {
+      const lastTok = headerNums[headerNums.length - 1];
+      const hv = parseNumber(lastTok);
+      if (hv !== null && hv >= minValue && hv <= maxValue) {
+        sum = hv;
+        count = 1;
+        headerLineIdx = i;
+      }
+    }
+
+    const maxJ = Math.min(lines.length - 1, i + 22);
+    for (let j = i + 1; j <= maxJ; j++) {
+      const L = lines[j];
+      if (L.length === 0) {
+        if (count >= 2) break;
+        continue;
+      }
+      if (L.length > 180) continue;
+      if (
+        L.length < 120 &&
+        INCOME_STATEMENT_PATTERNS.some((p) => {
+          const mm = L.match(p);
+          if (!mm || (mm.index ?? 0) >= 15) return false;
+          const afterMatch = L.substring((mm.index ?? 0) + mm[0].length).trim();
+          return afterMatch.length < 10 || /^\d{1,3}$/.test(afterMatch);
+        })
+      ) {
+        break;
+      }
+      if (SECTION_BOUNDARY_PATTERNS.some((p) => p.test(L)) && count >= 1) break;
+      if (SEGMENT_EBIT_BEFORE_FIN_RE.test(L) && j > i + 1) break;
+      const v = parseSegmentTableNumericLine(L, opts);
+      if (v === null) continue;
+      sum += v;
+      count++;
+    }
+
+    if (count < 2) continue;
+    const unit = detectSectionUnitContext(lines, Math.max(0, i - 3), maxJ, unitContext);
+    const msek = Math.round(normalizeToMsek(sum, unit));
+    if (!Number.isFinite(msek) || msek === 0) continue;
+
+    return {
+      value: sum,
+      lineIndex: headerLineIdx,
+      label: 'segment sum (before financial items)',
+      rawCell: String(sum),
+      context: 'segment-fallback',
+      sectionRange: { start: Math.max(0, i - 2), end: maxJ + 1 },
+    };
+  }
+  return null;
+}
+
+function normalizeEbitMatchToMsek(
+  m: NumberMatch,
+  lines: string[],
+  unitContext: UnitContext | null,
+): number {
+  const ebitUnit = m.sectionRange
+    ? detectSectionUnitContext(
+        lines,
+        m.sectionRange.start,
+        m.sectionRange.end,
+        unitContext,
+      )
+    : unitContext;
+  return Math.round(normalizeToMsek(m.value, ebitUnit));
+}
+
+/**
+ * Sequential EBIT strategies: stop at first hit. Returns value, provenance match, and extra notes.
+ */
+function extractEbitWithStrategies(
+  detectedType: CompanyType,
+  lines: string[],
+  labels: LabelSet,
+  unitContext: UnitContext | null,
+  revMatch: NumberMatch | null,
+  revenue: number | null,
+  revProvenance: FieldProvenance | null,
+  fallbackFiscalYear: number | null,
+  bankScan: ScanConstraints,
+): { msek: number | null; match: NumberMatch | null; extraNotes: string[] } {
+  const extraNotes: string[] = [];
+  if (detectedType === 'investment_company') {
+    return { msek: null, match: null, extraNotes };
+  }
+
+  const ebitPick: NumberPickContext = {
+    preferredFiscalYear: fallbackFiscalYear,
+    revenueRawHintForEbit: revMatch !== null ? revMatch.value : null,
+  };
+  const ebitOpts: NumberSearchOpts = {
+    minValue: detectedType === 'bank' ? -1_000_000 : -500_000,
+    maxValue: detectedType === 'bank' ? 1_000_000 : 500_000,
+    exclusions: EBIT_EXCLUSIONS,
+  };
+
+  let match: NumberMatch | null =
+    detectedType === 'bank'
+      ? findFinancialNumberPhased(
+          lines,
+          BANK_EBIT_LABELS_PRIMARY,
+          labels.ebit,
+          ebitOpts,
+          ebitPick,
+          bankScan,
+        )
+      : findFinancialNumber(lines, labels.ebit, ebitOpts, ebitPick, SCAN_DEFAULT);
+
+  if (match !== null) {
+    return {
+      msek: normalizeEbitMatchToMsek(match, lines, unitContext),
+      match,
+      extraNotes,
+    };
+  }
+
+  const adjustedOpts: NumberSearchOpts = {
+    ...ebitOpts,
+    exclusions: EBIT_EXCLUSIONS_ADJUSTED_PASS,
+  };
+  match = findFinancialNumber(
+    lines,
+    ADJUSTED_EBIT_LABELS,
+    adjustedOpts,
+    ebitPick,
+    detectedType === 'bank' ? bankScan : SCAN_DEFAULT,
+  );
+  if (match !== null) {
+    extraNotes.push('EBIT sourced from adjusted variant — verify against reported figure.');
+    return {
+      msek: normalizeEbitMatchToMsek(match, lines, unitContext),
+      match,
+      extraNotes,
+    };
+  }
+
+  if (revenue !== null) {
+    match = extractEbitFromOperatingMarginTimesRevenue(
+      lines,
+      revenue,
+      revProvenance,
+    );
+    if (match !== null) {
+      extraNotes.push('EBIT derived from operating margin × revenue — verify.');
+      return { msek: match.value, match, extraNotes };
+    }
+  }
+
+  match = extractEbitFromEbitaMinusAmortization(
+    lines,
+    ebitOpts,
+    ebitPick,
+    detectedType === 'bank' ? bankScan : SCAN_DEFAULT,
+  );
+  if (match !== null) {
+    extraNotes.push('EBIT derived from EBITA minus amortization.');
+    return {
+      msek: normalizeEbitMatchToMsek(match, lines, unitContext),
+      match,
+      extraNotes,
+    };
+  }
+
+  match = extractEbitFromSegmentResultsBeforeFinancial(lines, ebitOpts, unitContext);
+  if (match !== null) {
+    extraNotes.push('EBIT derived from sum of segment results — verify consolidation.');
+    return {
+      msek: normalizeEbitMatchToMsek(match, lines, unitContext),
+      match,
+      extraNotes,
+    };
+  }
+
+  return { msek: null, match: null, extraNotes };
+}
+
 // ---------------------------------------------------------------------------
 // Main entry point
 // ---------------------------------------------------------------------------
@@ -1356,37 +1787,38 @@ export function extractFields(
   let ebit: number | null = null;
 
   if (detectedType !== 'investment_company') {
-    const ebitPick: NumberPickContext = {
-      preferredFiscalYear: fallbackFiscalYear,
-      revenueRawHintForEbit: revMatch !== null ? revMatch.value : null,
-    };
-    const ebitOpts: NumberSearchOpts = {
-      minValue: detectedType === 'bank' ? -1_000_000 : -500_000,
-      maxValue: detectedType === 'bank' ? 1_000_000 : 500_000,
-      exclusions: EBIT_EXCLUSIONS,
-    };
-    const ebitMatch =
-      detectedType === 'bank'
-        ? findFinancialNumberPhased(
-            lines,
-            BANK_EBIT_LABELS_PRIMARY,
-            labels.ebit,
-            ebitOpts,
-            ebitPick,
-            bankScan,
-          )
-        : findFinancialNumber(lines, labels.ebit, ebitOpts, ebitPick, SCAN_DEFAULT);
-    if (ebitMatch !== null) {
-      const ebitUnit = ebitMatch.sectionRange
-        ? detectSectionUnitContext(lines, ebitMatch.sectionRange.start, ebitMatch.sectionRange.end, unitContext)
-        : unitContext;
-      ebit = Math.round(normalizeToMsek(ebitMatch.value, ebitUnit));
-      ebitProvenance = numMatchToProvenance(ebitMatch);
+    const ebitOutcome = extractEbitWithStrategies(
+      detectedType,
+      lines,
+      labels,
+      unitContext,
+      revMatch,
+      revenue,
+      revProvenance,
+      fallbackFiscalYear,
+      bankScan,
+    );
+    for (const n of ebitOutcome.extraNotes) {
+      notes.push(n);
+    }
+    if (ebitOutcome.msek !== null && ebitOutcome.match !== null) {
+      ebit = ebitOutcome.msek;
+      ebitProvenance = numMatchToProvenance(ebitOutcome.match);
       log.info(`EBIT: ${ebit} MSEK`);
       if (detectedType === 'bank') {
-        notes.push(`Bank — '${ebitMatch.label}' mapped to ebit_msek`);
+        notes.push(`Bank — '${ebitOutcome.match.label}' mapped to ebit_msek`);
       }
-      if (ebitUnit === 'eur_m') {
+      const ebitUnit =
+        ebitOutcome.match.sectionRange &&
+        !/margin|× revenue/i.test(ebitOutcome.match.rawCell)
+          ? detectSectionUnitContext(
+              lines,
+              ebitOutcome.match.sectionRange.start,
+              ebitOutcome.match.sectionRange.end,
+              unitContext,
+            )
+          : unitContext;
+      if (ebitUnit === 'eur_m' && !/margin|× revenue/i.test(ebitOutcome.match.rawCell)) {
         notes.push(
           `EBIT converted from EUR millions using approximate EUR/SEK ${EUR_MILLIONS_TO_MSEK_APPROX} — verify report footnote`,
         );

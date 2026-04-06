@@ -31,6 +31,16 @@ export const INDUSTRIAL_LABELS: LabelSet = {
     'intäkter',
   ],
   ebit: [
+    // Longer phrases first (direct / consolidated EBIT — not adjusted-only variants)
+    'rörelseresultat före finansiella poster',
+    'operating result before financial items',
+    'profit before net financial items',
+    'resultat från den löpande verksamheten',
+    'resultat från verksamheten',
+    'profit from operating activities',
+    'earnings from operations',
+    'operating earnings',
+    'resultat före finansnetto',
     'operating profit/loss',
     'operating profit',
     'operating income',

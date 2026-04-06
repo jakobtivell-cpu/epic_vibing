@@ -422,18 +422,14 @@ function ensurePlaywrightChromiumInstalled(): void {
     const pw = require('playwright');
     const chromium = pw?.chromium as { executablePath: () => string } | undefined;
     if (!chromium) {
-      console.info('[INFO] Playwright chromium API unavailable — skipping startup browser check');
+      console.info('[INFO] Playwright chromium API unavailable — skipping startup browser install');
       return;
     }
 
-    const executablePath = chromium.executablePath();
-    if (executablePath && fs.existsSync(executablePath)) {
-      console.info(`[INFO] Playwright Chromium already installed at ${executablePath}`);
-      return;
-    }
-
+    const beforePath = chromium.executablePath();
+    const hadBinary = Boolean(beforePath && fs.existsSync(beforePath));
     console.info(
-      '[INFO] Playwright Chromium executable missing — running "npx playwright install chromium --with-deps"',
+      `[INFO] Running "npx playwright install chromium --with-deps" at startup (browser already present: ${hadBinary ? 'yes' : 'no'}${hadBinary ? ` at ${beforePath}` : ''})`,
     );
     const install = spawnSync('npx', ['playwright', 'install', 'chromium', '--with-deps'], {
       cwd: ROOT,
@@ -444,11 +440,14 @@ function ensurePlaywrightChromiumInstalled(): void {
     });
 
     if (install.status === 0) {
-      console.info('[INFO] Playwright Chromium install completed successfully');
+      const afterPath = chromium.executablePath();
+      console.info(
+        `[INFO] Playwright "install chromium --with-deps" finished successfully (executablePath: ${afterPath})`,
+      );
     } else {
       const details = (install.stderr || install.stdout || '').toString().trim();
       console.info(
-        `[INFO] Playwright Chromium install failed (code: ${install.status ?? 'null'})${details ? `: ${details}` : ''}`,
+        `[INFO] Playwright "install chromium --with-deps" failed (exit ${install.status ?? 'null'})${details ? `: ${details}` : ''}`,
       );
     }
   } catch (e) {

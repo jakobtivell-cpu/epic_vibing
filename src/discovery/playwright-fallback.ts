@@ -134,6 +134,29 @@ async function extractLinksFromPage(page: any, baseUrl: string): Promise<PageLin
 
 const GOTO_TIMEOUT_MS = 25_000;
 
+/** Full Playwright Chromium (not chromium-headless-shell); see EXECUTABLE_PATHS.chromium in playwright-core. */
+function findPlaywrightFullChromiumExecutable(): string | undefined {
+  const root = path.join(PROJECT_ROOT, 'node_modules', 'playwright-core', '.local-browsers');
+  if (!fs.existsSync(root)) return undefined;
+  const relCandidates = [
+    ['chrome-linux64', 'chrome'],
+    ['chrome-linux', 'chrome'],
+    ['chrome-win64', 'chrome.exe'],
+    ['chrome-win', 'chrome.exe'],
+    ['chrome-mac-x64', 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'],
+    ['chrome-mac-arm64', 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'],
+  ];
+  for (const dir of fs.readdirSync(root)) {
+    const base = path.join(root, dir);
+    if (!fs.statSync(base).isDirectory()) continue;
+    for (const parts of relCandidates) {
+      const p = path.join(base, ...parts);
+      if (fs.existsSync(p)) return p;
+    }
+  }
+  return undefined;
+}
+
 async function gotoWithRetry(page: any, url: string, companyName: string): Promise<void> {
   try {
     await page.goto(url, { waitUntil: 'networkidle', timeout: GOTO_TIMEOUT_MS });
@@ -195,8 +218,10 @@ export async function tryPlaywrightFallback(
       const playwrightLinuxLibsPath = path.join(PROJECT_ROOT, 'playwright-linux-libs');
       const useBundledLinuxLibs =
         process.platform === 'linux' && fs.existsSync(playwrightLinuxLibsPath);
+      const fullChromiumExe = findPlaywrightFullChromiumExecutable();
       browser = await chromium.launch({
         headless: true,
+        ...(fullChromiumExe ? { executablePath: fullChromiumExe } : {}),
         ...(useBundledLinuxLibs
           ? {
               env: {

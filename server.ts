@@ -415,19 +415,7 @@ app.get('/api/status/:jobId', (req: Request, res: Response) => {
 });
 
 const PORT = Number(process.env.PORT) || 3000;
-const PLAYWRIGHT_LINUX_LIB_BUNDLE = path.join(ROOT, 'playwright-linux-libs');
-
-function prependLinuxPlaywrightLibBundle(): void {
-  if (process.platform !== 'linux') return;
-  if (!fs.existsSync(PLAYWRIGHT_LINUX_LIB_BUNDLE)) return;
-  const prev = process.env.LD_LIBRARY_PATH;
-  process.env.LD_LIBRARY_PATH = prev
-    ? `${PLAYWRIGHT_LINUX_LIB_BUNDLE}:${prev}`
-    : PLAYWRIGHT_LINUX_LIB_BUNDLE;
-}
-
 function ensurePlaywrightChromiumInstalled(): void {
-  prependLinuxPlaywrightLibBundle();
   try {
     // @ts-ignore — playwright is an optional dependency
     // eslint-disable-next-line @typescript-eslint/no-var-requires

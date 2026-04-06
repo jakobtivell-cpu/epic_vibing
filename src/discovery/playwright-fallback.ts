@@ -6,6 +6,9 @@
 // If Playwright is not installed, skips gracefully and returns [].
 // ---------------------------------------------------------------------------
 
+import * as fs from 'fs';
+import * as path from 'path';
+import { PROJECT_ROOT } from '../config/settings';
 import { ReportCandidate, SOURCE_PLAYWRIGHT_FALLBACK } from '../types';
 import { createLogger } from '../utils/logger';
 
@@ -189,7 +192,21 @@ export async function tryPlaywrightFallback(
       /* use bundled Chromium below */
     }
     if (!browser) {
-      browser = await chromium.launch({ headless: true });
+      const playwrightLinuxLibsPath = path.join(PROJECT_ROOT, 'playwright-linux-libs');
+      const useBundledLinuxLibs =
+        process.platform === 'linux' && fs.existsSync(playwrightLinuxLibsPath);
+      browser = await chromium.launch({
+        headless: true,
+        ...(useBundledLinuxLibs
+          ? {
+              env: {
+                ...process.env,
+                LD_LIBRARY_PATH:
+                  playwrightLinuxLibsPath + ':' + (process.env.LD_LIBRARY_PATH || ''),
+              },
+            }
+          : {}),
+      });
     }
     const context = await browser.newContext({
       userAgent:

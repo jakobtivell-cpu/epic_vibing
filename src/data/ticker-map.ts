@@ -14,7 +14,18 @@ import { toAbsoluteHttpUrl } from '../utils/url-helpers';
 
 const log = createLogger('ticker-map');
 
-const TICKERS_PATH = join(__dirname, '..', '..', 'data', 'ticker.json');
+/** Prefer `cwd/data` (spawn cwd is deploy root); fall back to `dist/data/ticker.json` from compiled `dist/src/data`. */
+function resolveTickersJsonPath(): string {
+  const cwdPath = join(process.cwd(), 'data', 'ticker.json');
+  if (fs.existsSync(cwdPath)) {
+    return cwdPath;
+  }
+  const distNested = join(__dirname, '..', '..', 'data', 'ticker.json');
+  if (fs.existsSync(distNested)) {
+    return distNested;
+  }
+  return cwdPath;
+}
 
 interface TickerEntry {
   name: string;
@@ -45,11 +56,12 @@ export function loadTickerMap(): void {
   loaded = true;
 
   try {
-    if (!fs.existsSync(TICKERS_PATH)) {
-      log.warn(`Ticker file not found at ${TICKERS_PATH} — running without ticker enrichment`);
+    const tickersPath = resolveTickersJsonPath();
+    if (!fs.existsSync(tickersPath)) {
+      log.warn(`Ticker file not found at ${tickersPath} — running without ticker enrichment`);
       return;
     }
-    const raw = fs.readFileSync(TICKERS_PATH, 'utf-8');
+    const raw = fs.readFileSync(tickersPath, 'utf-8');
     const parsed = JSON.parse(raw);
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
       log.warn('Ticker file is not a JSON object — ignoring');
@@ -85,7 +97,7 @@ export function loadTickerMap(): void {
       }
     }
 
-    log.info(`Loaded ${Object.keys(tickerMap).length} ticker mappings from ${TICKERS_PATH}`);
+    log.info(`Loaded ${Object.keys(tickerMap).length} ticker mappings from ${tickersPath}`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log.warn(`Failed to load ticker file: ${msg} — running without ticker enrichment`);

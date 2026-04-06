@@ -657,7 +657,7 @@ function render(){
   }
 
   // ── EMPTY STATE ──
-  if(!hasData&&!act.length) h+=`<div class="cd empty"><div style="font-size:32px;margin-bottom:12px;opacity:.15">⊞</div><div style="font-size:15px;font-weight:600;margin-bottom:6px">No companies yet</div><div style="font-size:13px;color:var(--t3);max-width:460px;margin:0 auto;line-height:1.5">Run <span class="mono" style="font-size:12px">npm run server</span> and open the dashboard from <span class="mono" style="font-size:12px">http://localhost:3000</span>, then scrape by name or ticker.</div></div>`;
+  if(!hasData&&!act.length) h+=`<div class="cd empty"><div style="font-size:32px;margin-bottom:12px;opacity:.15">⊞</div><div style="font-size:15px;font-weight:600;margin-bottom:6px">No companies yet</div><div style="font-size:13px;color:var(--t3);max-width:460px;margin:0 auto;line-height:1.5">Enter a company name or ticker above to begin scraping.</div></div>`;
   else if(!hasData&&act.length>0) h+=`<div class="cd" style="padding:48px 40px;text-align:center">${spin("#2563EB",20)}<div style="font-size:14px;font-weight:600;margin-top:14px">Scraping in progress…</div></div>`;
 
   // ── DATA VIEWS ──

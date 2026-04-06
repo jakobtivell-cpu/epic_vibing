@@ -23,6 +23,7 @@ Production-minded **Node.js + TypeScript** scraper for **Nasdaq Stockholm Large 
 - [x] URL normalization (encoded quotes, double slashes) and same-site helpers (`src/utils/url-helpers.ts`).
 - [x] Post-download entity verification and fiscal-year checks (`src/validation/post-download-checks.ts`).
 - [x] Industrial / bank / investment-company extraction and validation paths.
+- [x] EBIT field extraction with **priority-ordered strategies** in `field-extractor.ts` / `labels.ts`: **(1)** direct table labels (expanded SV/EN set), **(2)** adjusted EBIT-style labels (annotated in notes), **(3)** operating margin × revenue when revenue is high-confidence, **(4)** EBITA minus amortization of intangibles nearby, **(5)** sum of segment operating results explicitly before financial items. No EBITDA derivation by design.
 - [x] Fused-year integer detection and revenue megascale / unit guards (`src/extraction/number-guards.ts`, wired from `field-extractor.ts`).
 - [x] Playwright fallback (optional); early use when Cheerio finds no PDFs on the IR page; **2407d9f** also covers first **Axios 403** → Playwright retry.
 - [x] Results writer with **merge by `company` name** (case-insensitive) for partial reruns.
@@ -35,8 +36,8 @@ Each item below is an **expected** frontier for this problem class, not a surpri
 
 ### Partial rows on the default batch
 
-- **What:** Several default issuers finish as **`partial`** when plausibility rules null out EBIT or other fields after extraction.
-- **Why this is acceptable now:** The pipeline prefers **recoverable nulls** over shipping numbers that fail industrial / bank consistency checks; the row still carries URLs, notes, and confidence for human or downstream review.
+- **What:** Several default issuers can still finish as **`partial`** when plausibility rules null out extracted figures (including EBIT after a candidate is deemed inconsistent with revenue or reporting model).
+- **Why this is acceptable now:** The pipeline prefers **recoverable nulls** over shipping numbers that fail industrial / bank consistency checks; the row still carries URLs, notes, and confidence for human or downstream review. **EBIT-specific gap-filling** (extra labels + margin / EBITA / adjusted / segment paths) is **shipped in v2.1.1**—remaining partials are validation or layout edge cases, not “missing EBIT logic.”
 - **Resolution path:** Extend heuristics and **`tests/`** coverage per issuer class; re-benchmark with `npx ts-node scrape.ts --force` and update the README status table.
 
 ### Banks and brand / hostname collisions
@@ -92,5 +93,5 @@ data/entity-confusion.json  Host / brand collision hints
 
 - `README.md` — how to run, schema, dashboard, default ticker table.
 - `CONTRIBUTING.md` — adding companies, commits, rate limits.
-- `CHANGELOG.md` — version history (v2.1.0 current).
+- `CHANGELOG.md` — version history (v2.1.1 current for extraction notes; see file for full list).
 - `docs/ARCHITECTURE_ENTITY_AND_DISCOVERY.md` — deeper discovery / entity notes (if present).

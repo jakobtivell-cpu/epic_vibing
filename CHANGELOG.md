@@ -2,6 +2,12 @@
 
 Changes are grouped by area. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.1] — 2026-04-06
+
+### Extraction
+
+- Expanded EBIT extraction — added derivation strategies including adjusted EBIT variants, operating margin × revenue, EBITA minus amortization, and segment result aggregation; added 20+ Swedish and English label variants.
+
 ## [2.1.0] — 2026-04-05
 
 Release **2.1.0** ships documentation aligned with the live pipeline, regression tests around parsing and URLs, extraction guards for fused years and megascale revenue, version metadata, and handoff artifacts.
@@ -44,4 +50,5 @@ Release **2.1.0** ships documentation aligned with the live pipeline, regression
 
 - **2.0.x and prior** — Initial scaffold, rename dashboard asset, core pipeline and ticker map (`a973d25`, `fe0588c`, `135aa03`, …).
 
+[2.1.1]: https://github.com/jakobtivell-cpu/epic_vibing/commits/main
 [2.1.0]: https://github.com/jakobtivell-cpu/epic_vibing/compare/a973d25...HEAD

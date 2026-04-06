@@ -45,7 +45,13 @@ jobs:
           for bin in "${bins[@]}"; do
             echo "Collecting ldd dependencies for: $bin"
             while read -r dep; do
-              [ -n "$dep" ] && [ -f "$dep" ] && cp -f "$dep" "$LIB_DIR/"
+              [ -z "$dep" ] && continue
+              [ ! -f "$dep" ] && continue
+              b=$(basename "$dep")
+              case "$b" in
+                libc.so.6|libm.so.6|libpthread.so.0|libdl.so.2|librt.so.1|ld-linux-x86-64.so.2) continue ;;
+              esac
+              cp -f "$dep" "$LIB_DIR/"
             done < <(ldd "$bin" 2>/dev/null | awk '$3 ~ /^\// { print $3 }' || true)
           done
           echo "Bundled $(find "$LIB_DIR" -maxdepth 1 -type f | wc -l) shared libraries into playwright-linux-libs/"

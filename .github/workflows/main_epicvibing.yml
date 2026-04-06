@@ -9,6 +9,12 @@ on:
       - main
   workflow_dispatch:
 
+# OneDeploy often returns 409 Conflict when two deploys hit the same App Service at once
+# (overlapping workflow runs or SCM still finishing). Queue runs; do not cancel in-flight deploy.
+concurrency:
+  group: azure-epicvibing-${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest

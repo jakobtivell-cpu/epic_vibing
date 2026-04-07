@@ -428,26 +428,38 @@ function ensurePlaywrightChromiumInstalled(): void {
 
     const beforePath = chromium.executablePath();
     const hadBinary = Boolean(beforePath && fs.existsSync(beforePath));
+    const cliPath = path.join(ROOT, 'node_modules', 'playwright', 'cli.js');
+    if (!fs.existsSync(cliPath)) {
+      console.info(
+        `[INFO] Playwright startup install skipped: CLI not found at ${cliPath} (system deps not installed)`,
+      );
+      return;
+    }
+
     console.info(
-      `[INFO] Running "npx playwright install chromium --with-deps" at startup (browser already present: ${hadBinary ? 'yes' : 'no'}${hadBinary ? ` at ${beforePath}` : ''})`,
+      `[INFO] Running "node node_modules/playwright/cli.js install chromium --with-deps" at startup (browser already present: ${hadBinary ? 'yes' : 'no'}${hadBinary ? ` at ${beforePath}` : ''})`,
     );
-    const install = spawnSync('npx', ['playwright', 'install', 'chromium', '--with-deps'], {
-      cwd: ROOT,
-      env: process.env,
-      shell: process.platform === 'win32',
-      stdio: 'pipe',
-      encoding: 'utf8',
-    });
+    const install = spawnSync(
+      process.execPath,
+      [cliPath, 'install', 'chromium', '--with-deps'],
+      {
+        cwd: ROOT,
+        env: process.env,
+        shell: false,
+        stdio: 'pipe',
+        encoding: 'utf8',
+      },
+    );
 
     if (install.status === 0) {
       const afterPath = chromium.executablePath();
       console.info(
-        `[INFO] Playwright "install chromium --with-deps" finished successfully (executablePath: ${afterPath})`,
+        `[INFO] Playwright startup install succeeded; Chromium + system deps installed (executablePath: ${afterPath})`,
       );
     } else {
       const details = (install.stderr || install.stdout || '').toString().trim();
       console.info(
-        `[INFO] Playwright "install chromium --with-deps" failed (exit ${install.status ?? 'null'})${details ? `: ${details}` : ''}`,
+        `[INFO] Playwright startup install failed (system deps not installed) (exit ${install.status ?? 'null'})${details ? `: ${details}` : ''}`,
       );
     }
   } catch (e) {

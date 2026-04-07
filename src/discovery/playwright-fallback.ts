@@ -30,6 +30,8 @@ const SUBPAGE_PATTERNS = [
   /rapporter/i,
 ];
 
+const STRONG_ANNUAL_REPORT_SCORE = 12;
+
 function scorePdfUrl(href: string): number {
   if (!/\.pdf(\?|$)/i.test(href)) return -999;
 
@@ -267,7 +269,10 @@ export async function tryPlaywrightFallback(
       }
     }
 
-    if (pdfCandidates.length === 0) {
+    const hasStrongAnnualCandidate = pdfCandidates.some(
+      (c) => c.score >= STRONG_ANNUAL_REPORT_SCORE,
+    );
+    if (!hasStrongAnnualCandidate) {
       const visitedPages = new Set<string>([irPageUrl]);
       const dedupSubUrls = new Set<string>();
       const subPageLinks = allLinks

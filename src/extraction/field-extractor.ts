@@ -432,6 +432,20 @@ function normalizeToMsek(value: number, unit: UnitContext | null): number {
   }
 }
 
+function applyEbitMegascaleGuard(
+  ebit: number,
+  revenue: number | null,
+): { ebit: number; adjusted: boolean } {
+  if (!Number.isFinite(ebit)) return { ebit, adjusted: false };
+  if (Math.abs(ebit) < 1_000_000) return { ebit, adjusted: false };
+  const candidate = Math.round(ebit / 1_000);
+  if (revenue === null) return { ebit, adjusted: false };
+  if (Math.abs(candidate) <= Math.abs(revenue) * 2 + 1) {
+    return { ebit: candidate, adjusted: true };
+  }
+  return { ebit, adjusted: false };
+}
+
 /**
  * Detect unit context within a specific line range (e.g., an income
  * statement section). Falls back to the global context if no local
@@ -1719,9 +1733,16 @@ function extractEbitWithStrategies(
     preferredFiscalYear: fallbackFiscalYear,
     revenueRawHintForEbit: revMatch !== null ? revMatch.value : null,
   };
+  const revAbsRaw = revMatch !== null ? Math.abs(revMatch.value) : 0;
+  const revAbsMsek = revenue !== null ? Math.abs(revenue) : 0;
+  const ebitMaxNonBank = Math.max(
+    500_000,
+    revAbsRaw * 50 + 1,
+    revAbsMsek * 50 + 1,
+  );
   const ebitOpts: NumberSearchOpts = {
     minValue: detectedType === 'bank' ? -1_000_000 : -500_000,
-    maxValue: detectedType === 'bank' ? 1_000_000 : 500_000,
+    maxValue: detectedType === 'bank' ? 1_000_000 : ebitMaxNonBank,
     exclusions: EBIT_EXCLUSIONS,
   };
   const telecomLike = detectedType === 'industrial' && TELECOM_SIGNALS.test(lines.slice(0, 350).join(' '));
@@ -2117,6 +2138,17 @@ export function extractFields(
         `Revenue unit guard: ${revenue} → ${rev2} MSEK (likely tkr/KSEK misread as MSEK)`,
       );
       revenue = rev2;
+    }
+  }
+
+  if (ebit !== null) {
+    const ebitGuard = applyEbitMegascaleGuard(ebit, revenue);
+    if (ebitGuard.adjusted) {
+      notes.push(`EBIT unit guard: ${ebit} → ${ebitGuard.ebit} MSEK (likely tkr/KSEK misread as MSEK)`);
+      log.warn(
+        `EBIT ${ebit} MSEK appears unit-inflated versus revenue ${revenue ?? 'n/a'} — applying ÷1000 guard → ${ebitGuard.ebit} MSEK`,
+      );
+      ebit = ebitGuard.ebit;
     }
   }
 

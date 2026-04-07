@@ -234,4 +234,26 @@ describe('EBIT extraction strategies', () => {
     const r = extractFields(text, 'TelCoB', 2025, 'industrial');
     expect(r.data.ebit_msek).toBe(5600);
   });
+
+  it('applies EBIT unit guard when value is inflated by 1000x', () => {
+    const text = [
+      'Koncernens resultaträkning',
+      'Net sales  79000',
+      'Operating profit  1868000',
+    ].join('\n');
+    const r = extractFields(text, 'SaabLike', 2025, 'industrial');
+    expect(r.data.ebit_msek).toBe(1868);
+    expect(r.notes.some((n) => n.includes('EBIT unit guard: 1868000 → 1868 MSEK'))).toBe(true);
+  });
+
+  it('does not extract EBIT when raw value is far above revenue ceiling', () => {
+    const text = [
+      'Koncernens resultaträkning',
+      'Net sales  79000',
+      'Operating profit  200000000',
+    ].join('\n');
+    const r = extractFields(text, 'NoGuardCo', 2025, 'industrial');
+    expect(r.data.ebit_msek).toBeNull();
+    expect(r.notes.some((n) => n.includes('EBIT unit guard:'))).toBe(false);
+  });
 });

@@ -597,8 +597,7 @@
         "name": "Catena AB (publ)",
         "irPage": "https://www.catenafastigheter.se/en/investors/",
         "candidateDomains": [
-            "https://www.catenafastigheter.se",
-            "https://www.catena.se"
+            "https://www.catenafastigheter.se"
         ]
     },
     "LOOMIS.ST": {
@@ -791,7 +790,7 @@
     },
     "BURE.ST": {
         "name": "Bure Equity AB (publ)",
-        "irPage": "https://www.bure.se/en/investors/",
+        "irPage": "https://www.bure.se/en/investors",
         "candidateDomains": [
             "https://www.bure.se"
         ]

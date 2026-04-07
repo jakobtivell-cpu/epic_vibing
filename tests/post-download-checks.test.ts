@@ -30,4 +30,15 @@ describe('post-download entity verification', () => {
     expect(r.passed).toBe(true);
     expect(r.matchedTerm).toContain('H&M');
   });
+
+  it('accepts strong legal anchor in wider 12k window', () => {
+    const entity = hmLikeProfile();
+    const text =
+      `${'filler line without company identity\n'.repeat(250)}` +
+      'H & M Hennes & Mauritz AB (publ)\nAnnual report 2025\n';
+    const r = verifyEntityInPdf(text, entity);
+    expect(r.passed).toBe(true);
+    expect(r.checkedRegion).toBe('first-12000-chars-strong');
+    expect(r.matchedTerm).toContain('legal:');
+  });
 });

@@ -222,6 +222,12 @@ interface PdfExtractionFailure {
   notes: string[];
 }
 
+type CandidateRejectReason =
+  | 'quality-gate'
+  | 'entity-check'
+  | 'revenue-too-high'
+  | 'revenue-too-low-warning';
+
 /** Optional circuit breaking for PDF download storms (search-guessed URLs, rate limits). */
 interface TryPdfCircuitOptions {
   /** After this many download failures on a host, skip remaining candidates on that host. */
@@ -270,6 +276,11 @@ async function tryPdfCandidates(
 
   let downloadAttempts = 0;
   let displayIndex = 0;
+  const rejectReasonCount = new Map<CandidateRejectReason, number>();
+
+  const recordReject = (reason: CandidateRejectReason): void => {
+    rejectReasonCount.set(reason, (rejectReasonCount.get(reason) ?? 0) + 1);
+  };
 
   for (const candidate of ranked) {
     if (downloadAttempts >= maxAttempts) break;
@@ -347,6 +358,7 @@ async function tryPdfCandidates(
     if (!gateResult.passed) {
       log.warn(`[${entity.displayName}] Quality gate rejected candidate #${displayIndex}: ${gateResult.reason}`);
       notes.push(`Rejected ${stepName} candidate #${displayIndex} "${candidate.url}" — ${gateResult.reason}`);
+      recordReject('quality-gate');
       continue;
     }
 
@@ -354,6 +366,7 @@ async function tryPdfCandidates(
     if (!entityCheck.passed) {
       log.warn(`[${entity.displayName}] Entity check FAILED for candidate #${displayIndex} — likely wrong company's report`);
       notes.push(`Rejected ${stepName} candidate #${displayIndex} "${candidate.url}" — entity check failed (wrong company)`);
+      recordReject('entity-check');
       continue;
     }
     notes.push(`Entity verified (${entityCheck.matchedTerm})`);
@@ -378,6 +391,7 @@ async function tryPdfCandidates(
     if (rev !== null && rev > 5_000_000) {
       log.warn(`[${entity.displayName}] Revenue ${rev} MSEK implausible — rejecting candidate #${displayIndex}`);
       notes.push(`Rejected ${stepName} candidate #${displayIndex} — revenue ${rev} MSEK implausible`);
+      recordReject('revenue-too-high');
       continue;
     }
     if (
@@ -386,9 +400,13 @@ async function tryPdfCandidates(
       entity.reportingModelHint !== 'bank' &&
       extraction.detectedCompanyType !== 'bank'
     ) {
-      log.warn(`[${entity.displayName}] Revenue ${rev} MSEK implausible — rejecting candidate #${displayIndex}`);
-      notes.push(`Rejected ${stepName} candidate #${displayIndex} — revenue ${rev} MSEK implausible`);
-      continue;
+      log.warn(
+        `[${entity.displayName}] Revenue ${rev} MSEK low for non-bank — keeping candidate with penalty note`,
+      );
+      notes.push(
+        `Warning ${stepName} candidate #${displayIndex} — low revenue ${rev} MSEK for non-bank; accepted but requires manual verification`,
+      );
+      recordReject('revenue-too-low-warning');
     }
 
     let dataSource: DataSource;
@@ -413,6 +431,14 @@ async function tryPdfCandidates(
       pdfPageCount: pdfText.pageCount,
       suspiciouslyShortPdf: pdfText.suspiciouslyShort,
     };
+  }
+
+  if (rejectReasonCount.size > 0) {
+    const summary = Array.from(rejectReasonCount.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([reason, count]) => `${reason}=${count}`)
+      .join(', ');
+    notes.push(`${stepName}: rejection summary (${summary})`);
   }
 
   return { success: false, notes };

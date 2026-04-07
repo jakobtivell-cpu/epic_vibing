@@ -18,10 +18,11 @@ export interface EntityCheckResult {
   passed: boolean;
   /** Provenance label + matched text, e.g. `legal:stripped:Sandvik` or `org:digits:5560427220` */
   matchedTerm: string | null;
-  checkedRegion: 'first-6000-chars';
+  checkedRegion: 'first-6000-chars' | 'first-12000-chars-strong';
 }
 
 const ENTITY_CHECK_CHARS = 6_000;
+const ENTITY_CHECK_STRONG_CHARS = 12_000;
 
 function stripLegalSuffixes(name: string): string {
   return name
@@ -85,6 +86,14 @@ function buildTickerVariants(ticker: string | null): string[] {
 export interface EntityCheckTerm {
   needle: string;
   provenance: string;
+}
+
+function isStrongEntityTerm(term: EntityCheckTerm): boolean {
+  return (
+    term.provenance.startsWith('legal:') ||
+    term.provenance.startsWith('org:') ||
+    term.provenance.startsWith('alias:')
+  );
 }
 
 /**
@@ -202,6 +211,7 @@ function weakNeedleAllowed(region: string, needleLower: string, entity: EntityPr
  */
 export function verifyEntityInPdf(text: string, entity: EntityProfile): EntityCheckResult {
   const region = text.substring(0, ENTITY_CHECK_CHARS).toLowerCase();
+  const strongRegion = text.substring(0, ENTITY_CHECK_STRONG_CHARS).toLowerCase();
   const terms = buildEntityCheckTerms(entity);
 
   for (const { needle, provenance } of terms) {
@@ -214,8 +224,21 @@ export function verifyEntityInPdf(text: string, entity: EntityProfile): EntityCh
     return { passed: true, matchedTerm: label, checkedRegion: 'first-6000-chars' };
   }
 
+  for (const term of terms) {
+    if (!isStrongEntityTerm(term)) continue;
+    const n = term.needle.toLowerCase();
+    if (!strongRegion.includes(n)) continue;
+    const label = `${term.provenance}:${term.needle}`;
+    log.info(`[${entity.displayName}] Entity check OK (wide strong pass) — matched ${label}`);
+    return {
+      passed: true,
+      matchedTerm: label,
+      checkedRegion: 'first-12000-chars-strong',
+    };
+  }
+
   log.warn(
-    `[${entity.displayName}] Entity check FAILED — no entity term matched in first ${ENTITY_CHECK_CHARS} chars`,
+    `[${entity.displayName}] Entity check FAILED — no entity term matched in first ${ENTITY_CHECK_CHARS} chars (or strong terms in first ${ENTITY_CHECK_STRONG_CHARS} chars)`,
   );
   return { passed: false, matchedTerm: null, checkedRegion: 'first-6000-chars' };
 }

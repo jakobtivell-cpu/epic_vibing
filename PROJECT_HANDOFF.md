@@ -22,10 +22,13 @@ Production-minded **Node.js + TypeScript** scraper for **Nasdaq Stockholm Large 
 - [x] Search-assisted discovery, IR discovery, report ranking, publication-hub probes, entity-aware candidate filtering.
 - [x] URL normalization (encoded quotes, double slashes) and same-site helpers (`src/utils/url-helpers.ts`).
 - [x] Post-download entity verification and fiscal-year checks (`src/validation/post-download-checks.ts`).
-- [x] Industrial / bank / investment-company extraction and validation paths.
+- [x] Industrial / bank / investment-company / real-estate extraction and validation paths.
 - [x] EBIT field extraction with **priority-ordered strategies** in `field-extractor.ts` / `labels.ts`: **(1)** direct table labels (expanded SV/EN set), **(2)** adjusted EBIT-style labels (annotated in notes), **(3)** operating margin × revenue when revenue is high-confidence, **(4)** EBITA minus amortization of intangibles nearby, **(5)** sum of segment operating results explicitly before financial items. No EBITDA derivation by design.
 - [x] Fused-year integer detection and revenue megascale / unit guards (`src/extraction/number-guards.ts`, wired from `field-extractor.ts`).
+- [x] EBIT megascale/unit guard to recover likely tkr/KSEK 1000x inflation against revenue context (with notes and tests).
 - [x] Playwright fallback (optional); early use when Cheerio finds no PDFs on the IR page; **2407d9f** also covers first **Axios 403** → Playwright retry.
+- [x] Playwright fallback deepening: continue exploring report sub-pages unless a strong annual-report candidate is already present.
+- [x] Legacy `playwright-linux-libs` / `LD_LIBRARY_PATH` injection removed to avoid glibc conflicts in Azure Linux runtime.
 - [x] Results writer with **merge by `company` name** (case-insensitive) for partial reruns.
 - [x] Express server + dashboard HTML (`npm run server`).
 - [x] Jest coverage for parsing guards, URL helpers, entity verification, ticker `irPage` HTTPS checks, validation plausibility, and discovery-related tests under `tests/`.
@@ -86,7 +89,7 @@ data/entity-confusion.json  Host / brand collision hints
 ## Operational notes
 
 - **Tests:** `npx tsc --noEmit` and `npx jest` before commits (see `.cursorrules`).
-- **Playwright:** `npm install` then `npx playwright install chromium` when PDF links are JS-only.
+- **Playwright:** `npm install` then `npx playwright install chromium --with-deps` on Linux/Azure build runners when PDF links are JS-only.
 - **Host respect:** Prefer single-ticker **`--force`** during iterative work to keep request volume predictable.
 
 ## Reference docs

@@ -1,6 +1,6 @@
 # Swedish Large Cap Annual Report Scraper
 
-**Version 2.1.1**
+**Version 2.1.2**
 
 This project is a **Node.js + TypeScript** system for **Nasdaq Stockholm Large Cap** issuers: it discovers investor-relations entry points and annual-report PDFs, extracts consolidated figures with **deterministic heuristics**, runs **type-aware validation**, and emits **`output/results.json`** with explicit provenance. The stack is built for **repeatable batch operation**, **merge-safe partial reruns**, and **reviewability** (`extractionNotes`, numeric confidence). The **core scraper** uses **public websites only** (no API keys required). **OpenAI** optionally powers an LLM challenger pass; **Anthropic** is used only by the **IR health-check** script (see [Environment](#environment)).
 
@@ -8,12 +8,20 @@ This project is a **Node.js + TypeScript** system for **Nasdaq Stockholm Large C
 
 - **End-to-end pipeline** for arbitrary Swedish Large Cap names (`--company`) or Nasdaq Stockholm tickers (`--ticker`), resolved through `data/ticker.json`.
 - **Verified `irPage` URLs** in `ticker.json` skip brittle IR discovery for those rows.
-- **Cheerio-first HTML**, **pdf-parse** for text, optional **Playwright** for JS-rendered IR pages (install Chromium when needed: `npx playwright install chromium`).
+- **Cheerio-first HTML**, **pdf-parse** for text, and **Playwright** fallback for JS-rendered IR pages (install Chromium when needed: `npx playwright install chromium --with-deps` on Linux/Azure build runners).
 - **Per-host User-Agent rotation**, retries, and backoff in `src/utils/http-client.ts`.
-- **Entity-aware PDF checks**, URL normalization (encoded quotes, double slashes), fused-year and unit guards in extraction, type-aware validation (industrial / bank / investment company).
+- **Entity-aware PDF checks**, URL normalization (encoded quotes, double slashes), fused-year and unit guards in extraction, type-aware validation (industrial / bank / investment company / real estate).
 - **EBIT (`ebit_msek`)** — broad direct label set (20+ Swedish / English phrases, including *rörelseresultat före finansiella poster*, *resultat före finansnetto*, *profit before net financial items*, etc.) and ordered fallbacks when no direct line matches: **adjusted EBIT-style labels** (with extraction notes), **operating margin × revenue** (when revenue is high-confidence table extraction, not narrative BSEK / allabolag), **EBITA minus amortization of intangibles** (±10 lines), and **sum of segment results** explicitly *before financial items* (with verification notes). EBITDA is intentionally not derived.
 - **Merge-safe reruns**: processing one ticker updates that company’s row in `results.json` by matching **`company` name** (case-insensitive), leaving other rows unchanged.
 - **Express dashboard** (`npm run server`): static UI, API for results, scrape jobs with log streaming (see [Dashboard](#dashboard)).
+
+### Recent validated successes (2026-04-07)
+
+- **Telia (`TELIA.ST`)** now completes end-to-end from `playwright+pdf` with 5/5 fields after removing legacy `playwright-linux-libs` injection path.
+- Deterministic fallback tuning reduced false candidate rejection and improved Playwright resilience on JS-heavy IR pages.
+- Additional deterministic hardening shipped for difficult rows:
+  - Playwright now follows report sub-pages unless a strong annual-report candidate already exists.
+  - EBIT guard can recover 1000x unit-inflated picks when consistent with revenue (with explicit extraction note).
 
 ## Architecture
 
@@ -160,7 +168,7 @@ Opens the Express app (default **http://localhost:3000/** unless `PORT` is set).
 
 - Run **`npm run build`** then **`npm start`** (`node dist/server.js`). Output, downloads, cache, and **`GET /api/results`** all use the same project root via [`src/config/settings.ts`](src/config/settings.ts): from compiled `dist/src/config` the root is resolved three levels up; from source `src/config` it is two levels up. Set **`APP_ROOT`** (see [Environment](#environment)) if the app files live in a non-standard layout.
 - Keep **`data/`** next to **`dist/`** at deploy root so `data/ticker.json` and related JSON load from `{PROJECT_ROOT}/data/`. A fallback to `dist/data/ticker.json` still works if you mirror data there.
-- **Playwright** is an **`optionalDependency`**; **`postinstall`** runs **`npx playwright install chromium`**. For the browser fallback on Azure, avoid **`npm install --omit=optional`**. On Linux, the code uses **bundled Chromium** (no system Chrome); macOS/Windows may try the **`chrome`** channel first, then fall back.
+- **Playwright** is a regular dependency. Build/deploy installs Chromium with dependencies; runtime uses bundled Chromium on Linux and does not inject custom `LD_LIBRARY_PATH` overrides. macOS/Windows may try the `chrome` channel first, then bundled Chromium fallback.
 
 ## Environment
 

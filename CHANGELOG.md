@@ -2,6 +2,27 @@
 
 Changes are grouped by area. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.2] — 2026-04-07
+
+### Discovery
+
+- Deterministic Playwright deepening: sub-page exploration now continues unless a strong annual-report candidate is already found on the main IR page.
+- Improved candidate handling diagnostics and deterministic rejection tracing in pipeline fallback paths.
+
+### Extraction
+
+- EBIT unit recovery hardening: accepts large raw EBIT candidates when revenue context supports it, then applies a 1000x megascale correction when plausible.
+- Added regression tests for EBIT unit guard behavior (recover vs reject).
+
+### Validation
+
+- Expanded entity verification strategy with stronger long-window matching to reduce false negatives on valid annual reports.
+
+### Infrastructure
+
+- Removed legacy Playwright shared-library injection path (`LD_LIBRARY_PATH`) and workflow-time `ldd` bundle coupling that caused glibc conflicts.
+- Confirmed successful Azure run for `TELIA.ST` via `playwright+pdf` with complete extraction.
+
 ## [2.1.1] — 2026-04-06
 
 ### Extraction
@@ -52,3 +73,4 @@ Release **2.1.0** ships documentation aligned with the live pipeline, regression
 
 [2.1.1]: https://github.com/jakobtivell-cpu/epic_vibing/commits/main
 [2.1.0]: https://github.com/jakobtivell-cpu/epic_vibing/compare/a973d25...HEAD
+[2.1.2]: https://github.com/jakobtivell-cpu/epic_vibing/commits/main

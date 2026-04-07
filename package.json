@@ -1,6 +1,6 @@
 {
   "name": "swedish-largecap-scraper",
-  "version": "2.1.0",
+  "version": "2.1.2",
   "description": "Automated annual report scraper for Swedish Large Cap companies listed on Nasdaq Stockholm",
   "engines": {
     "node": ">=18"

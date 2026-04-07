@@ -5,7 +5,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import { randomBytes } from 'crypto';
-import { spawn, spawnSync, ChildProcess } from 'child_process';
+import { spawn, ChildProcess } from 'child_process';
 import express, { Request, Response } from 'express';
 import { RESULTS_PATH } from './src/config/settings';
 
@@ -436,32 +436,43 @@ function ensurePlaywrightChromiumInstalled(): void {
       return;
     }
 
-    console.info(
-      `[INFO] Running "node node_modules/playwright/cli.js install chromium --with-deps" at startup (browser already present: ${hadBinary ? 'yes' : 'no'}${hadBinary ? ` at ${beforePath}` : ''})`,
-    );
-    const install = spawnSync(
-      process.execPath,
-      [cliPath, 'install', 'chromium', '--with-deps'],
-      {
-        cwd: ROOT,
-        env: process.env,
-        shell: false,
-        stdio: 'pipe',
-        encoding: 'utf8',
-      },
-    );
-
-    if (install.status === 0) {
-      const afterPath = chromium.executablePath();
+    if (hadBinary) {
       console.info(
-        `[INFO] Playwright startup install succeeded; Chromium + system deps installed (executablePath: ${afterPath})`,
+        `[INFO] Playwright startup install skipped: Chromium already present at ${beforePath}`,
       );
-    } else {
-      const details = (install.stderr || install.stdout || '').toString().trim();
-      console.info(
-        `[INFO] Playwright startup install failed (system deps not installed) (exit ${install.status ?? 'null'})${details ? `: ${details}` : ''}`,
-      );
+      return;
     }
+
+    console.info(
+      '[INFO] Playwright Chromium missing at startup; launching non-blocking install (without --with-deps)',
+    );
+    const install = spawn(process.execPath, [cliPath, 'install', 'chromium'], {
+      cwd: ROOT,
+      env: process.env,
+      shell: false,
+      stdio: 'pipe',
+    });
+    let stdout = '';
+    let stderr = '';
+    install.stdout?.on('data', (c: Buffer) => {
+      stdout += c.toString('utf8');
+    });
+    install.stderr?.on('data', (c: Buffer) => {
+      stderr += c.toString('utf8');
+    });
+    install.on('close', (code) => {
+      if (code === 0) {
+        const afterPath = chromium.executablePath();
+        console.info(
+          `[INFO] Playwright startup install completed (executablePath: ${afterPath})`,
+        );
+      } else {
+        const details = (stderr || stdout).trim();
+        console.info(
+          `[INFO] Playwright startup install failed (exit ${code ?? 'null'})${details ? `: ${details}` : ''}`,
+        );
+      }
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.info(`[INFO] Playwright startup check skipped: ${msg}`);

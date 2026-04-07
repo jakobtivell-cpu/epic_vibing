@@ -30,6 +30,7 @@ import {
   resolveIrPage,
   resolveIsin,
   resolveIrEmail,
+  resolveCompanyType,
   normalizeTickerForLookup,
 } from './src/data/ticker-map';
 import { runCompaniesWithOptionalChildTimeout } from './src/cli/child-runner';
@@ -272,6 +273,7 @@ function buildCompanyList(opts: Record<string, unknown>): CompanyProfile[] {
       const irPage = resolveIrPage(rawTicker) ?? undefined;
       const isin = resolveIsin(rawTicker) ?? undefined;
       const irEmail = resolveIrEmail(rawTicker) ?? undefined;
+      const companyType = resolveCompanyType(rawTicker) ?? undefined;
       if (legalName) {
         log.info(
           `Ticker ${rawTicker} → "${legalName}" (${canonicalTicker})${orgNumber ? ` org: ${orgNumber}` : ''}${isin ? ` isin: ${isin}` : ''}${candidateDomains?.length ? ` candidateDomains: ${candidateDomains.join(', ')}` : ''}${irPage ? ` irPage: ${irPage}` : ''}${irEmail ? ` irEmail: ${irEmail}` : ''}`,
@@ -285,6 +287,7 @@ function buildCompanyList(opts: Record<string, unknown>): CompanyProfile[] {
           ...(irPage ? { irPage } : {}),
           ...(isin ? { isin } : {}),
           ...(irEmail ? { irEmail } : {}),
+          ...(companyType ? { companyType } : {}),
         });
       } else {
         log.warn(`Ticker ${rawTicker} not found in ticker map — using as company search name`);

@@ -11,7 +11,7 @@ export type { DualTrackAdjudication };
  * Classification used to select extraction heuristics (banks report differently).
  * Auto-detected from document content at runtime — never preconfigured.
  */
-export type CompanyType = 'industrial' | 'bank' | 'investment_company';
+export type CompanyType = 'industrial' | 'bank' | 'investment_company' | 'real_estate';
 
 /**
  * Minimal runtime description of one company to scrape.
@@ -42,6 +42,8 @@ export interface CompanyProfile {
   irEmail?: string;
   /** Extra strings that may appear in filings (brands, local names) — used for PDF entity check. */
   knownAliases?: string[];
+  /** Optional explicit reporting model from ticker map. */
+  companyType?: CompanyType;
 }
 
 /** The 4 core financial fields the assignment requires. */

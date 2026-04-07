@@ -15,6 +15,8 @@ import {
   BANK_REVENUE_LABELS_PRIMARY,
   BANK_EBIT_LABELS_PRIMARY,
   INVESTMENT_LABELS,
+  REAL_ESTATE_LABELS,
+  REAL_ESTATE_EBIT_LABELS_PRIMARY,
   LabelSet,
 } from './labels';
 import { createLogger } from '../utils/logger';
@@ -69,6 +71,8 @@ function getLabels(companyType: CompanyType): LabelSet {
       return BANK_LABELS;
     case 'investment_company':
       return INVESTMENT_LABELS;
+    case 'real_estate':
+      return REAL_ESTATE_LABELS;
     default:
       return INDUSTRIAL_LABELS;
   }
@@ -103,6 +107,15 @@ const INVESTMENT_SIGNALS = [
   /\bsubstansvärde\b/i,
 ];
 
+const REAL_ESTATE_SIGNALS = [
+  /\bförvaltningsresultat\b/i,
+  /\bincome\s+from\s+property\s+management\b/i,
+  /\bdriftnetto\b/i,
+  /\boperating\s+surplus\b/i,
+  /\bfair\s+value\s+changes?\b/i,
+  /\bvärdeförändring(ar)?\b/i,
+];
+
 export function detectCompanyType(text: string): CompanyType {
   const sample = text.substring(0, 30_000).toLowerCase();
 
@@ -115,14 +128,19 @@ export function detectCompanyType(text: string): CompanyType {
   for (const p of INVESTMENT_SIGNALS) {
     if (p.test(sample)) investScore++;
   }
+  let realEstateScore = 0;
+  for (const p of REAL_ESTATE_SIGNALS) {
+    if (p.test(sample)) realEstateScore++;
+  }
 
   if (investScore >= 3) return 'investment_company';
   if (bankScore >= 2) return 'bank';
+  if (realEstateScore >= 2) return 'real_estate';
 
   return 'industrial';
 }
 
-/** Merge legal-name hint with PDF signals — hint wins for bank / investment when set. */
+/** Merge legal-name hint with PDF signals — hint wins when explicitly set. */
 export function resolveCompanyTypeForExtraction(
   text: string,
   hint?: ReportingModelHint | null,
@@ -130,6 +148,7 @@ export function resolveCompanyTypeForExtraction(
   const detected = detectCompanyType(text);
   if (hint === 'bank') return 'bank';
   if (hint === 'investment_company') return 'investment_company';
+  if (hint === 'real_estate') return 'real_estate';
   if (hint === 'industrial') return 'industrial';
   return detected;
 }
@@ -454,10 +473,15 @@ const EBIT_EXCLUSIONS: RegExp[] = [
   /\boperating\s+margin\b/i,
   /\brörelsemarginal\b/i,
   /\bjusterad\b/i,
+  /\badjusted\b/i,
   /\bjämförelsestörande\b/i,
   /\bitems\s+affecting\s+comparability\b/i,
   /\bexkl\.\s/i,
   /\bexcluding\s/i,
+  /\bförvaltningsresultat\b/i,
+  /\bincome\s+from\s+property\s+management\b/i,
+  /\bdriftnetto\b/i,
+  /\boperating\s+surplus\b/i,
 ];
 
 /** Exclusions for adjusted-EBIT pass — still block EBITDA / PBT, but allow adjusted / underlying labels. */
@@ -467,7 +491,16 @@ const EBIT_EXCLUSIONS_ADJUSTED_PASS: RegExp[] = [
   /\bprofit\s+before\s+tax\b/i,
 ];
 
+/** Bank pass allows profit-before-tax proxy labels (with explicit note when used). */
+const EBIT_EXCLUSIONS_BANK: RegExp[] = [
+  /\bebitda\b/i,
+  /\boperating\s+margin\b/i,
+  /\brörelsemarginal\b/i,
+];
+
 const ADJUSTED_EBIT_LABELS: string[] = [
+  'adjusted operating profit',
+  'adjusted operating income',
   'ebit ex. items affecting comparability',
   'ebit före jämförelsestörande poster',
   'justerat rörelseresultat',
@@ -485,6 +518,8 @@ const OPERATING_MARGIN_LABEL_PATTERNS: RegExp[] = [
   /\bebit\s+margin\b/i,
   /\brörelseresultat\s+i\s*%\b/i,
 ];
+
+const TELECOM_SIGNALS = /\btelecom\b|\barpu\b|\bsubscriber(s)?\b|\bmobile\b|\boperator\b/i;
 
 const SEGMENT_EBIT_BEFORE_FIN_RE =
   /\brörelseresultat\s+före\s+finansiella(?:\s+poster)?\b|\boperating\s+profit\s+before\s+financial\s+items?\b/i;
@@ -1600,6 +1635,70 @@ function normalizeEbitMatchToMsek(
   return Math.round(normalizeToMsek(m.value, ebitUnit));
 }
 
+const BANK_PBT_PROXY_LABEL = 'result before tax';
+const REAL_ESTATE_VALUE_CHANGE_RE =
+  /\bvärdeförändring(ar)?\b|\bunreali[sz]ed\s+gains?\b|\bfair\s+value\s+changes?\b/i;
+const INVESTMENT_PORTFOLIO_RE =
+  /\bportfolio\b|\bnet\s+asset\s+value\b|\bnav\b|\bfair\s+value\b|\bsubstansvärde\b/i;
+const INVESTMENT_OPERATING_SECTION_RE =
+  /\bindustrial\b|\boperations?\b|\brörelse(n|r)?\b/i;
+
+function extractInvestmentOperatingEbit(
+  lines: string[],
+  opts: NumberSearchOpts,
+  pick: NumberPickContext,
+): { match: NumberMatch | null; discardedPortfolioTotal: boolean } {
+  const candidates = findAllLabeledNumbers(
+    lines,
+    INDUSTRIAL_LABELS.ebit,
+    opts,
+    pick,
+    SCAN_DEFAULT.loose.maxLineLen,
+    SCAN_DEFAULT.loose.maxLabelOffset,
+  );
+  let discardedPortfolioTotal = false;
+  for (const m of candidates) {
+    const line = lines[m.lineIndex].toLowerCase();
+    const headingWindow = lines
+      .slice(Math.max(0, m.lineIndex - 10), m.lineIndex + 1)
+      .join(' ')
+      .toLowerCase();
+    const inOperatingSection = INVESTMENT_OPERATING_SECTION_RE.test(headingWindow);
+    const looksPortfolio = INVESTMENT_PORTFOLIO_RE.test(line) || INVESTMENT_PORTFOLIO_RE.test(headingWindow);
+    if (looksPortfolio && !inOperatingSection) {
+      discardedPortfolioTotal = true;
+      continue;
+    }
+    if (inOperatingSection) {
+      return { match: m, discardedPortfolioTotal };
+    }
+  }
+  return { match: null, discardedPortfolioTotal };
+}
+
+function extractRealEstateEbitProxy(
+  lines: string[],
+  opts: NumberSearchOpts,
+  pick: NumberPickContext,
+): NumberMatch | null {
+  const reOpts: NumberSearchOpts = { ...opts, exclusions: [] };
+  const m = findFinancialNumber(
+    lines,
+    REAL_ESTATE_EBIT_LABELS_PRIMARY,
+    reOpts,
+    pick,
+    SCAN_DEFAULT,
+  );
+  if (m === null) return null;
+  const around = lines
+    .slice(Math.max(0, m.lineIndex - 2), Math.min(lines.length, m.lineIndex + 3))
+    .join(' ');
+  if (REAL_ESTATE_VALUE_CHANGE_RE.test(around)) {
+    return null;
+  }
+  return m;
+}
+
 /**
  * Sequential EBIT strategies: stop at first hit. Returns value, provenance match, and extra notes.
  */
@@ -1615,9 +1714,6 @@ function extractEbitWithStrategies(
   bankScan: ScanConstraints,
 ): { msek: number | null; match: NumberMatch | null; extraNotes: string[] } {
   const extraNotes: string[] = [];
-  if (detectedType === 'investment_company') {
-    return { msek: null, match: null, extraNotes };
-  }
 
   const ebitPick: NumberPickContext = {
     preferredFiscalYear: fallbackFiscalYear,
@@ -1628,6 +1724,36 @@ function extractEbitWithStrategies(
     maxValue: detectedType === 'bank' ? 1_000_000 : 500_000,
     exclusions: EBIT_EXCLUSIONS,
   };
+  const telecomLike = detectedType === 'industrial' && TELECOM_SIGNALS.test(lines.slice(0, 350).join(' '));
+
+  if (detectedType === 'investment_company') {
+    const inv = extractInvestmentOperatingEbit(lines, ebitOpts, ebitPick);
+    if (inv.match !== null) {
+      return {
+        msek: normalizeEbitMatchToMsek(inv.match, lines, unitContext),
+        match: inv.match,
+        extraNotes,
+      };
+    }
+    if (inv.discardedPortfolioTotal) {
+      extraNotes.push('EBIT not extracted — investment company, portfolio result excluded');
+    }
+    return { msek: null, match: null, extraNotes };
+  }
+
+  if (detectedType === 'real_estate') {
+    const reMatch = extractRealEstateEbitProxy(lines, ebitOpts, ebitPick);
+    if (reMatch !== null) {
+      extraNotes.push(
+        'EBIT estimated from förvaltningsresultat — real estate reporting, excludes fair value changes',
+      );
+      return {
+        msek: normalizeEbitMatchToMsek(reMatch, lines, unitContext),
+        match: reMatch,
+        extraNotes,
+      };
+    }
+  }
 
   let match: NumberMatch | null =
     detectedType === 'bank'
@@ -1635,13 +1761,39 @@ function extractEbitWithStrategies(
           lines,
           BANK_EBIT_LABELS_PRIMARY,
           labels.ebit,
-          ebitOpts,
+          { ...ebitOpts, exclusions: EBIT_EXCLUSIONS_BANK },
           ebitPick,
           bankScan,
         )
       : findFinancialNumber(lines, labels.ebit, ebitOpts, ebitPick, SCAN_DEFAULT);
 
+  if (telecomLike) {
+    const telecomAdjusted = findFinancialNumber(
+      lines,
+      ADJUSTED_EBIT_LABELS,
+      {
+        ...ebitOpts,
+        exclusions: EBIT_EXCLUSIONS_ADJUSTED_PASS,
+      },
+      ebitPick,
+      SCAN_DEFAULT,
+    );
+    if (telecomAdjusted !== null) {
+      extraNotes.push('EBIT sourced from adjusted variant — preferred for telecom reporting.');
+      return {
+        msek: normalizeEbitMatchToMsek(telecomAdjusted, lines, unitContext),
+        match: telecomAdjusted,
+        extraNotes,
+      };
+    }
+  }
+
   if (match !== null) {
+    if (detectedType === 'bank' && match.label.toLowerCase() === BANK_PBT_PROXY_LABEL) {
+      extraNotes.push(
+        'EBIT estimated from profit before tax — bank reporting, no pure EBIT available',
+      );
+    }
     return {
       msek: normalizeEbitMatchToMsek(match, lines, unitContext),
       match,
@@ -1761,7 +1913,7 @@ export function extractFields(
   let revMatch: NumberMatch | null = null;
 
   if (detectedType === 'investment_company') {
-    notes.push('Investment company — standard revenue/EBIT not applicable');
+    notes.push('Investment company — standard revenue not applicable');
   } else {
     const revMin = detectedType === 'bank' ? 50 : 100;
     if (detectedType === 'bank') {
@@ -1837,47 +1989,45 @@ export function extractFields(
   // --- EBIT ---
   let ebit: number | null = null;
 
-  if (detectedType !== 'investment_company') {
-    const ebitOutcome = extractEbitWithStrategies(
-      detectedType,
-      lines,
-      labels,
-      unitContext,
-      revMatch,
-      revenue,
-      revProvenance,
-      fallbackFiscalYear,
-      bankScan,
-    );
-    for (const n of ebitOutcome.extraNotes) {
-      notes.push(n);
+  const ebitOutcome = extractEbitWithStrategies(
+    detectedType,
+    lines,
+    labels,
+    unitContext,
+    revMatch,
+    revenue,
+    revProvenance,
+    fallbackFiscalYear,
+    bankScan,
+  );
+  for (const n of ebitOutcome.extraNotes) {
+    notes.push(n);
+  }
+  if (ebitOutcome.msek !== null && ebitOutcome.match !== null) {
+    ebit = ebitOutcome.msek;
+    ebitProvenance = numMatchToProvenance(ebitOutcome.match);
+    log.info(`EBIT: ${ebit} MSEK`);
+    if (detectedType === 'bank') {
+      notes.push(`Bank — '${ebitOutcome.match.label}' mapped to ebit_msek`);
     }
-    if (ebitOutcome.msek !== null && ebitOutcome.match !== null) {
-      ebit = ebitOutcome.msek;
-      ebitProvenance = numMatchToProvenance(ebitOutcome.match);
-      log.info(`EBIT: ${ebit} MSEK`);
-      if (detectedType === 'bank') {
-        notes.push(`Bank — '${ebitOutcome.match.label}' mapped to ebit_msek`);
-      }
-      const ebitUnit =
-        ebitOutcome.match.sectionRange &&
-        !/margin|× revenue/i.test(ebitOutcome.match.rawCell)
-          ? detectSectionUnitContext(
-              lines,
-              ebitOutcome.match.sectionRange.start,
-              ebitOutcome.match.sectionRange.end,
-              unitContext,
-            )
-          : unitContext;
-      if (ebitUnit === 'eur_m' && !/margin|× revenue/i.test(ebitOutcome.match.rawCell)) {
-        notes.push(
-          `EBIT converted from EUR millions using approximate EUR/SEK ${EUR_MILLIONS_TO_MSEK_APPROX} — verify report footnote`,
-        );
-      }
-    } else {
-      notes.push(`EBIT not found for ${companyName}`);
-      log.warn(`EBIT not found for ${companyName}`);
+    const ebitUnit =
+      ebitOutcome.match.sectionRange &&
+      !/margin|× revenue/i.test(ebitOutcome.match.rawCell)
+        ? detectSectionUnitContext(
+            lines,
+            ebitOutcome.match.sectionRange.start,
+            ebitOutcome.match.sectionRange.end,
+            unitContext,
+          )
+        : unitContext;
+    if (ebitUnit === 'eur_m' && !/margin|× revenue/i.test(ebitOutcome.match.rawCell)) {
+      notes.push(
+        `EBIT converted from EUR millions using approximate EUR/SEK ${EUR_MILLIONS_TO_MSEK_APPROX} — verify report footnote`,
+      );
     }
+  } else {
+    notes.push(`EBIT not found for ${companyName}`);
+    log.warn(`EBIT not found for ${companyName}`);
   }
 
   // --- Employees ---

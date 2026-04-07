@@ -16,7 +16,12 @@ const log = createLogger('entity-profile');
 export type AmbiguityLevel = 'low' | 'medium' | 'high';
 
 /** Soft hint only — never used to skip pipeline steps or force company type. */
-export type ReportingModelHint = 'unspecified' | 'industrial' | 'bank' | 'investment_company';
+export type ReportingModelHint =
+  | 'unspecified'
+  | 'industrial'
+  | 'bank'
+  | 'investment_company'
+  | 'real_estate';
 
 export interface HostnameRejectRule {
   ifLegalNameMatches: string;
@@ -120,6 +125,7 @@ function reportingHintFromLegal(legal: string): ReportingModelHint {
   const l = legal.toLowerCase();
   if (/\bbank\b|banken|bankaktiebolag|enskilda/.test(l)) return 'bank';
   if (/investment\s*company|investmentbolag|investor\s+ab/.test(l)) return 'investment_company';
+  if (/fastigheter|real\s+estate|property/.test(l)) return 'real_estate';
   return 'unspecified';
 }
 
@@ -192,7 +198,7 @@ export function buildEntityProfile(company: CompanyProfile): EntityProfile {
     aliasNamesLowTrust,
     distinctiveTokens,
     ambiguityLevel,
-    reportingModelHint: reportingHintFromLegal(legalName),
+    reportingModelHint: company.companyType ?? reportingHintFromLegal(legalName),
     hostnameRejectRules,
     seedCandidateDomains,
     seedIrPage,

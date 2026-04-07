@@ -54,4 +54,29 @@ describe('bank field extraction', () => {
     expect(r.data.revenue_msek).toBe(70_234);
     expect(r.data.ebit_msek).toBe(32_100);
   });
+
+  it('uses profit before impairments as bank EBIT proxy', () => {
+    const text = [
+      'Consolidated income statement',
+      'Total operating income  50 000',
+      'Profit before impairments  11 500',
+    ].join('\n');
+    const r = extractFields(text, 'BankProxyA', 2025, 'bank');
+    expect(r.data.ebit_msek).toBe(11_500);
+  });
+
+  it('uses result before tax as last-resort bank proxy and adds note', () => {
+    const text = [
+      'Consolidated income statement',
+      'Total operating income  50 000',
+      'Result before tax  9 900',
+    ].join('\n');
+    const r = extractFields(text, 'BankProxyB', 2025, 'bank');
+    expect(r.data.ebit_msek).toBe(9_900);
+    expect(
+      r.notes.some((n) =>
+        n.includes('EBIT estimated from profit before tax — bank reporting, no pure EBIT available'),
+      ),
+    ).toBe(true);
+  });
 });

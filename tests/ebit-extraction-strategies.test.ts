@@ -157,4 +157,81 @@ describe('EBIT extraction strategies', () => {
       r.notes.some((n) => n.includes('EBIT derived from sum of segment results — verify consolidation')),
     ).toBe(true);
   });
+
+  it('real_estate: uses förvaltningsresultat as EBIT proxy with note', () => {
+    const text = [
+      'Fastighetsförvaltning',
+      'Förvaltningsresultat  3200',
+    ].join('\n');
+    const r = extractFields(text, 'RECoA', 2025, 'real_estate');
+    expect(r.detectedCompanyType).toBe('real_estate');
+    expect(r.data.ebit_msek).toBe(3200);
+    expect(
+      r.notes.some((n) =>
+        n.includes(
+          'EBIT estimated from förvaltningsresultat — real estate reporting, excludes fair value changes',
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it('real_estate: skips proxy when fair value change context contaminates line', () => {
+    const text = [
+      'Income statement',
+      'Income from property management / fair value changes  4100',
+    ].join('\n');
+    const r = extractFields(text, 'RECoB', 2025, 'real_estate');
+    expect(r.data.ebit_msek).toBeNull();
+  });
+
+  it('investment_company: extracts operating EBIT in industrial section', () => {
+    const text = [
+      'Portfolio result  22000',
+      'Industrial operations',
+      'Operating profit  3400',
+    ].join('\n');
+    const r = extractFields(text, 'InvCoA', 2025, 'investment_company');
+    expect(r.data.ebit_msek).toBe(3400);
+  });
+
+  it('investment_company: excludes portfolio total and adds note', () => {
+    const text = [
+      'Net asset value and portfolio',
+      'Operating profit  22000',
+    ].join('\n');
+    const r = extractFields(text, 'InvCoB', 2025, 'investment_company');
+    expect(r.data.ebit_msek).toBeNull();
+    expect(
+      r.notes.some((n) =>
+        n.includes('EBIT not extracted — investment company, portfolio result excluded'),
+      ),
+    ).toBe(true);
+  });
+
+  it('telecom: prefers adjusted EBIT over reported operating income', () => {
+    const text = [
+      'Telecom operations',
+      'Net sales  100000',
+      'Operating income  9200',
+      'Adjusted EBIT  9800',
+    ].join('\n');
+    const r = extractFields(text, 'TelCoA', 2025, 'industrial');
+    expect(r.data.ebit_msek).toBe(9800);
+    expect(
+      r.notes.some((n) =>
+        n.includes('EBIT sourced from adjusted variant — preferred for telecom reporting.'),
+      ),
+    ).toBe(true);
+  });
+
+  it('telecom: uses adjusted operating profit label in preference pass', () => {
+    const text = [
+      'ARPU and subscribers',
+      'Net sales  60000',
+      'Operating result  5100',
+      'Adjusted operating profit  5600',
+    ].join('\n');
+    const r = extractFields(text, 'TelCoB', 2025, 'industrial');
+    expect(r.data.ebit_msek).toBe(5600);
+  });
 });

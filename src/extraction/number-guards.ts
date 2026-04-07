@@ -11,11 +11,12 @@ export function isFusedYearIntegerCorruption(n: number): boolean {
 }
 
 /** Above this (MSEK field value), assume tkr/KSEK read as MSEK and apply ÷1000 once. */
-const MEGASCALE_MSEK_THRESHOLD: Record<'industrial' | 'bank' | 'investment_company', number> = {
+const MEGASCALE_MSEK_THRESHOLD: Record<'industrial' | 'bank' | 'investment_company' | 'real_estate', number> = {
   // Large Cap industrials rarely exceed ~1M MSEK; 1M was too aggressive (wrong table picks were mangled).
   industrial: 3_000_000,
   bank: 80_000_000,
   investment_company: 3_000_000,
+  real_estate: 3_000_000,
 };
 
 /**
@@ -24,7 +25,7 @@ const MEGASCALE_MSEK_THRESHOLD: Record<'industrial' | 'bank' | 'investment_compa
  */
 export function applyRevenueMegascaleMsekGuard(
   revenue: number,
-  companyType: 'industrial' | 'bank' | 'investment_company' = 'industrial',
+  companyType: 'industrial' | 'bank' | 'investment_company' | 'real_estate' = 'industrial',
 ): {
   revenue: number;
   adjusted: boolean;

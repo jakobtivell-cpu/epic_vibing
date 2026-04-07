@@ -39,7 +39,13 @@ export const INDUSTRIAL_LABELS: LabelSet = {
     'resultat från den löpande verksamheten',
     'resultat från verksamheten',
     'profit from operating activities',
+    'ebit before items affecting comparability',
+    'ebit före jämförelsestörande poster',
+    'adjusted operating profit',
+    'adjusted ebit',
     'earnings from operations',
+    'adjusted operating income',
+    'operating income',
     'operating earnings',
     'resultat före finansnetto',
     'operating profit/loss',
@@ -96,13 +102,15 @@ export const BANK_REVENUE_LABELS_PRIMARY: string[] = [
  * Bank operating-result lines — matched before industrial EBIT fallbacks.
  */
 export const BANK_EBIT_LABELS_PRIMARY: string[] = [
-  'resultat före kreditförluster',
-  'result before credit losses',
-  'rörelseresultat',
   'operating profit',
-  'operating result',
+  'rörelseresultat',
+  'profit before impairments',
+  'profit before loan losses',
   'operating profit before impairments',
-  'profit before credit losses',
+  'result before credit losses',
+  'resultat före kreditförluster',
+  'operating result',
+  'result before tax',
 ];
 
 function dedupeLabels(primary: string[], rest: string[]): string[] {
@@ -137,6 +145,20 @@ export const INVESTMENT_LABELS: LabelSet = {
     ...INDUSTRIAL_LABELS.revenue,
   ],
   ebit: INDUSTRIAL_LABELS.ebit,
+  employees: INDUSTRIAL_LABELS.employees,
+  ceo: INDUSTRIAL_LABELS.ceo,
+};
+
+export const REAL_ESTATE_EBIT_LABELS_PRIMARY: string[] = [
+  'förvaltningsresultat',
+  'income from property management',
+  'operating surplus',
+  'driftnetto',
+];
+
+export const REAL_ESTATE_LABELS: LabelSet = {
+  revenue: INDUSTRIAL_LABELS.revenue,
+  ebit: dedupeLabels(REAL_ESTATE_EBIT_LABELS_PRIMARY, INDUSTRIAL_LABELS.ebit),
   employees: INDUSTRIAL_LABELS.employees,
   ceo: INDUSTRIAL_LABELS.ceo,
 };

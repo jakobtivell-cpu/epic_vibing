@@ -63,6 +63,15 @@ export function classifyRevenueMapping(
         : `Bank: assignment revenue_msek from "${matchedLabel}" — verify against annual report definitions`,
     };
   }
+  if (detectedType === 'real_estate') {
+    return {
+      assignmentField: 'revenue_msek',
+      nativeLabelMatched: matchedLabel,
+      basis: 'mapped',
+      explanation:
+        'Real estate: revenue/NOI families vary by report; mapped approximately to assignment revenue_msek',
+    };
+  }
   const exact = INDUSTRIAL_REV_EXACT.some((p) => label.includes(p));
   return {
     assignmentField: 'revenue_msek',
@@ -97,6 +106,15 @@ export function classifyEbitMapping(
       explanation: fragile
         ? `Bank: EBIT assignment from "${matchedLabel}" — may differ from industrial EBIT; confirm in report`
         : `Bank: operating result mapped to ebit_msek from "${matchedLabel}"`,
+    };
+  }
+  if (detectedType === 'real_estate') {
+    return {
+      assignmentField: 'ebit_msek',
+      nativeLabelMatched: matchedLabel,
+      basis: 'mapped',
+      explanation:
+        'Real estate: EBIT proxy derived from förvaltningsresultat / operating surplus family',
     };
   }
   return {

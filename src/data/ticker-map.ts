@@ -11,6 +11,7 @@ import * as fs from 'fs';
 import { join } from 'path';
 import { createLogger } from '../utils/logger';
 import { toAbsoluteHttpUrl } from '../utils/url-helpers';
+import type { CompanyType } from '../types';
 
 const log = createLogger('ticker-map');
 
@@ -36,6 +37,7 @@ interface TickerEntry {
   irPage?: string;
   isin?: string;
   irEmail?: string;
+  companyType?: CompanyType;
 }
 
 /** Raw map: ticker symbol → canonical legal entity name. */
@@ -93,6 +95,9 @@ export function loadTickerMap(): void {
           ...(typeof o.irEmail === 'string' && o.irEmail.trim()
             ? { irEmail: o.irEmail.trim() }
             : {}),
+          ...(typeof o.companyType === 'string'
+            ? { companyType: o.companyType as CompanyType }
+            : {}),
         };
       }
     }
@@ -141,6 +146,11 @@ export function resolveIsin(ticker: string): string | null {
 export function resolveIrEmail(ticker: string): string | null {
   const entry = resolveTickerEntry(ticker);
   return entry?.irEmail ?? null;
+}
+
+export function resolveCompanyType(ticker: string): CompanyType | null {
+  const entry = resolveTickerEntry(ticker);
+  return entry?.companyType ?? null;
 }
 
 /**

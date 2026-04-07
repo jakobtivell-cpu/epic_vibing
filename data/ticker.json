@@ -9,6 +9,7 @@
     "ABB.ST": "ABB Ltd",
     "INVE-A.ST": {
         "name": "Investor AB (publ)",
+        "companyType": "investment_company",
         "orgNumber": "556013-8449",
         "irPage": "https://www.investorab.com/investors",
         "candidateDomains": [
@@ -19,6 +20,7 @@
     },
     "INVE-B.ST": {
         "name": "Investor AB (publ)",
+        "companyType": "investment_company",
         "orgNumber": "556013-8449",
         "irPage": "https://www.investorab.com/investors",
         "candidateDomains": [
@@ -71,6 +73,7 @@
     },
     "NDA-SE.ST": {
         "name": "Nordea Bank Abp",
+        "companyType": "bank",
         "irPage": "https://www.nordea.com/en/investors",
         "candidateDomains": [
             "https://www.nordea.com"
@@ -101,6 +104,7 @@
     },
     "SWED-A.ST": {
         "name": "Swedbank AB (publ)",
+        "companyType": "bank",
         "irPage": "https://www.swedbank.com/investor-relations",
         "candidateDomains": [
             "https://www.swedbank.com"
@@ -140,6 +144,7 @@
     },
     "SEB-A.ST": {
         "name": "Skandinaviska Enskilda Banken AB (publ)",
+        "companyType": "bank",
         "orgNumber": "502032-9081",
         "irPage": "https://sebgroup.com/investor-relations",
         "candidateDomains": [
@@ -150,6 +155,7 @@
     },
     "SEB-C.ST": {
         "name": "Skandinaviska Enskilda Banken AB (publ)",
+        "companyType": "bank",
         "orgNumber": "502032-9081",
         "irPage": "https://sebgroup.com/investor-relations",
         "candidateDomains": [
@@ -198,6 +204,7 @@
     "SAMPO-SEK.ST": "Sampo Oyj",
     "SHB-A.ST": {
         "name": "Svenska Handelsbanken AB (publ)",
+        "companyType": "bank",
         "irPage": "https://www.handelsbanken.com/en/investor-relations",
         "candidateDomains": [
             "https://www.handelsbanken.com"
@@ -207,6 +214,7 @@
     },
     "SHB-B.ST": {
         "name": "Svenska Handelsbanken AB (publ)",
+        "companyType": "bank",
         "irPage": "https://www.handelsbanken.com/en/investor-relations",
         "candidateDomains": [
             "https://www.handelsbanken.com"
@@ -243,6 +251,7 @@
     },
     "INDU-A.ST": {
         "name": "AB Industrivärden (publ)",
+        "companyType": "investment_company",
         "orgNumber": "556043-4200",
         "candidateDomains": [
             "https://www.industrivarden.net",
@@ -254,6 +263,7 @@
     },
     "INDU-C.ST": {
         "name": "AB Industrivärden (publ)",
+        "companyType": "investment_company",
         "orgNumber": "556043-4200",
         "candidateDomains": [
             "https://www.industrivarden.net",
@@ -315,6 +325,7 @@
     "TEL2-B.ST": "Tele2 AB (publ)",
     "LUND-B.ST": {
         "name": "L E Lundbergföretagen AB (publ)",
+        "companyType": "investment_company",
         "irPage": "https://www.lundbergforetagen.se/en/investors",
         "candidateDomains": [
             "https://www.lundbergforetagen.se"
@@ -322,6 +333,7 @@
     },
     "LATO-B.ST": {
         "name": "Investment AB Latour (publ)",
+        "companyType": "investment_company",
         "irPage": "https://www.latour.se/investors/",
         "candidateDomains": [
             "https://www.latour.se"
@@ -441,6 +453,7 @@
     "FROO.ST": "Frontline plc",
     "SAVE.ST": {
         "name": "Nordnet AB (publ)",
+        "companyType": "bank",
         "irPage": "https://www.nordnetab.com/investors/",
         "candidateDomains": [
             "https://www.nordnetab.com",
@@ -471,6 +484,7 @@
     },
     "BALD-B.ST": {
         "name": "Fastighets AB Balder (publ)",
+        "companyType": "real_estate",
         "irPage": "https://www.balder.se/en/investors/",
         "candidateDomains": [
             "https://www.balder.se"
@@ -498,6 +512,7 @@
     },
     "SAGA-A.ST": {
         "name": "AB Sagax (publ)",
+        "companyType": "real_estate",
         "irPage": "https://www.sagax.se/en/investors/",
         "candidateDomains": [
             "https://www.sagax.se"
@@ -505,6 +520,7 @@
     },
     "SAGA-B.ST": {
         "name": "AB Sagax (publ)",
+        "companyType": "real_estate",
         "irPage": "https://www.sagax.se/en/investors/",
         "candidateDomains": [
             "https://www.sagax.se"
@@ -512,6 +528,7 @@
     },
     "SAGA-D.ST": {
         "name": "AB Sagax (publ)",
+        "companyType": "real_estate",
         "irPage": "https://www.sagax.se/en/investors/",
         "candidateDomains": [
             "https://www.sagax.se"
@@ -526,6 +543,7 @@
     },
     "AZA.ST": {
         "name": "Avanza Bank Holding AB (publ)",
+        "companyType": "bank",
         "irPage": "https://investors.avanza.se",
         "candidateDomains": [
             "https://investors.avanza.se"
@@ -533,6 +551,7 @@
     },
     "CAST.ST": {
         "name": "Castellum AB (publ)",
+        "companyType": "real_estate",
         "irPage": "https://www.castellum.com/investors/",
         "candidateDomains": [
             "https://www.castellum.com"
@@ -588,6 +607,7 @@
     "CMBTOO.ST": "Cmb.Tech NV",
     "PNDX-B.ST": {
         "name": "Pandox AB (publ)",
+        "companyType": "real_estate",
         "irPage": "https://www.pandox.se/en/investors/",
         "candidateDomains": [
             "https://www.pandox.se"
@@ -595,6 +615,7 @@
     },
     "CATE.ST": {
         "name": "Catena AB (publ)",
+        "companyType": "real_estate",
         "irPage": "https://www.catenafastigheter.se/en/investors/",
         "candidateDomains": [
             "https://www.catenafastigheter.se"
@@ -627,6 +648,7 @@
     },
     "WIHL.ST": {
         "name": "Wihlborgs Fastigheter AB (publ)",
+        "companyType": "real_estate",
         "irPage": "https://www.wihlborgs.se/en/investor-relations/",
         "candidateDomains": [
             "https://www.wihlborgs.se"
@@ -634,6 +656,7 @@
     },
     "WALL-B.ST": {
         "name": "Wallenstam AB (publ)",
+        "companyType": "real_estate",
         "irPage": "https://wallenstam.se/en/investor-relations/",
         "candidateDomains": [
             "https://www.wallenstam.se"
@@ -652,6 +675,7 @@
     "TIETOS.ST": "Tieto Oyj",
     "FABG.ST": {
         "name": "Fabege AB (publ)",
+        "companyType": "real_estate",
         "irPage": "https://www.fabege.se/en/investors/",
         "candidateDomains": [
             "https://www.fabege.se",
@@ -668,6 +692,7 @@
     },
     "HUFV-A.ST": {
         "name": "Hufvudstaden AB (publ)",
+        "companyType": "real_estate",
         "irPage": "https://www.hufvudstaden.se/en/investor-relations/",
         "candidateDomains": [
             "https://www.hufvudstaden.se",
@@ -723,6 +748,7 @@
     "SHOT.ST": "Scandic Hotels Group AB (publ)",
     "ATRLJ-B.ST": {
         "name": "Atrium Ljungberg AB (publ)",
+        "companyType": "real_estate",
         "irPage": "https://www.al.se/en/investors/",
         "candidateDomains": [
             "https://www.al.se",
@@ -790,6 +816,7 @@
     },
     "BURE.ST": {
         "name": "Bure Equity AB (publ)",
+        "companyType": "investment_company",
         "irPage": "https://www.bure.se/en/investors",
         "candidateDomains": [
             "https://www.bure.se"
@@ -804,6 +831,7 @@
     },
     "NP3.ST": {
         "name": "NP3 Fastigheter AB (publ)",
+        "companyType": "real_estate",
         "irPage": "https://www.np3fastigheter.se/en/investors/",
         "candidateDomains": [
             "https://www.np3fastigheter.se"
@@ -852,6 +880,7 @@
     },
     "KINV-A.ST": {
         "name": "Kinnevik AB",
+        "companyType": "investment_company",
         "irPage": "https://www.kinnevik.com/investors/",
         "candidateDomains": [
             "https://www.kinnevik.com"
@@ -859,6 +888,7 @@
     },
     "KINV-B.ST": {
         "name": "Kinnevik AB",
+        "companyType": "investment_company",
         "irPage": "https://www.kinnevik.com/investors/",
         "candidateDomains": [
             "https://www.kinnevik.com"

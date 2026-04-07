@@ -215,22 +215,10 @@ export async function tryPlaywrightFallback(
       /* use bundled Chromium below */
     }
     if (!browser) {
-      const playwrightLinuxLibsPath = path.join(PROJECT_ROOT, 'playwright-linux-libs');
-      const useBundledLinuxLibs =
-        process.platform === 'linux' && fs.existsSync(playwrightLinuxLibsPath);
       const fullChromiumExe = findPlaywrightFullChromiumExecutable();
       browser = await chromium.launch({
         headless: true,
         ...(fullChromiumExe ? { executablePath: fullChromiumExe } : {}),
-        ...(useBundledLinuxLibs
-          ? {
-              env: {
-                ...process.env,
-                LD_LIBRARY_PATH:
-                  playwrightLinuxLibsPath + ':' + (process.env.LD_LIBRARY_PATH || ''),
-              },
-            }
-          : {}),
       });
     }
     const context = await browser.newContext({

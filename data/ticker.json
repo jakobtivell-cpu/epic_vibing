@@ -620,7 +620,7 @@
     "CATE.ST": {
         "name": "Catena AB (publ)",
         "companyType": "real_estate",
-        "irPage": "https://www.catenafastigheter.se/en/investors/",
+        "irPage": "https://www.catena.se/en/investors/",
         "candidateDomains": [
             "https://www.catenafastigheter.se"
         ]
@@ -880,7 +880,7 @@
     },
     "BONEX.ST": {
         "name": "Bonesupport Holding AB (publ)",
-        "irPage": "https://www.bonesupport.com/en/investors/",
+        "irPage": "https://investor.bonesupport.com/en/",
         "candidateDomains": [
             "https://www.bonesupport.com"
         ]

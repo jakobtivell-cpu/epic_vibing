@@ -1175,6 +1175,9 @@ const NON_NAME_PATTERNS = [
   'revisor',
   'board member',
   'styrelseledamot',
+  'single electronic format',
+  'electronic format',
+  'esef report',
 ];
 
 const CORPORATE_WORDS = /\b(?:group|board|committee|team|communications|holding|capital|partners|investment|management|report|statement|corporate|governance|foundation|business|area|president|director|officer|vice|senior|division|segment|unit|meeting|annual|general)\b/i;
@@ -2164,6 +2167,13 @@ export function extractFields(
     if (yearLike) {
       notes.push(`Employee count ${parsedEmployees} discarded — likely fiscal-year column misread`);
       log.warn(`Employees ${parsedEmployees} looks like fiscal year ${fy ?? 'n/a'} — discarding`);
+    } else if (detectedType === 'investment_company' && parsedEmployees >= 2_000) {
+      notes.push(
+        `Employee count ${parsedEmployees} discarded — likely portfolio/holdings headcount for investment company`,
+      );
+      log.warn(
+        `Employees ${parsedEmployees} likely portfolio-level for investment company ${companyName} — discarding`,
+      );
     } else {
       employees = parsedEmployees;
       empProvenance = numMatchToProvenance(empMatch);
@@ -2184,13 +2194,18 @@ export function extractFields(
   let ceo: string | null = null;
   const ceoMatch = findCeoWithProvenance(lines, labels.ceo);
   if (ceoMatch !== null) {
-    ceo = ceoMatch.name;
-    ceoProvenance = {
-      matchedLabel: ceoMatch.label,
-      rawSnippet: `${ceoMatch.name} [${ceoMatch.pattern}]`,
-      lineIndex: ceoMatch.lineIndex,
-      context: ceoMatch.context,
-    };
+    if (/single electronic format|electronic format|esef/i.test(ceoMatch.name)) {
+      notes.push(`CEO candidate "${ceoMatch.name}" discarded — non-person ESEF phrase`);
+      log.warn(`Discarding non-person CEO candidate: ${ceoMatch.name}`);
+    } else {
+      ceo = ceoMatch.name;
+      ceoProvenance = {
+        matchedLabel: ceoMatch.label,
+        rawSnippet: `${ceoMatch.name} [${ceoMatch.pattern}]`,
+        lineIndex: ceoMatch.lineIndex,
+        context: ceoMatch.context,
+      };
+    }
   } else {
     notes.push(`CEO not found for ${companyName}`);
     log.warn(`CEO not found for ${companyName}`);

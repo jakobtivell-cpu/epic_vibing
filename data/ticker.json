@@ -255,9 +255,11 @@
         "orgNumber": "556043-4200",
         "candidateDomains": [
             "https://www.industrivarden.net",
-            "https://www.industrivarden.se"
+            "https://www.industrivarden.se",
+            "https://storage.mfn.se",
+            "https://mfn.se"
         ],
-        "irPage": "https://www.industrivarden.net/investors",
+        "irPage": "https://www.industrivarden.se/en-gb/investors/reports/Annual-reports",
         "isin": "SE0000190126",
         "irEmail": "info@industrivarden.se"
     },
@@ -267,9 +269,11 @@
         "orgNumber": "556043-4200",
         "candidateDomains": [
             "https://www.industrivarden.net",
-            "https://www.industrivarden.se"
+            "https://www.industrivarden.se",
+            "https://storage.mfn.se",
+            "https://mfn.se"
         ],
-        "irPage": "https://www.industrivarden.net/investors",
+        "irPage": "https://www.industrivarden.se/en-gb/investors/reports/Annual-reports",
         "isin": "SE0000190126",
         "irEmail": "info@industrivarden.se"
     },

@@ -21,4 +21,14 @@ President and CEO
     const r = extractFields(text, 'Test AB', 2025);
     expect(r.data.ceo).toBe('Maria Samplesson');
   });
+
+  it('rejects ESEF phrase as CEO name', () => {
+    const text = `
+Annual report 2025
+European Single Electronic Format
+Chief Executive Officer
+`;
+    const r = extractFields(text, 'AB Industrivärden (publ)', 2025, 'investment_company');
+    expect(r.data.ceo).toBeNull();
+  });
 });

@@ -31,6 +31,8 @@ Production-minded **Node.js + TypeScript** scraper for **Nasdaq Stockholm Large 
 - [x] Legacy `playwright-linux-libs` / `LD_LIBRARY_PATH` injection removed to avoid glibc conflicts in Azure Linux runtime.
 - [x] Results writer with **merge by `company` name** (case-insensitive) for partial reruns.
 - [x] Express server + dashboard HTML (`npm run server`).
+- [x] Persistent Risk Map preflight mode (`src/risk/preflight-evaluator.ts`) with on-demand full-list evaluation via `POST /api/risk-map/evaluate`.
+- [x] Risk Map UI decoupled from scrape results (`/api/results` clear/remove does not clear risk data); run cards displayed in 3-column grid with per-run copy-text control.
 - [x] Jest coverage for parsing guards, URL helpers, entity verification, ticker `irPage` HTTPS checks, validation plausibility, and discovery-related tests under `tests/`.
 
 ## Engineering backlog (honest current frontier)
@@ -78,6 +80,7 @@ data/entity-confusion.json  Host / brand collision hints
 
 - **`output/results.json`** — see README “Output schema” (public rows omit internal `stages`).
 - **`output/run_summary.json`** — batch summary and `failureClass` per row.
+- **`output/preflight-risk.json`** — persisted preflight risk map for all ticker-map companies; consumed by `GET /api/risk-map`.
 
 ## Roadmap (next engineering steps)
 
@@ -90,6 +93,7 @@ data/entity-confusion.json  Host / brand collision hints
 
 - **Tests:** `npx tsc --noEmit` and `npx jest` before commits (see `.cursorrules`).
 - **Playwright:** `npm install` then `npx playwright install chromium --with-deps` on Linux/Azure build runners when PDF links are JS-only.
+- **Preflight risk run (no scrape):** call `POST /api/risk-map/evaluate` (or invoke `evaluatePreflightRiskForAll` directly) to refresh `output/preflight-risk.json`.
 - **Host respect:** Prefer single-ticker **`--force`** during iterative work to keep request volume predictable.
 
 ## Reference docs

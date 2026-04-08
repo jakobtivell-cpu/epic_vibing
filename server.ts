@@ -10,6 +10,7 @@ import express, { Request, Response } from 'express';
 import { RESULTS_PATH } from './src/config/settings';
 import type { PipelineResult } from './src/types';
 import { buildRiskMapResponse } from './src/risk/risk-map';
+import { evaluatePreflightRiskForAll, loadPreflightRiskFile } from './src/risk/preflight-evaluator';
 
 const LOG_LINE_RE = /^\d{4}-\d{2}-\d{2}T/;
 const MAX_CONCURRENT = 3;
@@ -20,6 +21,7 @@ const JOB_TTL_MS = 2 * 60 * 60 * 1000;
 const ROOT = path.resolve(__dirname, path.basename(__dirname) === 'dist' ? '..' : '.');
 const DASHBOARD_HTML = path.join(ROOT, 'app', 'swedish-largecap-dashboard.html');
 const TICKER_JSON = path.join(ROOT, 'data', 'ticker.json');
+const PREFLIGHT_RISK_PATH = path.join(ROOT, 'output', 'preflight-risk.json');
 
 interface CompanyRow {
   name: string;
@@ -392,6 +394,11 @@ app.get('/api/results', (_req: Request, res: Response) => {
 
 app.get('/api/risk-map', (_req: Request, res: Response) => {
   try {
+    const preflight = loadPreflightRiskFile(PREFLIGHT_RISK_PATH);
+    if (preflight) {
+      res.json(preflight);
+      return;
+    }
     if (!fs.existsSync(RESULTS_PATH)) {
       res.json(buildRiskMapResponse([], null));
       return;
@@ -404,6 +411,29 @@ app.get('/api/risk-map', (_req: Request, res: Response) => {
     };
     const results = Array.isArray(parsed.results) ? parsed.results : [];
     res.json(buildRiskMapResponse(results, parsed.generatedAt ?? null));
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: msg });
+  }
+});
+
+app.post('/api/risk-map/evaluate', async (_req: Request, res: Response) => {
+  try {
+    if (!fs.existsSync(TICKER_JSON)) {
+      res.status(400).json({ error: `Ticker file not found: ${TICKER_JSON}` });
+      return;
+    }
+    const payload = await evaluatePreflightRiskForAll({
+      tickerJsonPath: TICKER_JSON,
+      outputPath: PREFLIGHT_RISK_PATH,
+      concurrency: 8,
+    });
+    res.json({
+      ok: true,
+      generatedAt: payload.generatedAt,
+      companyCount: payload.companyCount,
+      outputPath: PREFLIGHT_RISK_PATH,
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: msg });

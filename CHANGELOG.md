@@ -2,6 +2,22 @@
 
 Changes are grouped by area. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Dashboard / Risk Map
+
+- Added persistent preflight risk dataset support via `output/preflight-risk.json`.
+- Added `POST /api/risk-map/evaluate` to run deterministic preflight risk evaluation for all ticker-map companies without running full scrapes.
+- `GET /api/risk-map` now prefers persisted preflight risk data, so risk assessments remain visible even when scrape results are cleared.
+- UI updates:
+  - `Risk Map` tab is always visible (independent of scrape table state).
+  - Scrape run cards now render in a 3-column grid.
+  - Added per-run **copy text** action that copies only that run's log text for error tracking.
+
+### Risk scoring
+
+- Tuned deterministic scoring to increase risk when both revenue and EBIT unit guards are present, improving visibility for layout-fragile "recently fixed" companies.
+
 ## [2.1.2] — 2026-04-07
 
 ### Discovery

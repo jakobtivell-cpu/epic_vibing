@@ -60,7 +60,8 @@ tbody tr.sel{background:var(--sf)}
 .job-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11.5px;animation:fadeUp .3s ease}
 .spinner{animation:spin .8s linear infinite;flex-shrink:0}
 .rm{margin-left:auto;padding:2px 8px;border-radius:4px;border:1px solid var(--bd);background:transparent;font-size:10px;color:var(--t3);cursor:pointer;font-family:'DM Mono',monospace}
-.job-wrap{margin-bottom:2px}
+.job-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.job-wrap{margin-bottom:2px;border:1px solid var(--bl);border-radius:8px;padding:8px;background:var(--sf)}
 .job-logbox{margin-top:6px;padding:10px 12px;border-radius:8px;background:#1a1a2e;height:180px;overflow-y:auto;overflow-x:hidden}
 .ll{font-size:11px;line-height:1.6;font-family:'DM Mono',monospace;color:#94a3b8}
 .ll.e{color:#f87171}
@@ -243,6 +244,7 @@ async function clearResults(){
     }
     inlineStatusMsg="";
     await loadResultsFromServer();
+    await loadRiskMapFromServer();
     selTk=null;
     render();
   }catch(e){
@@ -534,6 +536,20 @@ function toggleJobLogs(id){
   j.logsExpanded=!j.logsExpanded;
   render();
 }
+
+async function copyJobText(id){
+  const j=jobs.find(x=>x.id===id);
+  if(!j)return;
+  const text=(j.logs||[]).slice().reverse().join("\n");
+  if(!text.trim())return;
+  try{
+    await navigator.clipboard.writeText(text);
+    inlineStatusMsg="✓ Copied run log for "+j.name;
+  }catch(_){
+    inlineStatusMsg="✕ Could not copy run log";
+  }
+  render();
+}
 function removeResult(ticker){results=results.filter(r=>r.ticker!==ticker);if(selTk===ticker)selTk=null;render()}
 
 function downloadJSON(){
@@ -674,7 +690,7 @@ function filteredRiskRows(){
 }
 
 function renderRiskMap(){
-  if(!riskRows.length)return`<div class="cd empty"><div style="font-size:14px;font-weight:600;margin-bottom:6px">No risk data yet</div><div style="font-size:12.5px;color:var(--t3)">Run at least one scrape to build risk signals.</div></div>`;
+  if(!riskRows.length)return`<div class="cd empty"><div style="font-size:14px;font-weight:600;margin-bottom:6px">No risk data yet</div><div style="font-size:12.5px;color:var(--t3)">Run risk pre-evaluation to populate all known companies.</div><button class="bp" style="margin-top:14px" onclick="runRiskEvaluation()">Run risk evaluation</button></div>`;
   const rows=filteredRiskRows();
   const tierCount={low:0,medium:0,high:0};
   const archetypeCount={};
@@ -747,16 +763,35 @@ function renderRiskMap(){
   </div>`;
 }
 
+async function runRiskEvaluation(){
+  inlineStatusMsg="Running preflight risk evaluation for all companies...";
+  render();
+  try{
+    const r=await fetch(API_BASE+"/api/risk-map/evaluate",{method:"POST"});
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok){
+      inlineStatusMsg="✕ Risk evaluation failed: "+(data.error||("HTTP "+r.status));
+      render();
+      return;
+    }
+    await loadRiskMapFromServer();
+    inlineStatusMsg="✓ Risk evaluation complete for "+(data.companyCount||riskRows.length)+" companies";
+    render();
+  }catch(e){
+    inlineStatusMsg="✕ Risk evaluation failed: "+(e instanceof Error?e.message:String(e));
+    render();
+  }
+}
+
 // ── MAIN RENDER ──
 function render(){
   const act=jobs.filter(j=>j.status==="running");
   const hasData=results.length>0;
+  const hasRiskData=riskRows.length>0;
 
-  if(!hasData&&(view==="performance"||view==="risk"))view="table";
+  if(!hasData&&view==="performance")view="table";
 
-  document.getElementById("tabs").innerHTML=hasData
-    ?`<button type="button" class="tab ${view==="table"?"on":""}" onclick="setMainView('table')">Table</button><button type="button" class="tab ${view==="performance"?"on":""}" onclick="setMainView('performance')">Performance</button><button type="button" class="tab ${view==="risk"?"on":""}" onclick="setMainView('risk')">Risk Map</button>`
-    :"";
+  document.getElementById("tabs").innerHTML=`${hasData?`<button type="button" class="tab ${view==="table"?"on":""}" onclick="setMainView('table')">Table</button><button type="button" class="tab ${view==="performance"?"on":""}" onclick="setMainView('performance')">Performance</button>`:""}<button type="button" class="tab ${view==="risk"?"on":""}" onclick="setMainView('risk')">Risk Map</button>`;
 
   let h="";
 
@@ -770,6 +805,7 @@ function render(){
       <button class="bp" onclick="doAdd()">+ Scrape</button>
       ${hasData?`<button type="button" class="bo" onclick="clearResults()">Clear</button>`:""}
       ${hasData?`<button class="bo" onclick="downloadJSON()">↓ results.json (${results.length})</button>`:""}
+      <button type="button" class="bo" onclick="runRiskEvaluation()">Run risk evaluation</button>
     </div>
     ${inlineStatusMsg?`<div style="margin-top:8px;font-size:12px;color:${inlineStatusMsg.startsWith("✓")?"var(--green)":"var(--rose)"}">${esc(inlineStatusMsg)}</div>`:""}
   </div>`;
@@ -781,7 +817,7 @@ function render(){
         <div style="width:6px;height:6px;border-radius:50%;background:${act.length?"var(--amber)":"var(--green)"};${act.length?"animation:pulse 1.2s ease infinite;":""}flex-shrink:0"></div>
         <span style="font-weight:600;color:var(--tx)">scrape.ts ${act.length?"— running":"— idle"}</span>
       </div>
-      <div style="margin-top:4px;border-top:1px solid var(--bl);padding-top:8px">
+      <div class="job-grid" style="margin-top:4px;border-top:1px solid var(--bl);padding-top:8px">
         ${jobs.map(j=>{
           const a=j.status==="running";
           const cancelled=j.cancelled===true||(j.status==="failed"&&j.exitCode===-1);
@@ -791,21 +827,23 @@ function render(){
           else if(j.status==="done"){icon=chk();labelColor="var(--green)";label="Done"}
           else{icon=xx();labelColor="var(--rose)";label="Failed"}
           const logBtn=j.logs.length?`<button type="button" class="rm" onclick="event.stopPropagation();toggleJobLogs('${j.id}')">${j.logsExpanded?"hide logs":"show logs"}</button>`:"";
+          const copyBtn=j.logs.length?`<button class="rm" onclick="event.stopPropagation();copyJobText('${j.id}')">copy text</button>`:"";
           const logPanel=j.logsExpanded&&j.logs.length?`<div class="job-logbox" role="log" aria-live="polite">${j.logs.map(l=>`<div class="ll${l.includes("ERROR")?" e":""}">${esc(l)}</div>`).join("")}</div>`:"";
-          return`<div class="job-wrap"><div class="job-row">${icon}<span style="font-weight:600;color:var(--tx);min-width:90px">${esc(j.name)}</span><span style="color:${labelColor};font-weight:500">${label}</span>${logBtn}${a?`<button class="rm" onclick="event.stopPropagation();cancelJob('${j.id}')">Cancel</button>`:""}${!a?`<button class="rm" onclick="event.stopPropagation();removeJob('${j.id}')">remove</button>`:""}</div>${logPanel}</div>`;
+          return`<div class="job-wrap"><div class="job-row">${icon}<span style="font-weight:600;color:var(--tx);min-width:90px">${esc(j.name)}</span><span style="color:${labelColor};font-weight:500">${label}</span>${copyBtn}${logBtn}${a?`<button class="rm" onclick="event.stopPropagation();cancelJob('${j.id}')">Cancel</button>`:""}${!a?`<button class="rm" onclick="event.stopPropagation();removeJob('${j.id}')">remove</button>`:""}</div>${logPanel}</div>`;
         }).join("")}
       </div></div>`;
   }
 
   // ── EMPTY STATE ──
-  if(!hasData&&!act.length) h+=`<div class="cd empty"><div style="font-size:32px;margin-bottom:12px;opacity:.15">⊞</div><div style="font-size:15px;font-weight:600;margin-bottom:6px">No companies yet</div><div style="font-size:13px;color:var(--t3);max-width:460px;margin:0 auto;line-height:1.5">Enter a company name or ticker above to begin scraping.</div></div>`;
-  else if(!hasData&&act.length>0) h+=`<div class="cd" style="padding:48px 40px;text-align:center">${spin("#2563EB",20)}<div style="font-size:14px;font-weight:600;margin-top:14px">Scraping in progress…</div></div>`;
+  if(!hasData&&!hasRiskData&&!act.length&&view!=="risk") h+=`<div class="cd empty"><div style="font-size:32px;margin-bottom:12px;opacity:.15">⊞</div><div style="font-size:15px;font-weight:600;margin-bottom:6px">No companies yet</div><div style="font-size:13px;color:var(--t3);max-width:460px;margin:0 auto;line-height:1.5">Enter a company name or ticker above to begin scraping.</div></div>`;
+  else if(!hasData&&act.length>0&&view!=="risk") h+=`<div class="cd" style="padding:48px 40px;text-align:center">${spin("#2563EB",20)}<div style="font-size:14px;font-weight:600;margin-top:14px">Scraping in progress…</div></div>`;
 
   // ── DATA VIEWS ──
-  if(hasData){
+  if(view==="risk"){
+    h+=renderRiskMap();
+  }else if(hasData){
     if(view==="table")h+=renderTable();
     else if(view==="performance")h+=renderPerf();
-    else if(view==="risk")h+=renderRiskMap();
     else{view="table";h+=renderTable();}
   }
 

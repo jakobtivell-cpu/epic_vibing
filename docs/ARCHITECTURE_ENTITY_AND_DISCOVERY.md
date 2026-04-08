@@ -11,6 +11,7 @@
 7. **Post-download** ([`verifyEntityInPdf`](../src/validation/post-download-checks.ts)): org number in text, high-ambiguity distinctive-token requirement, then existing name/alias logic (including wider strong-term pass to reduce false negatives).
 8. **Extraction** ([`field-extractor.ts`](../src/extraction/field-extractor.ts)): company type from document; [`schema-mapping`](../src/extraction/schema-mapping.ts) documents native label → assignment field (`revenue_msek` / `ebit_msek`) with `exact` vs `mapped`, including EBIT unit recovery guard behavior.
 9. **Validation** ([`validator.ts`](../src/validation/validator.ts)): industrial vs bank vs investment_company vs real_estate plausibility rules.
+10. **Preflight risk map path** ([`src/risk/preflight-evaluator.ts`](../src/risk/preflight-evaluator.ts), [`server.ts`](../server.ts)): deterministic non-scrape checks over ticker-map companies (IR reachability/signals/domain drift/JS heaviness), persisted to `output/preflight-risk.json`, served via `GET /api/risk-map`.
 
 ## Weak points this addresses (SEB-like class)
 
@@ -29,8 +30,10 @@
 - IR loop: after `discoverIrPage`, `collectPublicationHubUrls` + extra `discoverAnnualReport` per hub
 - PDF try: `verifyEntityInPdf(..., entityOpts)`
 - Post-extract: `validateExtractedData(..., type, mappingNotes)`
+- Preflight batch: `evaluatePreflightRiskForAll({ tickerJsonPath, outputPath })` (invoked by `POST /api/risk-map/evaluate`)
 
 ## Recent changes (maintenance note)
 
 - **`data/entity-confusion.json`** patterns must be valid **JavaScript** `RegExp` sources. Do not use PCRE-only inline flags such as `(?i)`; use the `'i'` flag via code (the loader also strips a leading `(?i)` if present).
 - **Rule file resolution** tries `process.cwd()/data/` first, then `__dirname`-relative paths, so tests and CLI runs from the repo root load rules consistently.
+- **Risk map persistence split:** `/api/results` lifecycle does not own risk data anymore; risk view should read `/api/risk-map` (preflight file first, scrape-derived fallback second).

@@ -1,0 +1,4354 @@
+{
+  "generatedAt": "2026-04-08T11:56:39.105Z",
+  "companyCount": 160,
+  "results": [
+    {
+      "ticker": "SYSR.ST",
+      "company": "Systemair AB (publ)",
+      "riskScore": 75,
+      "riskTier": "high",
+      "confidenceBand": "high",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk",
+        "js_heavy_ir"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page.",
+        "Page appears JS-heavy; likely needs Playwright discovery.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Run targeted cloud scrape validation and tune discovery/fallback rules.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.systemair.com/en/investors/",
+        "finalUrl": "https://www.systemair.com/en/investors",
+        "statusCode": 404,
+        "responseTimeMs": 549,
+        "redirectCount": 1,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "INDU-A.ST",
+      "company": "AB Industrivärden (publ)",
+      "riskScore": 60,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.industrivarden.net/investors",
+        "finalUrl": "https://www.industrivarden.se/en-GB/investors",
+        "statusCode": 404,
+        "responseTimeMs": 405,
+        "redirectCount": 1,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "INDU-C.ST",
+      "company": "AB Industrivärden (publ)",
+      "riskScore": 60,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.industrivarden.net/investors",
+        "finalUrl": "https://www.industrivarden.se/en-GB/investors",
+        "statusCode": 404,
+        "responseTimeMs": 399,
+        "redirectCount": 1,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "ATRLJ-B.ST",
+      "company": "Atrium Ljungberg AB (publ)",
+      "riskScore": 60,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.al.se/en/investors/",
+        "finalUrl": "https://www.al.se/en/investors/",
+        "statusCode": 404,
+        "responseTimeMs": 206,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "EQT.ST",
+      "company": "EQT AB (publ)",
+      "riskScore": 60,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk",
+        "js_heavy_ir"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No PDF-like links detected on IR page.",
+        "Page appears JS-heavy; likely needs Playwright discovery.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://eqtgroup.com/investors",
+        "finalUrl": "https://eqtgroup.com/investors",
+        "statusCode": 404,
+        "responseTimeMs": 419,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "BALD-B.ST",
+      "company": "Fastighets AB Balder (publ)",
+      "riskScore": 60,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk",
+        "js_heavy_ir"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No PDF-like links detected on IR page.",
+        "Page appears JS-heavy; likely needs Playwright discovery.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.balder.se/en/investors/",
+        "finalUrl": "https://www.balder.se/en/investors",
+        "statusCode": 404,
+        "responseTimeMs": 166,
+        "redirectCount": 1,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "HPOL-B.ST",
+      "company": "HEXPOL AB (publ)",
+      "riskScore": 60,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (403).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.hexpol.com/en/investors",
+        "finalUrl": "https://www.hexpol.com/en/investors",
+        "statusCode": 403,
+        "responseTimeMs": 97,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "NCC-A.ST",
+      "company": "NCC AB (publ)",
+      "riskScore": 60,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.ncc.com/investor/",
+        "finalUrl": "https://www.ncc.com/investor/",
+        "statusCode": 404,
+        "responseTimeMs": 318,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "NCC-B.ST",
+      "company": "NCC AB (publ)",
+      "riskScore": 60,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.ncc.com/investor/",
+        "finalUrl": "https://www.ncc.com/investor/",
+        "statusCode": 404,
+        "responseTimeMs": 268,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "OEM-B.ST",
+      "company": "OEM International AB (publ)",
+      "riskScore": 60,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (429).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.oem.se/en/investors/",
+        "finalUrl": "https://www.oem.se/en/investors/",
+        "statusCode": 429,
+        "responseTimeMs": 121,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "STE-A.ST",
+      "company": "Stora Enso Oyj",
+      "riskScore": 60,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (403).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.storaenso.com/en/investors",
+        "finalUrl": "https://www.storaenso.com/en/investors",
+        "statusCode": 403,
+        "responseTimeMs": 68,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "STE-R.ST",
+      "company": "Stora Enso Oyj",
+      "riskScore": 60,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (403).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.storaenso.com/en/investors",
+        "finalUrl": "https://www.storaenso.com/en/investors",
+        "statusCode": 403,
+        "responseTimeMs": 20,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "ABB.ST",
+      "company": "ABB Ltd",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "ALIG.ST",
+      "company": "Alimak Group AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "AMBEA.ST",
+      "company": "Ambea AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "AQ.ST",
+      "company": "AQ Group AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.aqgroup.com/investors/",
+        "finalUrl": "https://www.aqgroup.com/investors",
+        "statusCode": 404,
+        "responseTimeMs": 353,
+        "redirectCount": 1,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "ARION-SDB.ST",
+      "company": "Arion banki hf.",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "ASKER.ST",
+      "company": "Asker Healthcare Group AB",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "ASMDEE-B.ST",
+      "company": "Asmodee Group AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "AZN.ST",
+      "company": "AstraZeneca PLC",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (403).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.astrazeneca.com/investor-relations.html",
+        "finalUrl": "https://www.astrazeneca.com/investor-relations.html",
+        "statusCode": 403,
+        "responseTimeMs": 97,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "ATT.ST",
+      "company": "Attendo AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "ALIV-SDB.ST",
+      "company": "Autoliv, Inc.",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "BILI-A.ST",
+      "company": "Bilia AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "BIOG-B.ST",
+      "company": "BioGaia AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "BRAV.ST",
+      "company": "Bravida Holding AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "BUFAB.ST",
+      "company": "Bufab AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "BWEO.ST",
+      "company": "BW Energy Limited",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "CAMX.ST",
+      "company": "Camurus AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "CIBUS.ST",
+      "company": "Cibus Nordic Real Estate AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "CMBTOO.ST",
+      "company": "Cmb.Tech NV",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "DNBO.ST",
+      "company": "DNB Bank ASA",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "EPRO-B.ST",
+      "company": "Electrolux Professional AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "FROO.ST",
+      "company": "Frontline plc",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "HACK.ST",
+      "company": "Hacksaw AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "HMS.ST",
+      "company": "HMS Networks AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "HOFI.ST",
+      "company": "Hoist Finance AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "HOLM-A.ST",
+      "company": "Holmen AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (500).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.holmen.com/en/investors/",
+        "finalUrl": "https://www.holmen.com/en/investors/",
+        "statusCode": 500,
+        "responseTimeMs": 176,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "HOLM-B.ST",
+      "company": "Holmen AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (500).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.holmen.com/en/investors/",
+        "finalUrl": "https://www.holmen.com/en/investors/",
+        "statusCode": 500,
+        "responseTimeMs": 139,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "HAUTOO.ST",
+      "company": "Höegh Autoliners ASA",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "INTEA-B.ST",
+      "company": "Intea Fastigheter AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "INTEA-D.ST",
+      "company": "Intea Fastigheter AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "IPCO.ST",
+      "company": "International Petroleum Corporation",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "IVSO.ST",
+      "company": "Invisio AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "KOGO.ST",
+      "company": "Kongsberg Gruppen ASA",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "LAGR-B.ST",
+      "company": "Lagercrantz Group AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "LIAB.ST",
+      "company": "Lindab International AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "LUG.ST",
+      "company": "Lundin Gold Inc.",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "MCOV-B.ST",
+      "company": "Medicover AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "MTRS.ST",
+      "company": "Munters Group AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "MYCR.ST",
+      "company": "Mycronic AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "NCAB.ST",
+      "company": "NCAB Group AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "NEWA-B.ST",
+      "company": "New Wave Group AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.nwg.se/en/investors/",
+        "finalUrl": "https://www.nwg.se/en/investors/",
+        "statusCode": 404,
+        "responseTimeMs": 323,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "NOBA.ST",
+      "company": "NOBA Bank Group AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "NOKIA-SEK.ST",
+      "company": "Nokia Oyj",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "NYF.ST",
+      "company": "Nyfosa AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "PDX.ST",
+      "company": "Paradox Interactive AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk",
+        "js_heavy_ir"
+      ],
+      "signals": [
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page.",
+        "Page appears JS-heavy; likely needs Playwright discovery.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.paradoxinteractive.com/en/investors",
+        "finalUrl": "https://www.paradoxinteractive.com/en/investors",
+        "statusCode": 200,
+        "responseTimeMs": 198,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "ROKO-B.ST",
+      "company": "Röko AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "SAMPO-SEK.ST",
+      "company": "Sampo Oyj",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "SHOT.ST",
+      "company": "Scandic Hotels Group AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "SINCH.ST",
+      "company": "Sinch AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "SKIS-B.ST",
+      "company": "SkiStar AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "STOR-B.ST",
+      "company": "Storskogen Group AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "TEL2-A.ST",
+      "company": "Tele2 AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "TEL2-B.ST",
+      "company": "Tele2 AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "TIETOS.ST",
+      "company": "Tieto Oyj",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "8TRA.ST",
+      "company": "Traton SE",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "VSURE.ST",
+      "company": "Verisure plc",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "VIMIAN.ST",
+      "company": "Vimian Group AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": null,
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": null,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "VITR.ST",
+      "company": "Vitrolife AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (network error).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.vitrolife.com/en/investors",
+        "finalUrl": null,
+        "statusCode": null,
+        "responseTimeMs": 2846,
+        "redirectCount": 0,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "WALL-B.ST",
+      "company": "Wallenstam AB (publ)",
+      "riskScore": 50,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://wallenstam.se/en/investor-relations/",
+        "finalUrl": "https://www.wallenstam.se/en/investor-relations/",
+        "statusCode": 404,
+        "responseTimeMs": 383,
+        "redirectCount": 1,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "SAGA-A.ST",
+      "company": "AB Sagax (publ)",
+      "riskScore": 45,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.sagax.se/en/investors/",
+        "finalUrl": "https://www.sagax.se/en/investors/",
+        "statusCode": 404,
+        "responseTimeMs": 704,
+        "redirectCount": 0,
+        "annualSignalCount": 2,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "SAGA-B.ST",
+      "company": "AB Sagax (publ)",
+      "riskScore": 45,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.sagax.se/en/investors/",
+        "finalUrl": "https://www.sagax.se/en/investors/",
+        "statusCode": 404,
+        "responseTimeMs": 701,
+        "redirectCount": 0,
+        "annualSignalCount": 2,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "SAGA-D.ST",
+      "company": "AB Sagax (publ)",
+      "riskScore": 45,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.sagax.se/en/investors/",
+        "finalUrl": "https://www.sagax.se/en/investors/",
+        "statusCode": 404,
+        "responseTimeMs": 572,
+        "redirectCount": 0,
+        "annualSignalCount": 2,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "ALIF-B.ST",
+      "company": "AddLife AB (publ)",
+      "riskScore": 45,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.add.life/en/investors",
+        "finalUrl": "https://www.add.life/en/investors",
+        "statusCode": 404,
+        "responseTimeMs": 533,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "AXFO.ST",
+      "company": "Axfood AB (publ)",
+      "riskScore": 45,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.axfood.com/investor/",
+        "finalUrl": "https://www.axfood.com/investor/",
+        "statusCode": 404,
+        "responseTimeMs": 220,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "INDT.ST",
+      "company": "Indutrade AB (publ)",
+      "riskScore": 45,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.indutrade.com/investors",
+        "finalUrl": "https://www.indutrade.com/investors",
+        "statusCode": 404,
+        "responseTimeMs": 264,
+        "redirectCount": 0,
+        "annualSignalCount": 1,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "LATO-B.ST",
+      "company": "Investment AB Latour (publ)",
+      "riskScore": 45,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.latour.se/investors/",
+        "finalUrl": "https://www.latour.se/en/investors",
+        "statusCode": 404,
+        "responseTimeMs": 536,
+        "redirectCount": 1,
+        "annualSignalCount": 2,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "MTG-A.ST",
+      "company": "Modern Times Group MTG AB",
+      "riskScore": 45,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.mtg.com/investors/",
+        "finalUrl": "https://www.mtg.com/investors/",
+        "statusCode": 404,
+        "responseTimeMs": 1712,
+        "redirectCount": 0,
+        "annualSignalCount": 2,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "MTG-B.ST",
+      "company": "Modern Times Group MTG AB",
+      "riskScore": 45,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.mtg.com/investors/",
+        "finalUrl": "https://www.mtg.com/investors/",
+        "statusCode": 404,
+        "responseTimeMs": 728,
+        "redirectCount": 0,
+        "annualSignalCount": 2,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "PNDX-B.ST",
+      "company": "Pandox AB (publ)",
+      "riskScore": 45,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.pandox.se/en/investors/",
+        "finalUrl": "https://www.pandox.se/en/investors/",
+        "statusCode": 404,
+        "responseTimeMs": 357,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "SSAB-A.ST",
+      "company": "SSAB AB (publ)",
+      "riskScore": 45,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.ssab.com/en/investors",
+        "finalUrl": "https://www.ssab.com/en/investors",
+        "statusCode": 404,
+        "responseTimeMs": 693,
+        "redirectCount": 0,
+        "annualSignalCount": 1,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "SSAB-B.ST",
+      "company": "SSAB AB (publ)",
+      "riskScore": 45,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.ssab.com/en/investors",
+        "finalUrl": "https://www.ssab.com/en/investors",
+        "statusCode": 404,
+        "responseTimeMs": 686,
+        "redirectCount": 0,
+        "annualSignalCount": 1,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "ERIC-A.ST",
+      "company": "Telefonaktiebolaget LM Ericsson (publ)",
+      "riskScore": 45,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (403).",
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.ericsson.com/en/investors",
+        "finalUrl": "https://www.ericsson.com/en/investors",
+        "statusCode": 403,
+        "responseTimeMs": 74,
+        "redirectCount": 0,
+        "annualSignalCount": 1,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "ERIC-B.ST",
+      "company": "Telefonaktiebolaget LM Ericsson (publ)",
+      "riskScore": 45,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (403).",
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.ericsson.com/en/investors",
+        "finalUrl": "https://www.ericsson.com/en/investors",
+        "statusCode": 403,
+        "responseTimeMs": 67,
+        "redirectCount": 0,
+        "annualSignalCount": 1,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "ELUX-A.ST",
+      "company": "AB Electrolux (publ)",
+      "riskScore": 35,
+      "riskTier": "medium",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.electroluxgroup.com/en/investor-relations/",
+        "finalUrl": "https://www.electroluxgroup.com/en/investor-relations/",
+        "statusCode": 404,
+        "responseTimeMs": 1098,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 1
+      }
+    },
+    {
+      "ticker": "ELUX-B.ST",
+      "company": "AB Electrolux (publ)",
+      "riskScore": 35,
+      "riskTier": "medium",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.electroluxgroup.com/en/investor-relations/",
+        "finalUrl": "https://www.electroluxgroup.com/en/investor-relations/",
+        "statusCode": 404,
+        "responseTimeMs": 995,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 1
+      }
+    },
+    {
+      "ticker": "ALFA.ST",
+      "company": "Alfa Laval AB (publ)",
+      "riskScore": 35,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk",
+        "js_heavy_ir"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Page appears JS-heavy; likely needs Playwright discovery.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.alfalaval.com/investors/",
+        "finalUrl": "https://www.alfalaval.com/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 168,
+        "redirectCount": 0,
+        "annualSignalCount": 1,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "BEIA-B.ST",
+      "company": "Beijer Alma AB (publ)",
+      "riskScore": 35,
+      "riskTier": "medium",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.beijeralma.se/en/investors/",
+        "finalUrl": "https://beijeralma.se/en/investors/",
+        "statusCode": 404,
+        "responseTimeMs": 669,
+        "redirectCount": 1,
+        "annualSignalCount": 2,
+        "pdfLikeLinkCount": 2
+      }
+    },
+    {
+      "ticker": "BOL.ST",
+      "company": "Boliden AB (publ)",
+      "riskScore": 35,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk",
+        "entity_ambiguity"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Final host investors.boliden.com does not match candidate domains.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://investors.boliden.com/en/investor-relations/reports-and-presentations",
+        "finalUrl": "https://investors.boliden.com/en/investor-relations/reports-and-presentations",
+        "statusCode": 200,
+        "responseTimeMs": 315,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "GETI-B.ST",
+      "company": "Getinge AB (publ)",
+      "riskScore": 35,
+      "riskTier": "medium",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.getinge.com/int/investors/",
+        "finalUrl": "https://www.getinge.com/int/investors/",
+        "statusCode": 404,
+        "responseTimeMs": 246,
+        "redirectCount": 0,
+        "annualSignalCount": 1,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "INVE-A.ST",
+      "company": "Investor AB (publ)",
+      "riskScore": 35,
+      "riskTier": "medium",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.investorab.com/investors",
+        "finalUrl": "https://www.investorab.com/investors",
+        "statusCode": 404,
+        "responseTimeMs": 465,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 2
+      }
+    },
+    {
+      "ticker": "INVE-B.ST",
+      "company": "Investor AB (publ)",
+      "riskScore": 35,
+      "riskTier": "medium",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.investorab.com/investors",
+        "finalUrl": "https://www.investorab.com/investors",
+        "statusCode": 404,
+        "responseTimeMs": 328,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 2
+      }
+    },
+    {
+      "ticker": "NIBE-B.ST",
+      "company": "NIBE Industrier AB (publ)",
+      "riskScore": 35,
+      "riskTier": "medium",
+      "confidenceBand": "medium",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk",
+        "entity_ambiguity"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Final host www.nibegroup.com does not match candidate domains.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.nibe.com/investors",
+        "finalUrl": "https://www.nibegroup.com/investors",
+        "statusCode": 200,
+        "responseTimeMs": 415,
+        "redirectCount": 1,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "PEAB-B.ST",
+      "company": "Peab AB (publ)",
+      "riskScore": 35,
+      "riskTier": "medium",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "IR page unreachable (404).",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Monitor IR link stability and verify annual report discoverability.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.peab.com/investor-relations/",
+        "finalUrl": "https://www.peab.com/investor-relations/",
+        "statusCode": 404,
+        "responseTimeMs": 200,
+        "redirectCount": 0,
+        "annualSignalCount": 1,
+        "pdfLikeLinkCount": 2
+      }
+    },
+    {
+      "ticker": "SKF-A.ST",
+      "company": "AB SKF (publ)",
+      "riskScore": 25,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus"
+      ],
+      "signals": [
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://investors.skf.com",
+        "finalUrl": "https://www.skf.com/group/investors",
+        "statusCode": 200,
+        "responseTimeMs": 327,
+        "redirectCount": 1,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "SKF-B.ST",
+      "company": "AB SKF (publ)",
+      "riskScore": 25,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus"
+      ],
+      "signals": [
+        "No annual-report language detected on IR page.",
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://investors.skf.com",
+        "finalUrl": "https://www.skf.com/group/investors",
+        "statusCode": 200,
+        "responseTimeMs": 402,
+        "redirectCount": 1,
+        "annualSignalCount": 0,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "BONEX.ST",
+      "company": "Bonesupport Holding AB (publ)",
+      "riskScore": 25,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk",
+        "entity_ambiguity"
+      ],
+      "signals": [
+        "Final host investor.bonesupport.com does not match candidate domains.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.bonesupport.com/en/investors/",
+        "finalUrl": "https://investor.bonesupport.com/en/",
+        "statusCode": 200,
+        "responseTimeMs": 1167,
+        "redirectCount": 1,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 1
+      }
+    },
+    {
+      "ticker": "CATE.ST",
+      "company": "Catena AB (publ)",
+      "riskScore": 25,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk",
+        "entity_ambiguity"
+      ],
+      "signals": [
+        "Final host www.catena.se does not match candidate domains.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.catenafastigheter.se/en/investors/",
+        "finalUrl": "https://www.catena.se/en/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 532,
+        "redirectCount": 1,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 1
+      }
+    },
+    {
+      "ticker": "EKTA-B.ST",
+      "company": "Elekta AB (publ)",
+      "riskScore": 25,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk",
+        "entity_ambiguity"
+      ],
+      "signals": [
+        "Final host ir.elekta.com does not match candidate domains.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.elekta.com/investors/",
+        "finalUrl": "https://ir.elekta.com/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 407,
+        "redirectCount": 1,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 4
+      }
+    },
+    {
+      "ticker": "HUFV-A.ST",
+      "company": "Hufvudstaden AB (publ)",
+      "riskScore": 25,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk",
+        "entity_ambiguity"
+      ],
+      "signals": [
+        "Final host hufvudstaden.se does not match candidate domains.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.hufvudstaden.se/en/investor-relations/",
+        "finalUrl": "https://hufvudstaden.se/",
+        "statusCode": 200,
+        "responseTimeMs": 771,
+        "redirectCount": 1,
+        "annualSignalCount": 2,
+        "pdfLikeLinkCount": 1
+      }
+    },
+    {
+      "ticker": "LUMI.ST",
+      "company": "Lundin Mining Corporation",
+      "riskScore": 25,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk",
+        "entity_ambiguity"
+      ],
+      "signals": [
+        "Final host lundinmining.com does not match candidate domains.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://lundinmining.com/investors/",
+        "finalUrl": "https://lundinmining.com/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 961,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 8
+      }
+    },
+    {
+      "ticker": "SAVE.ST",
+      "company": "Nordnet AB (publ)",
+      "riskScore": 25,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk",
+        "entity_ambiguity"
+      ],
+      "signals": [
+        "Final host nordnetab.com does not match candidate domains.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.nordnetab.com/investors/",
+        "finalUrl": "https://nordnetab.com/investors/investors-overview/",
+        "statusCode": 200,
+        "responseTimeMs": 1187,
+        "redirectCount": 1,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 1
+      }
+    },
+    {
+      "ticker": "SEB-A.ST",
+      "company": "Skandinaviska Enskilda Banken AB (publ)",
+      "riskScore": 25,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "entity_ambiguity"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Final host sebgroup.com does not match candidate domains."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://sebgroup.com/investor-relations",
+        "finalUrl": "https://sebgroup.com/investor-relations",
+        "statusCode": 200,
+        "responseTimeMs": 332,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "SEB-C.ST",
+      "company": "Skandinaviska Enskilda Banken AB (publ)",
+      "riskScore": 25,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "entity_ambiguity"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Final host sebgroup.com does not match candidate domains."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://sebgroup.com/investor-relations",
+        "finalUrl": "https://sebgroup.com/investor-relations",
+        "statusCode": 200,
+        "responseTimeMs": 333,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "VOLV-A.ST",
+      "company": "AB Volvo (publ)",
+      "riskScore": 20,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.volvogroup.com/en/investors.html",
+        "finalUrl": "https://www.volvogroup.com/en/investors.html",
+        "statusCode": 200,
+        "responseTimeMs": 173,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "VOLV-B.ST",
+      "company": "AB Volvo (publ)",
+      "riskScore": 20,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.volvogroup.com/en/investors.html",
+        "finalUrl": "https://www.volvogroup.com/en/investors.html",
+        "statusCode": 200,
+        "responseTimeMs": 332,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "ADDT-B.ST",
+      "company": "Addtech AB (publ.)",
+      "riskScore": 20,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.addtech.com/investors/",
+        "finalUrl": "https://www.addtech.com/investors-and-media",
+        "statusCode": 200,
+        "responseTimeMs": 1482,
+        "redirectCount": 1,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "AFRY.ST",
+      "company": "Afry AB",
+      "riskScore": 20,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://afry.com/en/investor-relations",
+        "finalUrl": "https://afry.com/en/investor-relations",
+        "statusCode": 200,
+        "responseTimeMs": 47,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "ASSA-B.ST",
+      "company": "ASSA ABLOY AB (publ)",
+      "riskScore": 20,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.assaabloy.com/group/en/investors",
+        "finalUrl": "https://www.assaabloy.com/group/en/investors",
+        "statusCode": 200,
+        "responseTimeMs": 160,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "AZA.ST",
+      "company": "Avanza Bank Holding AB (publ)",
+      "riskScore": 20,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://investors.avanza.se",
+        "finalUrl": "https://investors.avanza.se/",
+        "statusCode": 200,
+        "responseTimeMs": 213,
+        "redirectCount": 0,
+        "annualSignalCount": 2,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "BURE.ST",
+      "company": "Bure Equity AB (publ)",
+      "riskScore": 20,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.bure.se/",
+        "finalUrl": "https://www.bure.se/",
+        "statusCode": 200,
+        "responseTimeMs": 127,
+        "redirectCount": 0,
+        "annualSignalCount": 1,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "CAST.ST",
+      "company": "Castellum AB (publ)",
+      "riskScore": 20,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.castellum.com/investors/",
+        "finalUrl": "https://www.castellum.com/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 2638,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "CLA-B.ST",
+      "company": "Cloetta AB (publ)",
+      "riskScore": 20,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.cloetta.com/en/investors/",
+        "finalUrl": "https://www.cloetta.com/en/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 119,
+        "redirectCount": 0,
+        "annualSignalCount": 2,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "EPI-A.ST",
+      "company": "Epiroc AB (publ)",
+      "riskScore": 20,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.epirocgroup.com/en/investors",
+        "finalUrl": "https://www.epirocgroup.com/en/investors",
+        "statusCode": 200,
+        "responseTimeMs": 193,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "EPI-B.ST",
+      "company": "Epiroc AB (publ)",
+      "riskScore": 20,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.epirocgroup.com/en/investors",
+        "finalUrl": "https://www.epirocgroup.com/en/investors",
+        "statusCode": 200,
+        "responseTimeMs": 170,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "ESSITY-A.ST",
+      "company": "Essity AB (publ)",
+      "riskScore": 20,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.essity.com/investors/",
+        "finalUrl": "https://www.essity.com/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 1032,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "ESSITY-B.ST",
+      "company": "Essity AB (publ)",
+      "riskScore": 20,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.essity.com/investors/",
+        "finalUrl": "https://www.essity.com/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 1003,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "SAND.ST",
+      "company": "Sandvik AB (publ)",
+      "riskScore": 20,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.home.sandvik/en/investors/",
+        "finalUrl": "https://www.home.sandvik/en/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 182,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "SECT-B.ST",
+      "company": "Sectra AB (publ)",
+      "riskScore": 20,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://investor.sectra.com",
+        "finalUrl": "https://investor.sectra.com/",
+        "statusCode": 200,
+        "responseTimeMs": 91,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "SHB-A.ST",
+      "company": "Svenska Handelsbanken AB (publ)",
+      "riskScore": 20,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.handelsbanken.com/en/investor-relations",
+        "finalUrl": "https://www.handelsbanken.com/en/investor-relations",
+        "statusCode": 200,
+        "responseTimeMs": 130,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "SHB-B.ST",
+      "company": "Svenska Handelsbanken AB (publ)",
+      "riskScore": 20,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.handelsbanken.com/en/investor-relations",
+        "finalUrl": "https://www.handelsbanken.com/en/investor-relations",
+        "statusCode": 200,
+        "responseTimeMs": 88,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "SWED-A.ST",
+      "company": "Swedbank AB (publ)",
+      "riskScore": 20,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.swedbank.com/investor-relations",
+        "finalUrl": "https://www.swedbank.com/investor-relations",
+        "statusCode": 200,
+        "responseTimeMs": 193,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "TREL-B.ST",
+      "company": "Trelleborg AB (publ)",
+      "riskScore": 20,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.trelleborg.com/en/investors",
+        "finalUrl": "https://www.trelleborg.com/en/investors",
+        "statusCode": 200,
+        "responseTimeMs": 771,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "WIHL.ST",
+      "company": "Wihlborgs Fastigheter AB (publ)",
+      "riskScore": 20,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus",
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page.",
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.wihlborgs.se/en/investor-relations/",
+        "finalUrl": "https://www.wihlborgs.se/en/investor-relations/",
+        "statusCode": 200,
+        "responseTimeMs": 410,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "AAK.ST",
+      "company": "AAK AB (publ.)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.aak.com/investors/",
+        "finalUrl": "https://www.aak.com/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 1186,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 1
+      }
+    },
+    {
+      "ticker": "ALLEI.ST",
+      "company": "Alleima AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.alleima.com/en/investors/",
+        "finalUrl": "https://www.alleima.com/en/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 232,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 3
+      }
+    },
+    {
+      "ticker": "ATCO-A.ST",
+      "company": "Atlas Copco AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.atlascopcogroup.com/en/investor-relations",
+        "finalUrl": "https://www.atlascopcogroup.com/en/investors",
+        "statusCode": 200,
+        "responseTimeMs": 419,
+        "redirectCount": 1,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 3
+      }
+    },
+    {
+      "ticker": "ATCO-B.ST",
+      "company": "Atlas Copco AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.atlascopcogroup.com/en/investor-relations",
+        "finalUrl": "https://www.atlascopcogroup.com/en/investors",
+        "statusCode": 200,
+        "responseTimeMs": 374,
+        "redirectCount": 1,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 3
+      }
+    },
+    {
+      "ticker": "BEIJ-B.ST",
+      "company": "Beijer Ref AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.beijerref.com/investors/",
+        "finalUrl": "https://www.beijerref.com/investors",
+        "statusCode": 200,
+        "responseTimeMs": 366,
+        "redirectCount": 1,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 5
+      }
+    },
+    {
+      "ticker": "BETS-B.ST",
+      "company": "Betsson AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.betssonab.com/investors/",
+        "finalUrl": "https://www.betssonab.com/investors",
+        "statusCode": 200,
+        "responseTimeMs": 542,
+        "redirectCount": 1,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 5
+      }
+    },
+    {
+      "ticker": "BILL.ST",
+      "company": "Billerud AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.billerud.com/investors",
+        "finalUrl": "https://www.billerud.com/investors",
+        "statusCode": 200,
+        "responseTimeMs": 1273,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 3
+      }
+    },
+    {
+      "ticker": "BIOA-B.ST",
+      "company": "BioArctic AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.bioarctic.com/en/investors/",
+        "finalUrl": "https://www.bioarctic.com/en/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 257,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 4
+      }
+    },
+    {
+      "ticker": "CLAS-B.ST",
+      "company": "Clas Ohlson AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://about.clasohlson.com/en/investors/",
+        "finalUrl": "https://about.clasohlson.com/en/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 208,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 2
+      }
+    },
+    {
+      "ticker": "EVO.ST",
+      "company": "Evolution AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.evolution.com/investors/",
+        "finalUrl": "https://www.evolution.com/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 192,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 8
+      }
+    },
+    {
+      "ticker": "FABG.ST",
+      "company": "Fabege AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.fabege.se/en/investors/",
+        "finalUrl": "https://www.fabege.se/en/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 862,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 1
+      }
+    },
+    {
+      "ticker": "GRNG.ST",
+      "company": "Gränges AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.granges.com/investors/",
+        "finalUrl": "https://www.granges.com/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 296,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 2
+      }
+    },
+    {
+      "ticker": "HM-B.ST",
+      "company": "H & M Hennes & Mauritz AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://hmgroup.com/investors/",
+        "finalUrl": "https://hmgroup.com/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 129,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 4
+      }
+    },
+    {
+      "ticker": "HEXA-B.ST",
+      "company": "Hexagon AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://investors.hexagon.com",
+        "finalUrl": "https://investors.hexagon.com/",
+        "statusCode": 200,
+        "responseTimeMs": 741,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 3
+      }
+    },
+    {
+      "ticker": "HUSQ-A.ST",
+      "company": "Husqvarna AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.husqvarnagroup.com/en/investors",
+        "finalUrl": "https://www.husqvarnagroup.com/en/investors",
+        "statusCode": 200,
+        "responseTimeMs": 180,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 4
+      }
+    },
+    {
+      "ticker": "HUSQ-B.ST",
+      "company": "Husqvarna AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.husqvarnagroup.com/en/investors",
+        "finalUrl": "https://www.husqvarnagroup.com/en/investors",
+        "statusCode": 200,
+        "responseTimeMs": 171,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 4
+      }
+    },
+    {
+      "ticker": "KINV-A.ST",
+      "company": "Kinnevik AB",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.kinnevik.com/investors/",
+        "finalUrl": "https://www.kinnevik.com/investor-relations/",
+        "statusCode": 200,
+        "responseTimeMs": 394,
+        "redirectCount": 1,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 6
+      }
+    },
+    {
+      "ticker": "KINV-B.ST",
+      "company": "Kinnevik AB",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.kinnevik.com/investors/",
+        "finalUrl": "https://www.kinnevik.com/investor-relations/",
+        "statusCode": 200,
+        "responseTimeMs": 340,
+        "redirectCount": 1,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 6
+      }
+    },
+    {
+      "ticker": "LUND-B.ST",
+      "company": "L E Lundbergföretagen AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.lundbergforetagen.se/en/investors",
+        "finalUrl": "https://www.lundbergforetagen.se/en/investors",
+        "statusCode": 200,
+        "responseTimeMs": 252,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 4
+      }
+    },
+    {
+      "ticker": "LIFCO-B.ST",
+      "company": "Lifco AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://lifco.se/investors/",
+        "finalUrl": "https://www.lifco.se/investors",
+        "statusCode": 200,
+        "responseTimeMs": 299,
+        "redirectCount": 1,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 2
+      }
+    },
+    {
+      "ticker": "LOOMIS.ST",
+      "company": "Loomis AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.loomis.com/en/investors",
+        "finalUrl": "https://www.loomis.com/en/investors",
+        "statusCode": 200,
+        "responseTimeMs": 234,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 1
+      }
+    },
+    {
+      "ticker": "NOLA-B.ST",
+      "company": "Nolato AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.nolato.com/en/investors/",
+        "finalUrl": "https://www.nolato.com/en/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 163,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 27
+      }
+    },
+    {
+      "ticker": "NDA-SE.ST",
+      "company": "Nordea Bank Abp",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.nordea.com/en/investors",
+        "finalUrl": "https://www.nordea.com/en/investors",
+        "statusCode": 200,
+        "responseTimeMs": 166,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "NP3.ST",
+      "company": "NP3 Fastigheter AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.np3fastigheter.se/en/investors/",
+        "finalUrl": "https://www.np3fastigheter.se/en/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 1402,
+        "redirectCount": 0,
+        "annualSignalCount": 2,
+        "pdfLikeLinkCount": 2
+      }
+    },
+    {
+      "ticker": "RUSTA.ST",
+      "company": "Rusta AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://investors.rusta.com",
+        "finalUrl": "https://investors.rusta.com/en/",
+        "statusCode": 200,
+        "responseTimeMs": 202,
+        "redirectCount": 1,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 2
+      }
+    },
+    {
+      "ticker": "SAAB-B.ST",
+      "company": "Saab AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.saab.com/investors",
+        "finalUrl": "https://www.saab.com/investors",
+        "statusCode": 200,
+        "responseTimeMs": 422,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 1
+      }
+    },
+    {
+      "ticker": "SECU-B.ST",
+      "company": "Securitas AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.securitas.com/en/investors/",
+        "finalUrl": "https://www.securitas.com/en/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 679,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 6
+      }
+    },
+    {
+      "ticker": "SKA-B.ST",
+      "company": "Skanska AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://group.skanska.com/investors/",
+        "finalUrl": "https://group.skanska.com/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 409,
+        "redirectCount": 0,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 2
+      }
+    },
+    {
+      "ticker": "SCA-A.ST",
+      "company": "Svenska Cellulosa Aktiebolaget SCA (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.sca.com/en/investors/",
+        "finalUrl": "https://www.sca.com/en/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 422,
+        "redirectCount": 0,
+        "annualSignalCount": 5,
+        "pdfLikeLinkCount": 3
+      }
+    },
+    {
+      "ticker": "SCA-B.ST",
+      "company": "Svenska Cellulosa Aktiebolaget SCA (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.sca.com/en/investors/",
+        "finalUrl": "https://www.sca.com/en/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 530,
+        "redirectCount": 0,
+        "annualSignalCount": 5,
+        "pdfLikeLinkCount": 3
+      }
+    },
+    {
+      "ticker": "SWEC-A.ST",
+      "company": "Sweco AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.swecogroup.com/investor-relations/",
+        "finalUrl": "https://www.swecogroup.com/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 306,
+        "redirectCount": 1,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 5
+      }
+    },
+    {
+      "ticker": "SWEC-B.ST",
+      "company": "Sweco AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.swecogroup.com/investor-relations/",
+        "finalUrl": "https://www.swecogroup.com/investors/",
+        "statusCode": 200,
+        "responseTimeMs": 282,
+        "redirectCount": 1,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 5
+      }
+    },
+    {
+      "ticker": "SOBI.ST",
+      "company": "Swedish Orphan Biovitrum AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.sobi.com/en/investors",
+        "finalUrl": "https://www.sobi.com/en/investors",
+        "statusCode": 200,
+        "responseTimeMs": 325,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 4
+      }
+    },
+    {
+      "ticker": "TELIA.ST",
+      "company": "Telia Company AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "ambiguous_pdf_corpus"
+      ],
+      "signals": [
+        "No PDF-like links detected on IR page."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.teliacompany.com/en/investors",
+        "finalUrl": "https://www.teliacompany.com/en/investors",
+        "statusCode": 200,
+        "responseTimeMs": 359,
+        "redirectCount": 0,
+        "annualSignalCount": 1,
+        "pdfLikeLinkCount": 0
+      }
+    },
+    {
+      "ticker": "THULE.ST",
+      "company": "Thule Group AB (publ)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://www.thulegroup.com/en/investors",
+        "finalUrl": "https://www.thulegroup.com/en/investors",
+        "statusCode": 200,
+        "responseTimeMs": 214,
+        "redirectCount": 0,
+        "annualSignalCount": 4,
+        "pdfLikeLinkCount": 3
+      }
+    },
+    {
+      "ticker": "VOLCAR-B.ST",
+      "company": "Volvo Car AB (publ.)",
+      "riskScore": 10,
+      "riskTier": "low",
+      "confidenceBand": "low",
+      "archetypes": [
+        "cloud_transport_risk"
+      ],
+      "signals": [
+        "Potential anti-bot/challenge markers found."
+      ],
+      "recommendedAction": "Low maintenance; include in periodic preflight checks.",
+      "latestStatus": "preflight",
+      "latestConfidence": null,
+      "evidence": {
+        "irUrl": "https://investors.volvocars.com",
+        "finalUrl": "https://investors.volvocars.com/en",
+        "statusCode": 200,
+        "responseTimeMs": 661,
+        "redirectCount": 1,
+        "annualSignalCount": 3,
+        "pdfLikeLinkCount": 2
+      }
+    }
+  ]
+}

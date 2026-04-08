@@ -13,7 +13,8 @@ This project is a **Node.js + TypeScript** system for **Nasdaq Stockholm Large C
 - **Entity-aware PDF checks**, URL normalization (encoded quotes, double slashes), fused-year and unit guards in extraction, type-aware validation (industrial / bank / investment company / real estate).
 - **EBIT (`ebit_msek`)** — broad direct label set (20+ Swedish / English phrases, including *rörelseresultat före finansiella poster*, *resultat före finansnetto*, *profit before net financial items*, etc.) and ordered fallbacks when no direct line matches: **adjusted EBIT-style labels** (with extraction notes), **operating margin × revenue** (when revenue is high-confidence table extraction, not narrative BSEK / allabolag), **EBITA minus amortization of intangibles** (±10 lines), and **sum of segment results** explicitly *before financial items* (with verification notes). EBITDA is intentionally not derived.
 - **Merge-safe reruns**: processing one ticker updates that company’s row in `results.json` by matching **`company` name** (case-insensitive), leaving other rows unchanged.
-- **Express dashboard** (`npm run server`): static UI, API for results, scrape jobs with log streaming (see [Dashboard](#dashboard)).
+- **Express dashboard** (`npm run server`): static UI, API for results, scrape jobs with log streaming, and a persistent **Risk Map** backed by preflight evaluation data (see [Dashboard](#dashboard)).
+- **Preflight risk evaluation** for all known companies (no full scrape): runs deterministic IR reachability/content checks and writes `output/preflight-risk.json`, consumed by `GET /api/risk-map`.
 
 ### Recent validated successes (2026-04-07)
 
@@ -162,7 +163,23 @@ Each **result** object (public JSON — internal pipeline `stages` are stripped)
 npm run server
 ```
 
-Opens the Express app (default **http://localhost:3000/** unless `PORT` is set). Serves `app/swedish-largecap-dashboard.html`, exposes JSON APIs for ticker list and results, and spawns **`node dist/scrape.js`** (with working directory set to the app root) for dashboard scrape jobs.
+Opens the Express app (default **http://localhost:3000/** unless `PORT` is set). Serves `app/swedish-largecap-dashboard.html`, exposes JSON APIs for ticker list/results/risk map, and spawns **`node dist/scrape.js`** (with working directory set to the app root) for dashboard scrape jobs.
+
+### Dashboard risk map and preflight mode
+
+- `Risk Map` tab is always visible (independent from current scrape rows in `results.json`).
+- Risk data is loaded from `output/preflight-risk.json` when available, so it is **not cleared** by `DELETE /api/results` or removing individual scrape rows.
+- Trigger full preflight evaluation from UI (`Run risk evaluation`) or API:
+
+```bash
+curl -X POST http://localhost:3000/api/risk-map/evaluate
+```
+
+- API endpoints:
+  - `GET /api/risk-map` → returns preflight risk payload (or scrape-derived fallback when preflight file is absent)
+  - `POST /api/risk-map/evaluate` → runs preflight checks for all companies in `data/ticker.json` and writes `output/preflight-risk.json`
+
+Preflight evaluation checks are lightweight and deterministic (IR reachability, redirects/domain drift, annual-report keyword signals, PDF-link presence, JS-heaviness indicators, anti-bot hints). They do **not** run PDF extraction.
 
 ## Production build and Azure
 

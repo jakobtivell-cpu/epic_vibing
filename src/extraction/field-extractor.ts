@@ -17,6 +17,7 @@ import {
   INVESTMENT_LABELS,
   REAL_ESTATE_LABELS,
   REAL_ESTATE_EBIT_LABELS_PRIMARY,
+  REAL_ESTATE_REVENUE_LABELS_PRIMARY,
   LabelSet,
 } from './labels';
 import { createLogger } from '../utils/logger';
@@ -1859,9 +1860,16 @@ function extractEbitWithStrategies(
   if (detectedType === 'real_estate') {
     const reMatch = extractRealEstateEbitProxy(lines, ebitOpts, ebitPick);
     if (reMatch !== null) {
-      extraNotes.push(
-        'EBIT estimated from förvaltningsresultat — real estate reporting, excludes fair value changes',
-      );
+      const lab = reMatch.label.toLowerCase();
+      if (lab === 'förvaltningsresultat') {
+        extraNotes.push(
+          'EBIT estimated from förvaltningsresultat — real estate reporting, excludes fair value changes and is the primary operating metric for this company type.',
+        );
+      } else {
+        extraNotes.push(
+          `EBIT estimated from ${reMatch.label} — real estate reporting, excludes fair value changes`,
+        );
+      }
       return {
         msek: normalizeEbitMatchToMsek(reMatch, lines, unitContext),
         match: reMatch,
@@ -2039,6 +2047,15 @@ export function extractFields(
         { minValue: revMin },
         tablePickBase,
         bankScan,
+      );
+    } else if (detectedType === 'real_estate') {
+      revMatch = findFinancialNumberPhased(
+        lines,
+        REAL_ESTATE_REVENUE_LABELS_PRIMARY,
+        labels.revenue,
+        { minValue: revMin },
+        tablePickBase,
+        SCAN_DEFAULT,
       );
     } else {
       revMatch = findFinancialNumber(

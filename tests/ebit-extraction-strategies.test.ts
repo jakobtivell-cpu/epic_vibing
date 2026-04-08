@@ -169,10 +169,23 @@ describe('EBIT extraction strategies', () => {
     expect(
       r.notes.some((n) =>
         n.includes(
-          'EBIT estimated from förvaltningsresultat — real estate reporting, excludes fair value changes',
+          'EBIT estimated from förvaltningsresultat — real estate reporting, excludes fair value changes and is the primary operating metric for this company type.',
         ),
       ),
     ).toBe(true);
+  });
+
+  it('real_estate: prefers hyresintäkter over nettoomsättning in revenue phased pass', () => {
+    const text = [
+      'Koncernens resultaträkning',
+      '2025    2024',
+      'Nettoomsättning   50000  48000',
+      'Hyresintäkter      8000   7500',
+    ].join('\n');
+    const r = extractFields(text, 'REHyres', 2025, 'real_estate');
+    expect(r.detectedCompanyType).toBe('real_estate');
+    expect(r.data.revenue_msek).toBe(8000);
+    expect(r.provenance.revenue?.matchedLabel).toBe('hyresintäkter');
   });
 
   it('real_estate: skips proxy when fair value change context contaminates line', () => {

@@ -67,12 +67,25 @@ export function validateExtractedData(
     score -= 15;
   }
 
+  const realEstateForvaltEbitFromNotes =
+    companyType === 'real_estate' &&
+    pipelineNotes?.some(
+      (n) =>
+        n.includes('EBIT estimated from förvaltningsresultat') &&
+        n.includes('primary operating metric'),
+    );
+
   if (
     cleaned.revenue_msek !== null &&
     cleaned.ebit_msek !== null &&
     cleaned.ebit_msek > cleaned.revenue_msek
   ) {
-    if (companyType === 'bank') {
+    if (realEstateForvaltEbitFromNotes) {
+      warnings.push(
+        `Real estate: förvaltningsresultat (${cleaned.ebit_msek} MSEK) above revenue proxy (${cleaned.revenue_msek} MSEK) — kept; lines are not directly comparable to industrial EBIT vs revenue`,
+      );
+      score -= 4;
+    } else if (companyType === 'bank') {
       const ratio = cleaned.ebit_msek / Math.max(cleaned.revenue_msek, 1);
       if (ratio <= 1.25) {
         warnings.push(

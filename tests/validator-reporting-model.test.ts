@@ -39,4 +39,31 @@ describe('validateExtractedData reporting model', () => {
     expect(r.data.ebit_msek).toBeNull();
     expect(r.warnings.some((w) => /semantic mismatch/i.test(w))).toBe(true);
   });
+
+  it('real_estate: keeps EBIT above revenue when pipeline notes show förvaltningsresultat proxy', () => {
+    const pipelineNotes = [
+      'EBIT estimated from förvaltningsresultat — real estate reporting, excludes fair value changes and is the primary operating metric for this company type.',
+    ];
+    const r = validateExtractedData(
+      { revenue_msek: 800, ebit_msek: 3200, employees: 5000, ceo: 'A B' },
+      'real_estate',
+      pipelineNotes,
+    );
+    expect(r.data.ebit_msek).toBe(3200);
+    expect(r.data.revenue_msek).toBe(800);
+    expect(r.warnings.some((w) => /förvaltningsresultat.*above revenue proxy/i.test(w))).toBe(true);
+  });
+
+  it('real_estate: still discards EBIT above revenue when EBIT proxy is not förvaltningsresultat', () => {
+    const pipelineNotes = [
+      'EBIT estimated from driftnetto — real estate reporting, excludes fair value changes',
+    ];
+    const r = validateExtractedData(
+      { revenue_msek: 800, ebit_msek: 3200, employees: 5000, ceo: 'A B' },
+      'real_estate',
+      pipelineNotes,
+    );
+    expect(r.data.ebit_msek).toBeNull();
+    expect(r.warnings.some((w) => /exceeds revenue/i.test(w))).toBe(true);
+  });
 });

@@ -149,15 +149,28 @@ export const INVESTMENT_LABELS: LabelSet = {
   ceo: INDUSTRIAL_LABELS.ceo,
 };
 
+/**
+ * Real-estate rental / turnover lines — matched before industrial revenue fallbacks.
+ */
+export const REAL_ESTATE_REVENUE_LABELS_PRIMARY: string[] = [
+  'hyresintäkter',
+  'rental income',
+  'hyror',
+  'property income',
+  'intäkter från fastigheter',
+  'nettoomsättning',
+];
+
 export const REAL_ESTATE_EBIT_LABELS_PRIMARY: string[] = [
   'förvaltningsresultat',
+  'driftnetto',
+  'överskott fastigheter',
   'income from property management',
   'operating surplus',
-  'driftnetto',
 ];
 
 export const REAL_ESTATE_LABELS: LabelSet = {
-  revenue: INDUSTRIAL_LABELS.revenue,
+  revenue: dedupeLabels(REAL_ESTATE_REVENUE_LABELS_PRIMARY, INDUSTRIAL_LABELS.revenue),
   ebit: dedupeLabels(REAL_ESTATE_EBIT_LABELS_PRIMARY, INDUSTRIAL_LABELS.ebit),
   employees: INDUSTRIAL_LABELS.employees,
   ceo: INDUSTRIAL_LABELS.ceo,

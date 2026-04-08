@@ -124,6 +124,14 @@ export function buildRiskMap(results: PipelineResult[]): RiskMapRow[] {
       addArchetype(archetypes, 'layout_fragile_pdf');
       signals.push('Layout/number guards were required.');
     }
+    const hasRevenueUnitGuard = hasAnyNote(notes, /revenue unit guard/i);
+    const hasEbitUnitGuard = hasAnyNote(notes, /ebit unit guard/i);
+    if (hasRevenueUnitGuard && hasEbitUnitGuard) {
+      // Dual core-financial unit correction is a strong indicator of format fragility.
+      score += 10;
+      addArchetype(archetypes, 'layout_fragile_pdf');
+      signals.push('Both revenue and EBIT required unit guard correction.');
+    }
 
     if (hasAnyNote(notes, /fiscal year mismatch/i)) {
       score += 10;

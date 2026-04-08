@@ -102,4 +102,23 @@ describe('risk-map deterministic scoring', () => {
       }),
     );
   });
+
+  it('escalates dual financial unit-guard cases to medium risk', () => {
+    const rows = buildRiskMap([
+      mkResult({
+        company: 'Volatile Units Co',
+        ticker: 'VUCO.ST',
+        status: 'complete',
+        fallbackStepReached: 'playwright',
+        confidence: 100,
+        extractionNotes: [
+          'Revenue unit guard: 509504000 -> 509504 MSEK',
+          'EBIT unit guard: 62198000 -> 62198 MSEK',
+        ],
+      }),
+    ]);
+    expect(rows[0].riskTier).toBe('medium');
+    expect(rows[0].riskScore).toBeGreaterThanOrEqual(35);
+    expect(rows[0].signals.join(' ')).toContain('Both revenue and EBIT required unit guard correction.');
+  });
 });

@@ -1,5 +1,9 @@
 import type { EntityProfile } from '../src/entity/entity-profile';
-import { buildEntityCheckTerms, verifyEntityInPdf } from '../src/validation/post-download-checks';
+import {
+  buildEntityCheckTerms,
+  verifyAnnualReportContent,
+  verifyEntityInPdf,
+} from '../src/validation/post-download-checks';
 
 const hmLikeProfile = (): EntityProfile => ({
   displayName: 'H&M',
@@ -40,5 +44,21 @@ describe('post-download entity verification', () => {
     expect(r.passed).toBe(true);
     expect(r.checkedRegion).toBe('first-12000-chars-strong');
     expect(r.matchedTerm).toContain('legal:');
+  });
+});
+
+describe('annual content verification', () => {
+  it('does not classify annual reports as quarterly when strong annual markers exist', () => {
+    const text = [
+      'Annual report 2025',
+      'Q4 2025 highlights',
+      'Consolidated income statement',
+      'Consolidated balance sheet',
+      'Directors report',
+      'Förvaltningsberättelse',
+    ].join('\n');
+    const r = verifyAnnualReportContent(text);
+    expect(r.isQuarterlyReport).toBe(false);
+    expect(r.isLikelyAnnualReport).toBe(true);
   });
 });

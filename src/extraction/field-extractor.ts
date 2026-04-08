@@ -337,6 +337,7 @@ interface NarrativeBsekHit {
   rawSnippet: string;
 }
 
+
 function isPlausibleBsekBillions(val: number): boolean {
   return !isNaN(val) && val >= 1 && val <= 2_000;
 }
@@ -415,6 +416,7 @@ function findNarrativeBsekRevenueHit(text: string): NarrativeBsekHit | null {
 
   return tryPatterns(salesPatterns) ?? tryPatterns(genericPatterns);
 }
+
 
 function normalizeToMsek(value: number, unit: UnitContext | null): number {
   switch (unit) {
@@ -976,7 +978,42 @@ function pickNumberFromLabelTail(
   const { minValue = -Infinity, maxValue = Infinity } = opts;
   const tail = afterLabel.trim();
 
+  const gluedPairCells = extractGluedPairThousandCells(tail);
+  if (gluedPairCells.length >= 2) {
+    const gluedPick = selectBestNumericFromCells(
+      gluedPairCells,
+      lines,
+      lineIndex,
+      opts,
+      pickContext,
+    );
+    if (gluedPick !== null) return gluedPick;
+  }
+
   let chosen = selectBestNumericFromCells(splitIntoCells(tail), lines, lineIndex, opts, pickContext);
+  if (chosen !== null && /\d\s+\d/.test(chosen.cell) && (chosen.cell.match(/\s+/g) ?? []).length >= 2) {
+    const reconstructed = selectBestNumericFromCells(
+      reconstructCompactColumnCells(tail, lines, lineIndex),
+      lines,
+      lineIndex,
+      opts,
+      pickContext,
+    );
+    if (reconstructed !== null) {
+      chosen = reconstructed;
+    }
+  }
+  if (chosen !== null) return chosen;
+
+  // Some OCR/ESEF rows collapse multiple year columns into a single space-group
+  // stream (e.g. "215 016 215 240"). Reconstruct likely per-column numbers.
+  chosen = selectBestNumericFromCells(
+    reconstructCompactColumnCells(tail, lines, lineIndex),
+    lines,
+    lineIndex,
+    opts,
+    pickContext,
+  );
   if (chosen !== null) return chosen;
 
   const directTokens = extractNumberTokens(afterLabel);
@@ -1001,6 +1038,60 @@ function pickNumberFromLabelTail(
   }
 
   return null;
+}
+
+function extractGluedPairThousandCells(tail: string): string[] {
+  const t = tail.replace(/\u00A0/g, ' ').replace(/[.,]/g, ' ');
+  const m = t.match(/([-–−]?\d{1,3}\s+\d{3})\s*([-–−]?\d{1,3}\s+\d{3})/);
+  if (!m) return [];
+  const a = m[1].replace(/\s+/g, ' ').trim();
+  const b = m[2].replace(/\s+/g, ' ').trim();
+  if (!/\d/.test(a) || !/\d/.test(b)) return [];
+  return [a, b];
+}
+
+function reconstructCompactColumnCells(
+  tail: string,
+  lines: string[],
+  lineIndex: number,
+): string[] {
+  const normalized = tail
+    .replace(/[,\u00A0]/g, ' ')
+    .replace(/[^\d\s\-–−]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!/^\s*[-–−]?\d{1,4}(?:\s+\d{1,4}){3,}\s*$/.test(normalized)) return [];
+
+  const groups = normalized.match(/\d{1,4}/g);
+  if (!groups || groups.length < 4) return [];
+
+  let expectedCols: number | null = null;
+  for (const hdr of yearHeaderLinesAbove(lines, lineIndex)) {
+    const seq = parseYearSequenceFromHeaderLine(hdr);
+    if (seq.length >= 2) {
+      expectedCols = seq.length;
+      break;
+    }
+  }
+
+  const out: string[] = [];
+  if (expectedCols && expectedCols >= 2 && expectedCols <= 4) {
+    const groupsPerCol = Math.floor(groups.length / expectedCols);
+    if (groupsPerCol >= 1 && groupsPerCol <= 3) {
+      for (let c = 0; c < expectedCols; c++) {
+        const from = c * groupsPerCol;
+        const to = from + groupsPerCol;
+        if (to <= groups.length) out.push(groups.slice(from, to).join(' '));
+      }
+      if (out.length >= 2) return out;
+    }
+  }
+
+  // Fallback: pairwise thousand-group chunks for 2-column tables.
+  for (let i = 0; i + 1 < groups.length; i += 2) {
+    out.push(`${groups[i]} ${groups[i + 1]}`);
+  }
+  return out;
 }
 
 function scanForNumber(
@@ -2064,14 +2155,25 @@ export function extractFields(
   );
   let employees: number | null = null;
   if (empMatch !== null) {
-    employees = Math.round(empMatch.value);
-    empProvenance = numMatchToProvenance(empMatch);
-    log.info(`Employees: ${employees}`);
+    const parsedEmployees = Math.round(empMatch.value);
+    const fy = fallbackFiscalYear;
+    const yearLike =
+      parsedEmployees >= 1900 &&
+      parsedEmployees <= 2100 &&
+      (fy === parsedEmployees || fy === parsedEmployees - 1 || fy === parsedEmployees + 1);
+    if (yearLike) {
+      notes.push(`Employee count ${parsedEmployees} discarded — likely fiscal-year column misread`);
+      log.warn(`Employees ${parsedEmployees} looks like fiscal year ${fy ?? 'n/a'} — discarding`);
+    } else {
+      employees = parsedEmployees;
+      empProvenance = numMatchToProvenance(empMatch);
+      log.info(`Employees: ${employees}`);
 
-    // Plausibility: at least 1 employee per 10 MSEK of revenue
-    if (revenue !== null && employees > 0 && employees < revenue / 10) {
-      notes.push(`SUSPECT_LOW: ${employees} employees vs ${revenue} MSEK revenue (< 1 per 10 MSEK)`);
-      log.warn(`Employee count ${employees} suspiciously low relative to revenue ${revenue} MSEK`);
+      // Plausibility: at least 1 employee per 10 MSEK of revenue
+      if (revenue !== null && employees > 0 && employees < revenue / 10) {
+        notes.push(`SUSPECT_LOW: ${employees} employees vs ${revenue} MSEK revenue (< 1 per 10 MSEK)`);
+        log.warn(`Employee count ${employees} suspiciously low relative to revenue ${revenue} MSEK`);
+      }
     }
   } else {
     notes.push(`Employee count not found for ${companyName}`);

@@ -306,7 +306,9 @@ export function verifyAnnualReportContent(text: string): ContentCheckResult {
   const annualMarkerCount = ANNUAL_REPORT_MARKERS.filter((p) => p.test(lower)).length;
 
   const first5000 = lower.substring(0, 5_000);
-  const isQuarterlyReport = QUARTERLY_MARKERS.some((p) => p.test(first5000));
+  const hasQuarterlySignals = QUARTERLY_MARKERS.some((p) => p.test(first5000));
+  const strongAnnualSignals = annualMarkerCount >= 4 && hasIncomeStatement && hasBalanceSheet;
+  const isQuarterlyReport = hasQuarterlySignals && !strongAnnualSignals;
   const isGovernanceReport =
     GOVERNANCE_MARKERS.some((p) => p.test(first5000)) && annualMarkerCount < 3;
 

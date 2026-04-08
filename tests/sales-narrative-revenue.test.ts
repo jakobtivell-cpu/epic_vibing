@@ -30,4 +30,5 @@ Sales, SEK billion
     expect(r.data.revenue_msek).toBe(79_000);
     expect(r.notes.some((n) => n.includes('fused year'))).toBe(true);
   });
+
 });

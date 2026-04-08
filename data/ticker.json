@@ -817,7 +817,7 @@
     "BURE.ST": {
         "name": "Bure Equity AB (publ)",
         "companyType": "investment_company",
-        "irPage": "https://www.bure.se/en/investors",
+        "irPage": "https://www.bure.se/",
         "candidateDomains": [
             "https://www.bure.se"
         ]

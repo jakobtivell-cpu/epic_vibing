@@ -462,7 +462,6 @@ async function addCompany(name){
     }
     return (r.company||"").toLowerCase()===key;
   });
-  if(dupResult)return;
   if(jobs.some(j=>j.status==="running"&&j.queryKey===key))return;
 
   let res;
@@ -470,7 +469,7 @@ async function addCompany(name){
     res=await fetch(API_BASE+"/api/scrape",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify(isTicker?{ticker:trimmed}:{company:trimmed}),
+      body:JSON.stringify(isTicker?{ticker:trimmed,force:dupResult}:{company:trimmed,force:dupResult}),
     });
   }catch(e){
     inlineStatusMsg="✕ Cannot reach API: "+e.message+". Start the server with npm run server (default http://localhost:3000).";
@@ -499,7 +498,7 @@ async function addCompany(name){
     return;
   }
 
-  inlineStatusMsg="";
+  inlineStatusMsg=dupResult?"✓ Re-running existing company (force refresh)":"";
   const job={id:body.jobId,name:trimmed,status:"running",logs:[],logsExpanded:true,queryKey:key,es:null,exitCode:null,cancelled:false};
   jobs.push(job);
   render();

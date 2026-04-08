@@ -100,11 +100,15 @@ const SBG={Industrials:"#EFF6FF",Technology:"#F5F3FF",Consumer:"#FFFBEB",Financi
 // ── STATE ──
 let results=[];   // Full result objects (from API)
 let jobs=[];      // Active/completed scrape jobs: {id,name,status,logs[],logsExpanded?}
+let riskRows=[];  // Risk map rows from /api/risk-map
 let view="table",selTk=null,inlineStatusMsg="";
+let riskTierFilter="all";
+let riskArchetypeFilter="all";
+let selectedRiskTicker=null;
 
 /** Tab switching — use a named function so clicks always update script scope (inline handlers + top-level `let`). */
 function setMainView(v){
-  view=v==="performance"?"performance":"table";
+  view=(v==="performance"||v==="risk")?v:"table";
   render();
 }
 
@@ -212,7 +216,20 @@ async function loadResultsFromServer(){
     if(!r.ok)return;
     const data=await r.json();
     results=Array.isArray(data.results)?data.results.map(x=>({...x,_source:"api"})):[];
+    await loadRiskMapFromServer();
   }catch(e){console.warn("loadResultsFromServer",e)}
+}
+
+async function loadRiskMapFromServer(){
+  try{
+    const r=await fetch(API_BASE+"/api/risk-map");
+    if(!r.ok){riskRows=[];return}
+    const data=await r.json();
+    riskRows=Array.isArray(data.results)?data.results:[];
+  }catch(e){
+    console.warn("loadRiskMapFromServer",e);
+    riskRows=[];
+  }
 }
 
 async function clearResults(){
@@ -633,15 +650,112 @@ function renderPerf(){
   return`${agg}<div class="g2">${ch("Confidence score",c1)}${ch("Field extraction",c2)}${ch("Data source",c3)}${ch("Extraction notes",c4)}</div>`;
 }
 
+function setRiskTierFilter(v){
+  riskTierFilter=v;
+  render();
+}
+
+function setRiskArchetypeFilter(v){
+  riskArchetypeFilter=v;
+  render();
+}
+
+function selectRiskCompany(ticker){
+  selectedRiskTicker=selectedRiskTicker===ticker?null:ticker;
+  render();
+}
+
+function filteredRiskRows(){
+  return riskRows.filter(r=>{
+    if(riskTierFilter!=="all"&&r.riskTier!==riskTierFilter)return false;
+    if(riskArchetypeFilter!=="all"&&!(Array.isArray(r.archetypes)&&r.archetypes.includes(riskArchetypeFilter)))return false;
+    return true;
+  });
+}
+
+function renderRiskMap(){
+  if(!riskRows.length)return`<div class="cd empty"><div style="font-size:14px;font-weight:600;margin-bottom:6px">No risk data yet</div><div style="font-size:12.5px;color:var(--t3)">Run at least one scrape to build risk signals.</div></div>`;
+  const rows=filteredRiskRows();
+  const tierCount={low:0,medium:0,high:0};
+  const archetypeCount={};
+  for(const r of riskRows){
+    if(r.riskTier in tierCount)tierCount[r.riskTier]++;
+    for(const a of (Array.isArray(r.archetypes)?r.archetypes:[]))archetypeCount[a]=(archetypeCount[a]||0)+1;
+  }
+  const allArchetypes=Object.keys(archetypeCount).sort((a,b)=>(archetypeCount[b]-archetypeCount[a])||a.localeCompare(b));
+  const chips=['all','low','medium','high'].map(t=>`<button type="button" class="tab ${riskTierFilter===t?"on":""}" onclick="setRiskTierFilter('${t}')">${t==="all"?"All tiers":t}</button>`).join("");
+  const aChips=['all',...allArchetypes].map(a=>`<button type="button" class="tab ${riskArchetypeFilter===a?"on":""}" onclick="setRiskArchetypeFilter('${a}')">${a==="all"?"All archetypes":a}</button>`).join("");
+  const scoreColor=s=>s>=65?"var(--rose)":s>=35?"var(--amber)":"var(--green)";
+  const bodyRows=rows.map(r=>{
+    const sig=(Array.isArray(r.signals)?r.signals:[]).slice(0,2).join(" · ");
+    const tk=String(r.ticker||"");
+    const isSel=selectedRiskTicker===tk;
+    return`<tr class="${isSel?"sel":""}" onclick="selectRiskCompany('${esc(tk)}')">
+      <td class="tl" style="padding-left:14px"><div style="font-weight:600;font-size:12.5px">${esc(r.company)}</div><div class="mono" style="font-size:10px;color:var(--t3)">${esc(r.ticker||"—")}</div></td>
+      <td class="tr mono" style="color:${scoreColor(r.riskScore)}">${esc(String(r.riskScore))}</td>
+      <td class="tr"><span class="badge ${r.riskTier==="low"?"b-ok":r.riskTier==="medium"?"b-pt":"b-fl"}">${esc(r.riskTier)}</span></td>
+      <td class="tr mono">${esc(r.confidenceBand||"low")}</td>
+      <td class="tl" style="max-width:280px">${esc((r.archetypes||[]).join(", ")||"—")}</td>
+      <td class="tl" style="max-width:340px">${esc(sig||"—")}</td>
+      <td class="tl" style="padding-right:14px;max-width:260px">${esc(r.recommendedAction||"—")}</td>
+    </tr>`;
+  }).join("");
+  const selected=selectedRiskTicker?rows.find(r=>String(r.ticker||"")===String(selectedRiskTicker)):null;
+  const detail=selected?`<div class="cd detail" style="padding:16px;max-height:calc(100vh - 220px);overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+      <div><div style="font-size:15px;font-weight:700">${esc(selected.company)}</div><div class="mono" style="font-size:11px;color:var(--t3)">${esc(selected.ticker||"—")} · ${esc(selected.riskTier)} risk</div></div>
+      <button onclick="selectedRiskTicker=null;render()" style="width:24px;height:24px;border-radius:6px;border:1px solid var(--bd);background:transparent;cursor:pointer;color:var(--t3)">✕</button>
+    </div>
+    <div class="dg">
+      <div class="dc"><div class="l">Risk score</div><div class="v mono">${esc(String(selected.riskScore))}</div></div>
+      <div class="dc"><div class="l">Confidence band</div><div class="v mono">${esc(selected.confidenceBand||"low")}</div></div>
+      <div class="dc"><div class="l">Latest status</div><div class="v">${stBadge(selected.latestStatus)}</div></div>
+      <div class="dc"><div class="l">Latest confidence</div><div class="v mono">${selected.latestConfidence==null?"—":esc(String(selected.latestConfidence)+"%")}</div></div>
+    </div>
+    <div style="margin-top:12px;font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Archetypes</div>
+    <div style="margin-top:6px">${(selected.archetypes||[]).map(a=>`<span class="badge b-pt" style="margin-right:6px">${esc(a)}</span>`).join("")||'<span style="color:var(--t3);font-size:12px">None</span>'}</div>
+    <div style="margin-top:12px;font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Signals</div>
+    <div style="margin-top:6px">${(selected.signals||[]).map(s=>`<div class="note note-i">${esc(s)}</div>`).join("")||'<span style="color:var(--t3);font-size:12px">No signals</span>'}</div>
+    <div style="margin-top:12px;font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Recommended action</div>
+    <div class="note note-w" style="margin-top:6px">${esc(selected.recommendedAction||"—")}</div>
+  </div>`:"";
+  return `<div style="display:grid;gap:16px">
+    <div class="cd" style="padding:16px">
+      <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Risk summary</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
+        <div><div class="pm"><span class="n">${tierCount.low}</span></div><div style="font-size:10.5px;color:var(--t3)">Low risk</div></div>
+        <div><div class="pm"><span class="n">${tierCount.medium}</span></div><div style="font-size:10.5px;color:var(--t3)">Medium risk</div></div>
+        <div><div class="pm"><span class="n">${tierCount.high}</span></div><div style="font-size:10.5px;color:var(--t3)">High risk</div></div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${chips}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${aChips}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:${selected?"1fr 380px":"1fr"};gap:16px">
+    <div class="cd" style="overflow-x:auto">
+      <table><thead><tr>
+        <th class="tl" style="padding-left:14px">Company</th>
+        <th class="tr">Risk</th>
+        <th class="tr">Tier</th>
+        <th class="tr">Band</th>
+        <th class="tl">Archetypes</th>
+        <th class="tl">Top signals</th>
+        <th class="tl" style="padding-right:14px">Recommended action</th>
+      </tr></thead><tbody>${bodyRows}</tbody></table>
+    </div>
+    ${detail}
+    </div>
+  </div>`;
+}
+
 // ── MAIN RENDER ──
 function render(){
   const act=jobs.filter(j=>j.status==="running");
   const hasData=results.length>0;
 
-  if(!hasData&&view==="performance")view="table";
+  if(!hasData&&(view==="performance"||view==="risk"))view="table";
 
   document.getElementById("tabs").innerHTML=hasData
-    ?`<button type="button" class="tab ${view==="table"?"on":""}" onclick="setMainView('table')">Table</button><button type="button" class="tab ${view==="performance"?"on":""}" onclick="setMainView('performance')">Performance</button>`
+    ?`<button type="button" class="tab ${view==="table"?"on":""}" onclick="setMainView('table')">Table</button><button type="button" class="tab ${view==="performance"?"on":""}" onclick="setMainView('performance')">Performance</button><button type="button" class="tab ${view==="risk"?"on":""}" onclick="setMainView('risk')">Risk Map</button>`
     :"";
 
   let h="";
@@ -691,6 +805,7 @@ function render(){
   if(hasData){
     if(view==="table")h+=renderTable();
     else if(view==="performance")h+=renderPerf();
+    else if(view==="risk")h+=renderRiskMap();
     else{view="table";h+=renderTable();}
   }
 

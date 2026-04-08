@@ -8,6 +8,8 @@ import { randomBytes } from 'crypto';
 import { spawn, ChildProcess } from 'child_process';
 import express, { Request, Response } from 'express';
 import { RESULTS_PATH } from './src/config/settings';
+import type { PipelineResult } from './src/types';
+import { buildRiskMapResponse } from './src/risk/risk-map';
 
 const LOG_LINE_RE = /^\d{4}-\d{2}-\d{2}T/;
 const MAX_CONCURRENT = 3;
@@ -382,6 +384,26 @@ app.get('/api/results', (_req: Request, res: Response) => {
       companyCount: typeof data.companyCount === 'number' ? data.companyCount : results.length,
       generatedAt: data.generatedAt ?? null,
     });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: msg });
+  }
+});
+
+app.get('/api/risk-map', (_req: Request, res: Response) => {
+  try {
+    if (!fs.existsSync(RESULTS_PATH)) {
+      res.json(buildRiskMapResponse([], null));
+      return;
+    }
+
+    const raw = fs.readFileSync(RESULTS_PATH, 'utf8');
+    const parsed = JSON.parse(raw) as {
+      generatedAt?: string | null;
+      results?: PipelineResult[];
+    };
+    const results = Array.isArray(parsed.results) ? parsed.results : [];
+    res.json(buildRiskMapResponse(results, parsed.generatedAt ?? null));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: msg });

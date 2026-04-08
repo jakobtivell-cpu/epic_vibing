@@ -817,9 +817,11 @@
     "BURE.ST": {
         "name": "Bure Equity AB (publ)",
         "companyType": "investment_company",
-        "irPage": "https://www.bure.se/",
+        "irPage": "https://www.bure.se/en/investors/financial-reports",
         "candidateDomains": [
-            "https://www.bure.se"
+            "https://www.bure.se",
+            "https://storage.mfn.se",
+            "https://mfn.se"
         ]
     },
     "GRNG.ST": {
@@ -856,8 +858,9 @@
     },
     "SYSR.ST": {
         "name": "Systemair AB (publ)",
-        "irPage": "https://www.systemair.com/en/investors/",
+        "irPage": "https://group.systemair.com/investor-relations/reports-and-presentations/",
         "candidateDomains": [
+            "https://group.systemair.com",
             "https://www.systemair.com"
         ]
     },

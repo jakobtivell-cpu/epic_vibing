@@ -842,11 +842,9 @@ async function processCompany(
     } catch {
       domainBase = seededIr;
     }
-    const seedHk = originHostKey(seededIr);
-    if (seedHk) {
-      attemptedIrHosts.add(seedHk);
-    }
-    log.info(`[${name}] --- Ticker irPage seed (skip IR discovery): ${seededIr} ---`);
+    // Do not mark host as attempted yet: stale seeded IR URLs (404/moved)
+    // must still allow normal IR discovery on the same domain afterwards.
+    log.info(`[${name}] --- Ticker irPage seed (preferred first try): ${seededIr} ---`);
     if (!irPageUrl) irPageUrl = seededIr;
     irResult = { status: 'success', value: seededIr, durationMs: 0 };
     await runIrExtractionPath(domainBase, seededIr);

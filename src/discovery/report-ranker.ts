@@ -310,6 +310,42 @@ function scanPageForCandidates(
     candidates.push(candidate);
   });
 
+  // Some IR pages render report rows via inline JSON/script payloads where
+  // anchor hrefs are not directly exposed in the static DOM. Capture absolute
+  // PDF URLs from raw HTML/script text to avoid hard dependency on Playwright.
+  const embeddedPdfUrlRe = /https?:\/\/[^\s"'<>]+?\.pdf(?:\?[^\s"'<>]*)?/gi;
+  let m: RegExpExecArray | null;
+  while ((m = embeddedPdfUrlRe.exec(html)) !== null) {
+    const url = m[0];
+    if (seen.has(url)) continue;
+    if (candidateUrlsOrTextImpliesStaleReport(url, url)) continue;
+    seen.add(url);
+    candidates.push({
+      url,
+      score: Math.max(3, urlScore(url) + yearScore(extractYear(url))),
+      text: 'Embedded PDF URL',
+      source,
+    });
+  }
+
+  // Escaped JSON/script URLs (e.g. https:\/\/storage.mfn.se\/...\/annual-report.pdf)
+  // are common on IR pages rendered from CMS APIs.
+  const escapedPdfUrlRe = /https?:\\\/\\\/[^\s"'<>]+?\.pdf(?:\\\/\?[^\s"'<>]*)?/gi;
+  let e: RegExpExecArray | null;
+  while ((e = escapedPdfUrlRe.exec(html)) !== null) {
+    const raw = e[0];
+    const url = raw.replace(/\\\//g, '/');
+    if (seen.has(url)) continue;
+    if (candidateUrlsOrTextImpliesStaleReport(url, url)) continue;
+    seen.add(url);
+    candidates.push({
+      url,
+      score: Math.max(4, urlScore(url) + yearScore(extractYear(url))),
+      text: 'Embedded escaped PDF URL',
+      source,
+    });
+  }
+
   return candidates;
 }
 

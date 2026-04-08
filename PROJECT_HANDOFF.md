@@ -33,6 +33,9 @@ Production-minded **Node.js + TypeScript** scraper for **Nasdaq Stockholm Large 
 - [x] Express server + dashboard HTML (`npm run server`).
 - [x] Persistent Risk Map preflight mode (`src/risk/preflight-evaluator.ts`) with on-demand full-list evaluation via `POST /api/risk-map/evaluate`.
 - [x] Risk Map UI decoupled from scrape results (`/api/results` clear/remove does not clear risk data); run cards displayed in 3-column grid with per-run copy-text control.
+- [x] Seeded IR URL handling now treats `irPage` as preferred-first (not host lock), so stale ticker seeds no longer block same-domain fallback discovery.
+- [x] Report-ranker scans embedded script/JSON PDF URLs (including escaped URLs) to improve deterministic candidate discovery where anchors are not directly rendered.
+- [x] Additional extraction guards for investment-company reports: reject ESEF/non-person CEO phrases and discard likely portfolio-level employee counts.
 - [x] Jest coverage for parsing guards, URL helpers, entity verification, ticker `irPage` HTTPS checks, validation plausibility, and discovery-related tests under `tests/`.
 
 ## Engineering backlog (honest current frontier)

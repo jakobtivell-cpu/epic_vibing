@@ -37,3 +37,5 @@
 - **`data/entity-confusion.json`** patterns must be valid **JavaScript** `RegExp` sources. Do not use PCRE-only inline flags such as `(?i)`; use the `'i'` flag via code (the loader also strips a leading `(?i)` if present).
 - **Rule file resolution** tries `process.cwd()/data/` first, then `__dirname`-relative paths, so tests and CLI runs from the repo root load rules consistently.
 - **Risk map persistence split:** `/api/results` lifecycle does not own risk data anymore; risk view should read `/api/risk-map` (preflight file first, scrape-derived fallback second).
+- **Seeded `irPage` behavior:** ticker seed is a preferred first scan, but no longer marks host as exhausted up-front; same-domain IR discovery still runs when seed URL is stale/moved.
+- **Cheerio PDF discovery hardening:** report ranker now also extracts embedded PDF URLs from raw HTML/script payloads (including escaped `https:\/\/...pdf`) for CMS/MFN pages with weak anchor markup.

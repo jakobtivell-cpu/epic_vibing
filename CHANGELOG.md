@@ -18,6 +18,13 @@ Changes are grouped by area. Versions follow [Semantic Versioning](https://semve
 
 - Tuned deterministic scoring to increase risk when both revenue and EBIT unit guards are present, improving visibility for layout-fragile "recently fixed" companies.
 
+### Discovery / extraction hardening
+
+- Seeded ticker `irPage` is now treated as a preferred first attempt instead of a hard host lock, so stale seeds no longer prevent same-domain IR discovery.
+- Updated deterministic IR seeds/domains for difficult issuers (including Systemair, Bure, and Industrivärden) to reduce `.net`/moved-page 404 failures in cloud runs.
+- Report ranking now scans raw HTML/script payloads for embedded PDF URLs (plain and escaped forms), improving non-Playwright coverage on CMS/MFN-backed pages.
+- CEO extraction now rejects ESEF/non-person phrases (for example “Single Electronic Format”) and investment-company employee extraction discards likely portfolio-level headcount values.
+
 ## [2.1.2] — 2026-04-07
 
 ### Discovery

@@ -61,4 +61,18 @@ describe('annual content verification', () => {
     expect(r.isQuarterlyReport).toBe(false);
     expect(r.isLikelyAnnualReport).toBe(true);
   });
+
+  it('accepts bank report income markers when income statement heading is absent', () => {
+    const text = [
+      'Annual and Sustainability Report 2025',
+      'Consolidated Financial Statements',
+      'Net interest income',
+      'Operating income',
+      'Profit before tax',
+      'Statement of financial position',
+    ].join('\n');
+    const r = verifyAnnualReportContent(text);
+    expect(r.hasIncomeStatement).toBe(true);
+    expect(r.isLikelyAnnualReport).toBe(true);
+  });
 });

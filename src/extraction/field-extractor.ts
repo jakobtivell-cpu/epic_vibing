@@ -1179,6 +1179,8 @@ const NON_NAME_PATTERNS = [
   'single electronic format',
   'electronic format',
   'esef report',
+  'managing partner',
+  'internal audit',
 ];
 
 const CORPORATE_WORDS = /\b(?:group|board|committee|team|communications|holding|capital|partners|investment|management|report|statement|corporate|governance|foundation|business|area|president|director|officer|vice|senior|division|segment|unit|meeting|annual|general)\b/i;

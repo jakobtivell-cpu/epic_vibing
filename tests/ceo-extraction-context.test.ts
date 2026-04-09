@@ -31,4 +31,16 @@ Chief Executive Officer
     const r = extractFields(text, 'AB Industrivärden (publ)', 2025, 'investment_company');
     expect(r.data.ceo).toBeNull();
   });
+
+  it('rejects role-only title phrases as CEO name candidates', () => {
+    const text = `
+Annual report 2025
+Managing Partner
+Chief Executive Officer
+Internal Audit
+VD
+`;
+    const r = extractFields(text, 'RoleOnlyCo', 2025);
+    expect(r.data.ceo).toBeNull();
+  });
 });

@@ -82,6 +82,13 @@ const TEXT_NEGATIVE: { pattern: RegExp; points: number }[] = [
   { pattern: /\bsammandrag\b/i, points: -3 },
   { pattern: /\besef\b/i, points: -3 },
   { pattern: /\bcopy[\s-]+of[\s-]+the[\s-]+official\b/i, points: -5 },
+  { pattern: /\bpillar[\s-]*3\b/i, points: -24 },
+  { pattern: /\brisk\s+disclosures?\b/i, points: -20 },
+  { pattern: /\brisk\s+report\b/i, points: -16 },
+  { pattern: /\bnomination\s+committee'?s?\b/i, points: -24 },
+  { pattern: /\bboard\s+proposal\b/i, points: -24 },
+  { pattern: /\blti\b/i, points: -16 },
+  { pattern: /\bremuneration\s+report\b/i, points: -18 },
 ];
 
 function sustainabilityPenalty(text: string): number {
@@ -105,6 +112,9 @@ function urlScore(href: string): number {
   if (/press|\/pr-|\/news\/|pressrelease|_pr_/i.test(lower)) score -= 10;
   if (/interim|quarterly|q[1-4]\b/i.test(lower)) score -= 8;
   if (/voting|postal[\s-]*vote|kallelse|proxy|bolagsst(a|ä)mma|röstmaterial|\/agm\b|_agm_|instruktioner/i.test(lower)) {
+    score -= 22;
+  }
+  if (/nomination|board-proposal|board-proposals|lti-|remuneration-report/i.test(lower)) {
     score -= 22;
   }
 

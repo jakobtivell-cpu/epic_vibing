@@ -166,7 +166,7 @@
     },
     "EQT.ST": {
         "name": "EQT AB (publ)",
-        "irPage": "https://eqtgroup.com/investors",
+        "irPage": "https://eqtgroup.com/en/shareholders/reports-and-presentations",
         "candidateDomains": [
             "https://eqtgroup.com"
         ],
@@ -760,7 +760,14 @@
         ]
     },
     "SINCH.ST": "Sinch AB (publ)",
-    "ARION-SDB.ST": "Arion banki hf.",
+    "ARION-SDB.ST": {
+        "name": "Arion banki hf.",
+        "companyType": "bank",
+        "irPage": "https://www.arionbanki.is/english/about-us/investor-relations/financial-information/",
+        "candidateDomains": [
+            "https://www.arionbanki.is"
+        ]
+    },
     "ALLEI.ST": {
         "name": "Alleima AB (publ)",
         "irPage": "https://www.alleima.com/en/investors/",
@@ -823,9 +830,7 @@
         "companyType": "investment_company",
         "irPage": "https://www.bure.se/en/investors/financial-reports",
         "candidateDomains": [
-            "https://www.bure.se",
-            "https://storage.mfn.se",
-            "https://mfn.se"
+            "https://www.bure.se"
         ]
     },
     "GRNG.ST": {

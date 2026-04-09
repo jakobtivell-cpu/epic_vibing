@@ -104,7 +104,8 @@ function companySlugHyphen(name: string): string {
 
 const DOMAIN_STOPWORDS = new Set([
   'ab', 'publ', 'the', 'and', 'och', 'ltd', 'plc', 'oyj', 'asa', 'inc', 'group', 'gruppen',
-  'telefonaktiebolaget', 'aktiebolaget', 'svenska', 'corporation', 'company', 'holding',
+  'telefonaktiebolaget', 'aktiebolaget', 'svenska', 'corporation', 'company', 'holding', 'equity',
+  'partners',
 ]);
 
 /**
@@ -454,6 +455,13 @@ function scorePdfCandidate(
   }
   if (/summary|sammandrag/i.test(combined)) score -= 3;
 
+  const nameTokens = shortNames
+    .flatMap((n) => n.toLowerCase().split(/[^a-z0-9åäö]+/i))
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 4 && !DOMAIN_STOPWORDS.has(t));
+  const haystack = `${urlLower} ${combined}`;
+  const tokenMatched = nameTokens.some((t) => haystack.includes(t));
+
   const yearMatch = url.match(/\b(20[12]\d)\b/) ?? title.match(/\b(20[12]\d)\b/);
   if (yearMatch) {
     const year = parseInt(yearMatch[1], 10);
@@ -463,11 +471,13 @@ function scorePdfCandidate(
   }
 
   // Domain trust: bonus if URL domain contains one of the short names
+  let hostMatched = false;
   try {
     const hostname = new URL(url).hostname.toLowerCase();
     for (const sn of shortNames) {
       if (hostname.includes(sn.toLowerCase())) {
         score += 4;
+        hostMatched = true;
         break;
       }
     }
@@ -475,6 +485,12 @@ function scorePdfCandidate(
       score += 3;
     }
   } catch { /* skip */ }
+
+  // If neither the host nor the candidate text mentions company tokens,
+  // this is usually a cross-company false positive from broad search results.
+  if (!hostMatched && !tokenMatched) {
+    score -= 14;
+  }
 
   return score;
 }

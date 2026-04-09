@@ -296,7 +296,11 @@ export function verifyAnnualReportContent(text: string): ContentCheckResult {
   const hasIncomeStatement =
     /resultaträkning/i.test(lower) ||
     /income\s+statement/i.test(lower) ||
-    /statement\s+of\s+(income|profit|loss)/i.test(lower);
+    /statement\s+of\s+(income|profit|loss|comprehensive\s+income)/i.test(lower) ||
+    /\bprofit\s+before\s+tax\b/i.test(lower) ||
+    /\bresult\s+before\s+tax\b/i.test(lower) ||
+    /\bnet\s+interest\s+income\b/i.test(lower) ||
+    /\boperating\s+income\b/i.test(lower);
 
   const hasBalanceSheet =
     /balansräkning/i.test(lower) ||

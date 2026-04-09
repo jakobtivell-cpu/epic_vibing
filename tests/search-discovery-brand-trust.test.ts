@@ -19,5 +19,14 @@ describe('search discovery brand trust', () => {
     expect(merged).toContain('seb');
     expect(hostnameMatchesBrandTrust('www.sebgroup.com', merged)).toBe(true);
   });
+
+  it('does not treat "International" as a brand slug for Lindab International', () => {
+    const slugs = extractBrandSlugsForDomains('Lindab International AB (publ)');
+    expect(slugs).toContain('lindab');
+    expect(slugs).toContain('lindabgroup');
+    expect(slugs).not.toContain('international');
+    expect(hostnameMatchesBrandTrust('www.international.com', slugs)).toBe(false);
+    expect(hostnameMatchesBrandTrust('www.lindabgroup.com', slugs)).toBe(true);
+  });
 });
 

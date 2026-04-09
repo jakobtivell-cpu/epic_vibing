@@ -106,6 +106,8 @@ const DOMAIN_STOPWORDS = new Set([
   'ab', 'publ', 'the', 'and', 'och', 'ltd', 'plc', 'oyj', 'asa', 'inc', 'group', 'gruppen',
   'telefonaktiebolaget', 'aktiebolaget', 'svenska', 'corporation', 'company', 'holding', 'equity',
   'partners',
+  /** Avoid inventing www.international.com / international.se from "Lindab International AB". */
+  'international',
 ]);
 
 /**
@@ -139,6 +141,10 @@ export function extractBrandSlugsForDomains(companyOrLegalName: string): string[
   if (/\bsecuritas\b/i.test(raw)) slugs.add('securitas');
   if (/\balfa\s+laval\b/i.test(lower)) slugs.add('alfalaval');
   if (/\binvestor\s+ab\b/i.test(lower)) slugs.add('investorab');
+  if (/\blindab\b/i.test(lower)) {
+    slugs.add('lindab');
+    slugs.add('lindabgroup');
+  }
 
   const stripped = raw
     .replace(PAREN_SUFFIX, ' ')

@@ -828,7 +828,7 @@
     "BURE.ST": {
         "name": "Bure Equity AB (publ)",
         "companyType": "investment_company",
-        "irPage": "https://www.bure.se/en/investors/financial-reports",
+        "irPage": "https://www.bure.se/investerare/finansiella-rapporter",
         "candidateDomains": [
             "https://www.bure.se"
         ]
@@ -955,7 +955,14 @@
     "IVSO.ST": "Invisio AB (publ)",
     "CIBUS.ST": "Cibus Nordic Real Estate AB (publ)",
     "BIOG-B.ST": "BioGaia AB (publ)",
-    "LIAB.ST": "Lindab International AB (publ)",
+    "LIAB.ST": {
+        "name": "Lindab International AB (publ)",
+        "irPage": "https://www.lindabgroup.com/sv/investerare/finansiella-rapporter-och-presentationer/finansiella-rapporter",
+        "candidateDomains": [
+            "https://www.lindabgroup.com",
+            "https://www.lindab.se"
+        ]
+    },
     "BILI-A.ST": "Bilia AB (publ)",
     "ALIG.ST": "Alimak Group AB (publ)",
     "MTG-A.ST": {

@@ -89,6 +89,8 @@ const TEXT_NEGATIVE: { pattern: RegExp; points: number }[] = [
   { pattern: /\bboard\s+proposal\b/i, points: -24 },
   { pattern: /\blti\b/i, points: -16 },
   { pattern: /\bremuneration\s+report\b/i, points: -18 },
+  { pattern: /bolagsstyrningsrapport/i, points: -26 },
+  { pattern: /corporate\s+governance\s+report/i, points: -26 },
 ];
 
 function sustainabilityPenalty(text: string): number {
@@ -116,6 +118,9 @@ function urlScore(href: string): number {
   }
   if (/nomination|board-proposal|board-proposals|lti-|remuneration-report/i.test(lower)) {
     score -= 22;
+  }
+  if (/corpgov|bolagsstyrn|corp[-_]gov|governance[-_]report/i.test(lower)) {
+    score -= 28;
   }
 
   const urlYear = extractYear(href);
@@ -194,6 +199,55 @@ function scoreLinkCandidate(
 
 function isPdfUrl(url: string): boolean {
   return /\.pdf(\?|$)/i.test(url);
+}
+
+/** CMS/CDN hosts where PDF filenames are opaque hashes — require nearby annual-report context. */
+const OPAQUE_CDN_HOST_RE =
+  /sanity\.io|cloudinary\.com|ctfassets\.net|prismic\.io|contentful\.com/i;
+
+function sameSitePdf(baseUrl: string, pdfUrl: string): boolean {
+  try {
+    const baseHost = new URL(baseUrl).hostname.replace(/^www\./i, '').toLowerCase();
+    const pdfHost = new URL(pdfUrl).hostname.replace(/^www\./i, '').toLowerCase();
+    return pdfHost === baseHost || pdfHost.endsWith(`.${baseHost}`);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Deprioritize third-party embedded PDFs (e.g. Sanity) unless HTML near the URL mentions
+ * an annual report — fixes EQT-style pages where hundreds of hash PDFs tie at low scores.
+ */
+export function scoreEmbeddedPdfUrl(
+  pdfUrl: string,
+  baseScore: number,
+  html: string,
+  matchIndex: number,
+  baseUrl: string,
+): number {
+  if (sameSitePdf(baseUrl, pdfUrl)) return baseScore;
+
+  let host = '';
+  try {
+    host = new URL(pdfUrl).hostname;
+  } catch {
+    return baseScore;
+  }
+
+  if (!OPAQUE_CDN_HOST_RE.test(host)) return baseScore;
+
+  const start = Math.max(0, matchIndex - 550);
+  const end = Math.min(html.length, matchIndex + pdfUrl.length + 550);
+  const windowText = `${html.slice(start, end)} ${pdfUrl}`.toLowerCase();
+
+  const annualContext =
+    /annual\s*(and\s*sustainability\s*)?report|årsredovisning|integrated\s*(annual\s*)?report|financial\s*statements|koncernredovisning|arsredovisning|års-?\s*och\s*hållbarhets/i.test(
+      windowText,
+    );
+
+  if (annualContext) return baseScore + 10;
+  return Math.min(baseScore, 1);
 }
 
 const BINARY_EXTENSIONS = /\.(zip|xlsx?|docx?|pptx?|csv|png|jpg|jpeg|gif|svg|mp4|mp3)(\?|$)/i;
@@ -330,9 +384,11 @@ function scanPageForCandidates(
     if (seen.has(url)) continue;
     if (candidateUrlsOrTextImpliesStaleReport(url, url)) continue;
     seen.add(url);
+    const raw = Math.max(3, urlScore(url) + yearScore(extractYear(url)));
+    const score = scoreEmbeddedPdfUrl(url, raw, html, m.index, baseUrl);
     candidates.push({
       url,
-      score: Math.max(3, urlScore(url) + yearScore(extractYear(url))),
+      score,
       text: 'Embedded PDF URL',
       source,
     });
@@ -348,9 +404,11 @@ function scanPageForCandidates(
     if (seen.has(url)) continue;
     if (candidateUrlsOrTextImpliesStaleReport(url, url)) continue;
     seen.add(url);
+    const baseEsc = Math.max(4, urlScore(url) + yearScore(extractYear(url)));
+    const score = scoreEmbeddedPdfUrl(url, baseEsc, html, e.index, baseUrl);
     candidates.push({
       url,
-      score: Math.max(4, urlScore(url) + yearScore(extractYear(url))),
+      score,
       text: 'Embedded escaped PDF URL',
       source,
     });

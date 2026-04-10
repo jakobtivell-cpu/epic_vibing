@@ -20,6 +20,9 @@ Changes are grouped by area. Versions follow [Semantic Versioning](https://semve
 
 ### Discovery / extraction hardening
 
+- Precision-first pipeline tiers: optional **`annualReportPdfUrls`** (curated PDF override before discovery), **`cmsApiUrls`** (CMS/API PDF discovery), **`aggregatorUrls`** (allowlisted MFN/Nasdaq/Cision hosts), extended **`FallbackStep`** values, and **`PLAYWRIGHT_ENABLED` / `PLAYWRIGHT_DISABLED_HOSTS`** env toggles.
+- `run_summary.json` now includes **`fallbackStepBuckets`**, per-company **`fallbackStepReached`**, and **`rejectionTelemetry`** for regression tracking.
+- Documentation: **`docs/ticker-json-template.md`** copy-paste template for rich ticker entries.
 - Seeded ticker `irPage` is now treated as a preferred first attempt instead of a hard host lock, so stale seeds no longer prevent same-domain IR discovery.
 - Updated deterministic IR seeds/domains for difficult issuers (including Systemair, Bure, and Industrivärden) to reduce `.net`/moved-page 404 failures in cloud runs.
 - Report ranking now scans raw HTML/script payloads for embedded PDF URLs (plain and escaped forms), improving non-Playwright coverage on CMS/MFN-backed pages.

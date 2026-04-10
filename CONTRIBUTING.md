@@ -9,7 +9,7 @@ Short guide for changes to this scraper.
 3. Add **`candidateDomains`** when you know the corporate site — it speeds discovery but is not strictly required.
 4. **Never** overwrite the entire `ticker.json` from a script without a **backup** of the previous file.
 
-See `README.md` for the exact JSON shape used elsewhere in the file.
+See **`docs/ticker-json-template.md`** for a full optional-field template; `README.md` also summarizes ticker fields.
 
 ## Run checks before committing
 

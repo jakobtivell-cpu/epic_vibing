@@ -31,6 +31,10 @@ import {
   resolveIsin,
   resolveIrEmail,
   resolveCompanyType,
+  resolveAnnualReportPdfUrls,
+  resolveOverrideFiscalYear,
+  resolveCmsApiUrls,
+  resolveAggregatorUrls,
   normalizeTickerForLookup,
 } from './src/data/ticker-map';
 import { runCompaniesWithOptionalChildTimeout } from './src/cli/child-runner';
@@ -274,9 +278,13 @@ function buildCompanyList(opts: Record<string, unknown>): CompanyProfile[] {
       const isin = resolveIsin(rawTicker) ?? undefined;
       const irEmail = resolveIrEmail(rawTicker) ?? undefined;
       const companyType = resolveCompanyType(rawTicker) ?? undefined;
+      const annualReportPdfUrls = resolveAnnualReportPdfUrls(rawTicker) ?? undefined;
+      const overrideFiscalYear = resolveOverrideFiscalYear(rawTicker) ?? undefined;
+      const cmsApiUrls = resolveCmsApiUrls(rawTicker) ?? undefined;
+      const aggregatorUrls = resolveAggregatorUrls(rawTicker) ?? undefined;
       if (legalName) {
         log.info(
-          `Ticker ${rawTicker} → "${legalName}" (${canonicalTicker})${orgNumber ? ` org: ${orgNumber}` : ''}${isin ? ` isin: ${isin}` : ''}${candidateDomains?.length ? ` candidateDomains: ${candidateDomains.join(', ')}` : ''}${irPage ? ` irPage: ${irPage}` : ''}${irEmail ? ` irEmail: ${irEmail}` : ''}`,
+          `Ticker ${rawTicker} → "${legalName}" (${canonicalTicker})${orgNumber ? ` org: ${orgNumber}` : ''}${isin ? ` isin: ${isin}` : ''}${candidateDomains?.length ? ` candidateDomains: ${candidateDomains.join(', ')}` : ''}${irPage ? ` irPage: ${irPage}` : ''}${irEmail ? ` irEmail: ${irEmail}` : ''}${annualReportPdfUrls?.length ? ` overridePdfUrls: ${annualReportPdfUrls.length}` : ''}${cmsApiUrls?.length ? ` cmsApiUrls: ${cmsApiUrls.length}` : ''}${aggregatorUrls?.length ? ` aggregatorUrls: ${aggregatorUrls.length}` : ''}`,
         );
         profiles.push({
           name: legalName,
@@ -288,6 +296,10 @@ function buildCompanyList(opts: Record<string, unknown>): CompanyProfile[] {
           ...(isin ? { isin } : {}),
           ...(irEmail ? { irEmail } : {}),
           ...(companyType ? { companyType } : {}),
+          ...(annualReportPdfUrls?.length ? { annualReportPdfUrls } : {}),
+          ...(overrideFiscalYear ? { overrideFiscalYear } : {}),
+          ...(cmsApiUrls?.length ? { cmsApiUrls } : {}),
+          ...(aggregatorUrls?.length ? { aggregatorUrls } : {}),
         });
       } else {
         log.warn(`Ticker ${rawTicker} not found in ticker map — using as company search name`);

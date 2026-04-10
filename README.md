@@ -98,7 +98,7 @@ npx ts-node scrape.ts --company "Sandvik,Tele2" --force
 
 1. Add a key for the Nasdaq Stockholm symbol (e.g. `"EXAMPLE-B.ST"`).
 2. Prefer an **object** entry with at least `"name"` and **`"irPage"`** (HTTPS investor URL you have verified in a browser).
-3. Optionally add `"orgNumber"`, `"candidateDomains"`, `"isin"`, `"irEmail"` — see existing entries for shape.
+3. Optionally add `"orgNumber"`, `"candidateDomains"`, `"isin"`, `"irEmail"`, **`"companyType"`**, and precision-first fallbacks: **`"annualReportPdfUrls"`**, **`"overrideFiscalYear"`**, **`"cmsApiUrls"`**, **`"aggregatorUrls"`** — see [`docs/ticker-json-template.md`](docs/ticker-json-template.md) for a full copy-paste template.
 4. **Do not overwrite the whole file from a script without a backup** (see `.cursorrules`).
 
 Ticker resolution helpers live in `src/data/ticker-map.ts`.
@@ -190,6 +190,11 @@ Preflight evaluation checks are lightweight and deterministic (IR reachability, 
 ## Environment
 
 Copy `.env.example` to `.env` if you use tools that load it. The scraper does not require a `.env` for basic runs; see the example file for **PORT**, optional **`APP_ROOT`**, optional **OPENAI** / **LLM** variables, **ANTHROPIC** for `scripts/ir-health-check.mjs`, and reserved knobs.
+
+**Playwright toggles (optional):**
+
+- **`PLAYWRIGHT_ENABLED`** — set to `false` to skip the Playwright fallback entirely (e.g. Azure Linux images missing Chromium system libraries).
+- **`PLAYWRIGHT_DISABLED_HOSTS`** — comma-separated hostnames (no `www.`) for which Playwright is skipped even when globally enabled.
 
 ## Tests
 

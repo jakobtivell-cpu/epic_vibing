@@ -38,6 +38,10 @@ interface TickerEntry {
   isin?: string;
   irEmail?: string;
   companyType?: CompanyType;
+  annualReportPdfUrls?: string[];
+  overrideFiscalYear?: number;
+  cmsApiUrls?: string[];
+  aggregatorUrls?: string[];
 }
 
 /** Raw map: ticker symbol → canonical legal entity name. */
@@ -98,6 +102,33 @@ export function loadTickerMap(): void {
           ...(typeof o.companyType === 'string'
             ? { companyType: o.companyType as CompanyType }
             : {}),
+          ...(Array.isArray(o.annualReportPdfUrls)
+            ? {
+                annualReportPdfUrls: o.annualReportPdfUrls
+                  .filter((x): x is string => typeof x === 'string')
+                  .map((s) => toAbsoluteHttpUrl(s))
+                  .filter((x): x is string => x !== null),
+              }
+            : {}),
+          ...(typeof o.overrideFiscalYear === 'number' && Number.isFinite(o.overrideFiscalYear)
+            ? { overrideFiscalYear: Math.trunc(o.overrideFiscalYear) }
+            : {}),
+          ...(Array.isArray(o.cmsApiUrls)
+            ? {
+                cmsApiUrls: o.cmsApiUrls
+                  .filter((x): x is string => typeof x === 'string')
+                  .map((s) => toAbsoluteHttpUrl(s))
+                  .filter((x): x is string => x !== null),
+              }
+            : {}),
+          ...(Array.isArray(o.aggregatorUrls)
+            ? {
+                aggregatorUrls: o.aggregatorUrls
+                  .filter((x): x is string => typeof x === 'string')
+                  .map((s) => toAbsoluteHttpUrl(s))
+                  .filter((x): x is string => x !== null),
+              }
+            : {}),
         };
       }
     }
@@ -151,6 +182,29 @@ export function resolveIrEmail(ticker: string): string | null {
 export function resolveCompanyType(ticker: string): CompanyType | null {
   const entry = resolveTickerEntry(ticker);
   return entry?.companyType ?? null;
+}
+
+export function resolveAnnualReportPdfUrls(ticker: string): string[] | null {
+  const entry = resolveTickerEntry(ticker);
+  const d = entry?.annualReportPdfUrls;
+  return d && d.length > 0 ? d : null;
+}
+
+export function resolveOverrideFiscalYear(ticker: string): number | null {
+  const entry = resolveTickerEntry(ticker);
+  return typeof entry?.overrideFiscalYear === 'number' ? entry.overrideFiscalYear : null;
+}
+
+export function resolveCmsApiUrls(ticker: string): string[] | null {
+  const entry = resolveTickerEntry(ticker);
+  const d = entry?.cmsApiUrls;
+  return d && d.length > 0 ? d : null;
+}
+
+export function resolveAggregatorUrls(ticker: string): string[] | null {
+  const entry = resolveTickerEntry(ticker);
+  const d = entry?.aggregatorUrls;
+  return d && d.length > 0 ? d : null;
 }
 
 /**

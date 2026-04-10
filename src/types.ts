@@ -44,6 +44,17 @@ export interface CompanyProfile {
   knownAliases?: string[];
   /** Optional explicit reporting model from ticker map. */
   companyType?: CompanyType;
+  /**
+   * Curated annual report PDF URLs (highest trust). Tried before discovery.
+   * Ordered by preference, newest first.
+   */
+  annualReportPdfUrls?: string[];
+  /** Optional fiscal year expected for override URLs (soft hint only). */
+  overrideFiscalYear?: number;
+  /** Optional CMS API endpoints returning report metadata / PDFs. */
+  cmsApiUrls?: string[];
+  /** Optional trusted aggregator page/PDF URLs (e.g. MFN / Nasdaq issuer pages). */
+  aggregatorUrls?: string[];
 }
 
 /** The 4 core financial fields the assignment requires. */
@@ -83,7 +94,18 @@ export type DataSource = 'pdf' | 'allabolag' | 'playwright+pdf' | 'search+pdf' |
 export type ResultStatus = 'complete' | 'partial' | 'failed' | 'timeout';
 
 /** Which fallback step produced the final result. */
-export type FallbackStep = 'search' | 'cheerio' | 'playwright' | 'direct-pdf-search' | 'ir-html' | 'allabolag' | 'cached' | 'none';
+export type FallbackStep =
+  | 'override'
+  | 'search'
+  | 'cheerio'
+  | 'playwright'
+  | 'cms-api'
+  | 'direct-pdf-search'
+  | 'aggregator'
+  | 'ir-html'
+  | 'allabolag'
+  | 'cached'
+  | 'none';
 
 /** One row in the final results.json — one per company, always present even on failure. */
 export interface PipelineResult {

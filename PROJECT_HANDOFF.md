@@ -17,7 +17,7 @@ Production-minded **Node.js + TypeScript** scraper for **Nasdaq Stockholm Large 
 ## Delivered capabilities
 
 - [x] Generic pipeline in `src/pipeline.ts` — not hardcoded to a single issuer list; default ten tickers are a CLI default string in `scrape.ts`.
-- [x] `data/ticker.json` as the source of truth for ticker → legal name, optional **org**, **irPage**, **candidateDomains**, etc.
+- [x] `data/ticker.json` as the source of truth for ticker → legal name, optional **org**, **irPage**, **candidateDomains**, optional **annualReportPdfUrls** / **cmsApiUrls** / **aggregatorUrls** (see `docs/ticker-json-template.md`).
 - [x] Ticker normalization and resolution (`src/data/ticker-map.ts`).
 - [x] Search-assisted discovery, IR discovery, report ranking, publication-hub probes, entity-aware candidate filtering.
 - [x] URL normalization (encoded quotes, double slashes) and same-site helpers (`src/utils/url-helpers.ts`).
@@ -82,7 +82,7 @@ data/entity-confusion.json  Host / brand collision hints
 ## Output
 
 - **`output/results.json`** — see README “Output schema” (public rows omit internal `stages`).
-- **`output/run_summary.json`** — batch summary and `failureClass` per row.
+- **`output/run_summary.json`** — batch summary, `failureClass` per row, `fallbackStepReached`, aggregated `fallbackStepBuckets`, and per-row `rejectionTelemetry` parsed from pipeline notes.
 - **`output/preflight-risk.json`** — persisted preflight risk map for all ticker-map companies; consumed by `GET /api/risk-map`.
 
 ## Roadmap (next engineering steps)

@@ -2,7 +2,7 @@
 
 ## Current flow (after refactor)
 
-1. **CLI** ([`scrape.ts`](../scrape.ts)) builds [`CompanyProfile`](../src/types.ts) (name, legalName, orgNumber, ticker, candidateDomains).
+1. **CLI** ([`scrape.ts`](../scrape.ts)) builds [`CompanyProfile`](../src/types.ts) (name, legalName, orgNumber, ticker, candidateDomains, optional override/CMS/aggregator fields from `ticker.json`).
 2. **Entity profiling** ([`src/entity/entity-profile.ts`](../src/entity/entity-profile.ts)) runs first in the pipeline: resolves `searchAnchor` (legal name preferred), `distinctiveTokens`, `ambiguityLevel`, optional hostname rejection rules from [`data/entity-confusion.json`](../data/entity-confusion.json).
 3. **Discovery** uses `searchAnchor` for search-engine queries; short aliases remain secondary (ticker sharpening) with trust reflected in ambiguity, not chain order.
 4. **Report corpus** ([`src/discovery/report-corpus.ts`](../src/discovery/report-corpus.ts)): after a base site exists, probes generic publication / reports-and-presentations hub paths; each 200 hub is scanned with the existing [`discoverAnnualReport`](../src/discovery/report-ranker.ts) so candidates come from an **archive/corpus**, not only the single IR landing page.
@@ -31,6 +31,23 @@
 - PDF try: `verifyEntityInPdf(..., entityOpts)`
 - Post-extract: `validateExtractedData(..., type, mappingNotes)`
 - Preflight batch: `evaluatePreflightRiskForAll({ tickerJsonPath, outputPath })` (invoked by `POST /api/risk-map/evaluate`)
+
+## Precision-first ticker overrides and fallbacks
+
+Discovery order is **trust-tiered** (curated URLs and same-origin IR before broad search). New optional `ticker.json` fields are loaded into `CompanyProfile` and consumed in [`processCompany`](../src/pipeline.ts):
+
+| Tier | Mechanism | Config |
+|------|-----------|--------|
+| 0 | Curated annual-report PDFs tried first | `annualReportPdfUrls`, optional `overrideFiscalYear` |
+| 1–3 | Seeded `irPage`, Cheerio, publication hubs, optional Playwright, Cheerio deep ladder | existing `irPage` / `candidateDomains` |
+| 4 | CMS / API JSON or HTML scanned for `.pdf` links | `cmsApiUrls` → [`cms-api.ts`](../src/discovery/cms-api.ts) |
+| 8 | Trusted aggregator pages or PDFs | `aggregatorUrls` → [`aggregator-fallback.ts`](../src/discovery/aggregator-fallback.ts) (host allowlist) |
+
+**Playwright:** `PLAYWRIGHT_ENABLED=false` or per-host `PLAYWRIGHT_DISABLED_HOSTS` skips browser launch when the runtime cannot load bundled Chromium (e.g. missing `libglib` on minimal Linux).
+
+**Telemetry:** [`writeRunSummary`](../src/output/writer.ts) adds `fallbackStepBuckets` and per-company `fallbackStepReached` plus parsed `rejectionTelemetry` from pipeline notes.
+
+**Template:** see [`ticker-json-template.md`](ticker-json-template.md).
 
 ## Recent changes (maintenance note)
 

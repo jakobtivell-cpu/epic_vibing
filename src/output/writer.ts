@@ -184,6 +184,24 @@ function tallyFailureBuckets(
   return init;
 }
 
+function collectRejectionTelemetry(notes: string[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  const re = /(?:^|:)\s*rejection summary \(([^)]+)\)/i;
+  for (const n of notes) {
+    const m = n.match(re);
+    if (!m) continue;
+    const items = m[1].split(',').map((s) => s.trim()).filter(Boolean);
+    for (const item of items) {
+      const kv = item.match(/^([a-z-]+)\s*=\s*(\d+)$/i);
+      if (!kv) continue;
+      const key = kv[1];
+      const value = Number(kv[2]);
+      out[key] = (out[key] ?? 0) + value;
+    }
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // run_summary.json
 // ---------------------------------------------------------------------------
@@ -194,6 +212,10 @@ export function writeRunSummary(results: PipelineResult[]): void {
   const failed = results.filter((r) => r.status === 'failed').length;
   const timedOut = results.filter((r) => r.status === 'timeout').length;
   const failureBuckets = tallyFailureBuckets(results);
+  const fallbackStepBuckets = results.reduce<Record<string, number>>((acc, r) => {
+    acc[r.fallbackStepReached] = (acc[r.fallbackStepReached] ?? 0) + 1;
+    return acc;
+  }, {});
 
   const perCompany = results.map((r) => {
     const failedStage = r.stages
@@ -205,10 +227,12 @@ export function writeRunSummary(results: PipelineResult[]): void {
       status: r.status,
       confidence: r.confidence,
       dataSource: r.dataSource,
+      fallbackStepReached: r.fallbackStepReached,
       fieldsExtracted: countFields(r),
       failureClass: classifyFailureClass(r),
       failedAtStage: failedStage ? failedStage[0] : null,
       errorSummary: failedStage?.[1].error ?? null,
+      rejectionTelemetry: collectRejectionTelemetry(r.extractionNotes ?? []),
     };
   });
 
@@ -220,6 +244,7 @@ export function writeRunSummary(results: PipelineResult[]): void {
     failed,
     timedOut,
     failureBuckets,
+    fallbackStepBuckets,
     companies: perCompany,
   };
 

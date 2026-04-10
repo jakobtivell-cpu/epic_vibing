@@ -42,6 +42,8 @@ import { discoverIrPage } from './discovery/ir-finder';
 import { discoverAnnualReport, quickScanPdfCandidatesOnPage } from './discovery/report-ranker';
 import { collectPublicationHubUrls } from './discovery/report-corpus';
 import { filterAndRankReportCandidatesForEntity } from './discovery/candidate-ranking';
+import { fetchCmsApiPdfCandidates } from './discovery/cms-api';
+import { fetchAggregatorPdfCandidates } from './discovery/aggregator-fallback';
 import { tryPlaywrightFallback } from './discovery/playwright-fallback';
 import { buildEntityProfile, type EntityProfile } from './entity';
 import { downloadPdf } from './download';
@@ -61,6 +63,13 @@ import { runChallengerTrack } from './challenger';
 
 const log = createLogger('pipeline');
 const CURRENT_YEAR = new Date().getFullYear();
+const PLAYWRIGHT_ENABLED = process.env.PLAYWRIGHT_ENABLED !== 'false';
+const PLAYWRIGHT_DISABLED_HOSTS = new Set(
+  (process.env.PLAYWRIGHT_DISABLED_HOSTS ?? '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase().replace(/^www\./, ''))
+    .filter(Boolean),
+);
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -524,6 +533,16 @@ function mergeSearchDiscovery(target: SearchDiscoveryResult, incoming: SearchDis
   }
 }
 
+function shouldSkipPlaywrightForUrl(url: string): boolean {
+  if (!PLAYWRIGHT_ENABLED) return true;
+  try {
+    const host = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+    return PLAYWRIGHT_DISABLED_HOSTS.has(host);
+  } catch {
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Main company processing — 7-step bulletproof fallback chain
 // ---------------------------------------------------------------------------
@@ -574,6 +593,33 @@ async function processCompany(
     entity.seedCandidateDomains.length > 0 ||
     Boolean(websiteTrimmed) ||
     Boolean(entity.seedIrPage);
+
+  if (!state.extractionResult.value && company.annualReportPdfUrls?.length) {
+    log.info(`[${name}] === Tier 0: Curated override PDF URL(s) ===`);
+    const yr = company.overrideFiscalYear;
+    const overrideCandidates = company.annualReportPdfUrls.map((url, idx) => ({
+      url,
+      score: 120 - idx,
+      text: `ticker override${yr ? ` ${yr}` : ''}`,
+      source: 'ticker-override',
+    }));
+    const overrideAttempt = await tryPdfCandidates(
+      overrideCandidates,
+      entity,
+      force,
+      'override',
+      Math.min(MAX_CANDIDATES_PER_STEP, overrideCandidates.length),
+      shortNames,
+      { maxFailuresPerHost: 2, consecutiveForbiddenAbortPerHost: 1 },
+    );
+    if (overrideAttempt.success) {
+      applyPdfSuccess(state, overrideAttempt, 'override');
+      state.notes.push('Tier 0 override accepted');
+    } else {
+      state.notes.push(...overrideAttempt.notes);
+      state.notes.push('Tier 0 override exhausted');
+    }
+  }
 
   // =========================================================================
   // Step 1: Search engine discovery (filetype:pdf, multi-query, short names)
@@ -707,6 +753,9 @@ async function processCompany(
     }
 
     if (!state.extractionResult.value) {
+      if (shouldSkipPlaywrightForUrl(domainIrUrl)) {
+        log.info(`[${name}] Playwright skipped for ${domainIrUrl} (feature flag / host denylist)`);
+      } else {
       log.info(`[${name}] Playwright crawl on: ${domainIrUrl}`);
       const playwrightCandidates = await tryPlaywrightFallback(entity.searchAnchor, domainIrUrl);
 
@@ -723,6 +772,7 @@ async function processCompany(
         } else {
           state.notes.push(...pwAttempt.notes);
         }
+      }
       }
     }
 
@@ -855,6 +905,30 @@ async function processCompany(
     await runSearchIrFallbackIfNeeded();
   }
 
+  if (!state.extractionResult.value && company.cmsApiUrls?.length) {
+    log.info(`[${name}] === Tier 4: CMS API fallback ===`);
+    const cmsCandidates = await fetchCmsApiPdfCandidates(entity.searchAnchor, company.cmsApiUrls);
+    if (cmsCandidates.length > 0) {
+      const rankedCms = filterAndRankReportCandidatesForEntity(cmsCandidates, entity);
+      const cmsAttempt = await tryPdfCandidates(
+        rankedCms,
+        entity,
+        force,
+        'cms-api',
+        MAX_CANDIDATES_PER_STEP,
+        shortNames,
+        CIRCUIT_PER_HOST,
+      );
+      if (cmsAttempt.success) {
+        applyPdfSuccess(state, cmsAttempt, 'cms-api');
+      } else {
+        state.notes.push(...cmsAttempt.notes);
+      }
+    } else {
+      state.notes.push('cms-api: no PDF candidates found');
+    }
+  }
+
   if (!state.extractionResult.value && hasTrustedOrigin) {
     log.info(`[${name}] === Step 1: Search engine discovery (deferred) ===`);
     const deferred = await searchDiscovery(
@@ -929,6 +1003,30 @@ async function processCompany(
       } else {
         state.notes.push(...directAttempt.notes);
       }
+    }
+  }
+
+  if (!state.extractionResult.value && company.aggregatorUrls?.length) {
+    log.info(`[${name}] === Tier 8: Trusted aggregator fallback ===`);
+    const aggregatorCandidates = await fetchAggregatorPdfCandidates(entity.searchAnchor, company.aggregatorUrls);
+    if (aggregatorCandidates.length > 0) {
+      const rankedAgg = filterAndRankReportCandidatesForEntity(aggregatorCandidates, entity);
+      const aggAttempt = await tryPdfCandidates(
+        rankedAgg,
+        entity,
+        force,
+        'aggregator',
+        MAX_CANDIDATES_PER_STEP,
+        shortNames,
+        CIRCUIT_SEARCH_GUESSES,
+      );
+      if (aggAttempt.success) {
+        applyPdfSuccess(state, aggAttempt, 'aggregator');
+      } else {
+        state.notes.push(...aggAttempt.notes);
+      }
+    } else {
+      state.notes.push('aggregator: no trusted PDF candidates found');
     }
   }
 

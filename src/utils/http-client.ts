@@ -95,6 +95,13 @@ function markHostRequiresBrowser(hostKey: string): void {
   );
 }
 
+/** Drop browser-only routing when Playwright cannot run (e.g. Azure missing libglib). */
+function clearHostBrowserMode(hostKey: string, reason: string): void {
+  if (!hostsRequiringBrowser.has(hostKey)) return;
+  hostsRequiringBrowser.delete(hostKey);
+  log.warn(`HTTP client: cleared browser-mode for "${hostKey}" — ${reason}`);
+}
+
 function axiosResponseCount(hostKey: string): number {
   return axiosHttpResponseCountByHost.get(hostKey) ?? 0;
 }
@@ -455,7 +462,12 @@ export async function headCheck(
   const hostKey = hostKeyFromUrl(url);
 
   if (hostsRequiringBrowser.has(hostKey)) {
-    return headCheckViaPlaywright(url, timeoutMs);
+    const browser = await getPlaywrightBrowser();
+    if (!browser) {
+      clearHostBrowserMode(hostKey, 'Playwright unavailable — retrying HEAD with Axios');
+    } else {
+      return headCheckViaPlaywright(url, timeoutMs);
+    }
   }
 
   await rateLimitDelay(hostKey);
@@ -484,8 +496,17 @@ export async function headCheck(
     const status = axErr.response?.status;
 
     if (status === 403 && axiosResponseCount(hostKey) === 0) {
-      markHostRequiresBrowser(hostKey);
       recordAxiosHttpResponse(hostKey);
+      const browser = await getPlaywrightBrowser();
+      if (!browser) {
+        log.warn(
+          `HTTP client: host "${hostKey}" returned 403 on first Axios response — Playwright unavailable; keeping Axios for this host`,
+        );
+        const canRetry = await handleRateLimitBackoff(hostKey);
+        if (canRetry) return headCheck(url, timeoutMs);
+        return { exists: false, status };
+      }
+      markHostRequiresBrowser(hostKey);
       return headCheckViaPlaywright(url, timeoutMs);
     }
 
@@ -513,7 +534,12 @@ export async function fetchPage(
   const t = timeoutMs ?? REQUEST_TIMEOUT_MS;
 
   if (hostsRequiringBrowser.has(hostKey)) {
-    return fetchPageViaPlaywright(url, t);
+    const browser = await getPlaywrightBrowser();
+    if (!browser) {
+      clearHostBrowserMode(hostKey, 'Playwright unavailable — retrying GET with Axios');
+    } else {
+      return fetchPageViaPlaywright(url, t);
+    }
   }
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -544,8 +570,20 @@ export async function fetchPage(
       const code = axErr.code;
 
       if (status === 403 && axiosResponseCount(hostKey) === 0) {
-        markHostRequiresBrowser(hostKey);
         recordAxiosHttpResponse(hostKey);
+        const browser = await getPlaywrightBrowser();
+        if (!browser) {
+          log.warn(
+            `HTTP client: host "${hostKey}" returned 403 — Playwright unavailable; continuing with Axios-only retries`,
+          );
+          const canRetry = await handleRateLimitBackoff(hostKey);
+          if (canRetry) {
+            attempt--;
+            continue;
+          }
+          return { ok: false, error: { message: axErr.message, status, code } };
+        }
+        markHostRequiresBrowser(hostKey);
         return fetchPageViaPlaywright(url, t);
       }
 
@@ -607,7 +645,12 @@ export async function fetchBinary(
   const maxAttempts = 4;
 
   if (hostsRequiringBrowser.has(hostKey)) {
-    return fetchBinaryViaPlaywright(url, timeoutMs);
+    const browser = await getPlaywrightBrowser();
+    if (!browser) {
+      clearHostBrowserMode(hostKey, 'Playwright unavailable — retrying binary GET with Axios');
+    } else {
+      return fetchBinaryViaPlaywright(url, timeoutMs);
+    }
   }
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -635,8 +678,20 @@ export async function fetchBinary(
       const code = axErr.code;
 
       if (status === 403 && axiosResponseCount(hostKey) === 0) {
-        markHostRequiresBrowser(hostKey);
         recordAxiosHttpResponse(hostKey);
+        const browser = await getPlaywrightBrowser();
+        if (!browser) {
+          log.warn(
+            `HTTP client: host "${hostKey}" returned 403 on binary GET — Playwright unavailable; continuing with Axios-only retries`,
+          );
+          const canRetry = await handleRateLimitBackoff(hostKey);
+          if (canRetry) {
+            attempt--;
+            continue;
+          }
+          return { ok: false, error: { message: axErr.message, status, code } };
+        }
+        markHostRequiresBrowser(hostKey);
         return fetchBinaryViaPlaywright(url, timeoutMs);
       }
 

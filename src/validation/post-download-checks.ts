@@ -367,6 +367,10 @@ export function crossValidateFiscalYear(
   }
 
   if (extractedYear !== discoveryYear) {
+    // URL/discovery year often trails document year by one (calendar vs FY, or archive ordering).
+    if (Math.abs(extractedYear - discoveryYear) === 1) {
+      return { match: true, extractedYear, discoveryYear, warning: null };
+    }
     const warning =
       `Fiscal year mismatch: PDF text says ${extractedYear}, report URL/discovery says ${discoveryYear}`;
     log.warn(warning);

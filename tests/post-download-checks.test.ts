@@ -1,6 +1,7 @@
 import type { EntityProfile } from '../src/entity/entity-profile';
 import {
   buildEntityCheckTerms,
+  crossValidateFiscalYear,
   verifyAnnualReportContent,
   verifyEntityInPdf,
 } from '../src/validation/post-download-checks';
@@ -74,5 +75,19 @@ describe('annual content verification', () => {
     const r = verifyAnnualReportContent(text);
     expect(r.hasIncomeStatement).toBe(true);
     expect(r.isLikelyAnnualReport).toBe(true);
+  });
+});
+
+describe('crossValidateFiscalYear', () => {
+  it('treats off-by-one year as match (no warning)', () => {
+    const r = crossValidateFiscalYear(2025, 2026);
+    expect(r.match).toBe(true);
+    expect(r.warning).toBeNull();
+  });
+
+  it('warns on larger mismatch', () => {
+    const r = crossValidateFiscalYear(2023, 2026);
+    expect(r.match).toBe(false);
+    expect(r.warning).toContain('mismatch');
   });
 });

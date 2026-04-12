@@ -75,6 +75,16 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Fill nulls in `base` from `supplement` without overwriting non-null values (PDF primary). */
+function mergeExtractedPreferBase(base: ExtractedData, supplement: ExtractedData): ExtractedData {
+  return {
+    revenue_msek: base.revenue_msek ?? supplement.revenue_msek,
+    ebit_msek: base.ebit_msek ?? supplement.ebit_msek,
+    employees: base.employees ?? supplement.employees,
+    ceo: base.ceo ?? supplement.ceo,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Concurrency limiter
 // ---------------------------------------------------------------------------
@@ -184,10 +194,12 @@ interface QualityGateResult {
 function applyQualityGates(
   text: string,
   companyName: string,
+  opts?: { minTextChars?: number },
 ): QualityGateResult {
   const textLength = text.length;
+  const minChars = opts?.minTextChars ?? 5_000;
 
-  if (textLength < 5_000) {
+  if (textLength < minChars) {
     return { passed: false, reason: `text too short (${textLength} chars)`, text: null, contentCheck: null };
   }
 
@@ -267,6 +279,7 @@ function isForbiddenOrNotFoundError(message: string | undefined): boolean {
 async function tryPdfCandidates(
   candidates: ReportCandidate[],
   entity: EntityProfile,
+  company: CompanyProfile,
   force: boolean,
   stepName: FallbackStep,
   maxAttempts: number = MAX_CANDIDATES_PER_STEP,
@@ -363,7 +376,8 @@ async function tryPdfCandidates(
       continue;
     }
 
-    const gateResult = applyQualityGates(pdfText.text, verifyName);
+    const minGateChars = entity.reportingModelHint === 'bank' ? 3_200 : 5_000;
+    const gateResult = applyQualityGates(pdfText.text, verifyName, { minTextChars: minGateChars });
     if (!gateResult.passed) {
       log.warn(`[${entity.displayName}] Quality gate rejected candidate #${displayIndex}: ${gateResult.reason}`);
       notes.push(`Rejected ${stepName} candidate #${displayIndex} "${candidate.url}" — ${gateResult.reason}`);
@@ -397,7 +411,11 @@ async function tryPdfCandidates(
     for (const n of extraction.notes) notes.push(n);
 
     const rev = extraction.data.revenue_msek;
-    if (rev !== null && rev > 5_000_000) {
+    const revenueCeilingMsek =
+      entity.reportingModelHint === 'bank' || extraction.detectedCompanyType === 'bank'
+        ? 50_000_000
+        : 5_000_000;
+    if (rev !== null && rev > revenueCeilingMsek) {
       log.warn(`[${entity.displayName}] Revenue ${rev} MSEK implausible — rejecting candidate #${displayIndex}`);
       notes.push(`Rejected ${stepName} candidate #${displayIndex} — revenue ${rev} MSEK implausible`);
       recordReject('revenue-too-high');
@@ -480,14 +498,19 @@ interface PipelineState {
   suspiciouslyShortPdf: boolean;
 }
 
-function applyPdfSuccess(state: PipelineState, attempt: PdfExtractionSuccess, step: FallbackStep): void {
+function applyPdfSuccess(
+  state: PipelineState,
+  attempt: PdfExtractionSuccess,
+  step: FallbackStep,
+  profile: CompanyProfile,
+): void {
   state.fallbackStep = step;
   state.reportUrl = attempt.reportUrl;
   state.downloadResult = { status: 'success', value: attempt.downloadPath };
   state.annualReportText = attempt.annualReportText;
   state.dataSource = attempt.dataSource;
   state.discoveryFiscalYear = attempt.discoveryFiscalYear;
-  state.detectedCompanyType = attempt.extraction.detectedCompanyType;
+  state.detectedCompanyType = profile.companyType ?? attempt.extraction.detectedCompanyType;
   state.fiscalYear = attempt.extraction.fiscalYear;
   state.extractionResult = { status: 'success', value: attempt.extraction.data };
   state.lastFieldExtraction = attempt.extraction;
@@ -555,6 +578,11 @@ async function processCompany(
   const entity = buildEntityProfile(company);
   const name = company.name;
   const shortNames = deriveShortNames(entity.searchAnchor, company.ticker);
+  const CIRCUIT_PER_HOST = { maxFailuresPerHost: 3 as const };
+  const CIRCUIT_SEARCH_GUESSES = {
+    maxFailuresPerHost: 3 as const,
+    consecutiveForbiddenAbortPerHost: 2 as const,
+  };
 
   const skipped: StageResult<never> = {
     status: 'skipped',
@@ -606,6 +634,7 @@ async function processCompany(
     const overrideAttempt = await tryPdfCandidates(
       overrideCandidates,
       entity,
+      company,
       force,
       'override',
       Math.min(MAX_CANDIDATES_PER_STEP, overrideCandidates.length),
@@ -613,11 +642,64 @@ async function processCompany(
       { maxFailuresPerHost: 2, consecutiveForbiddenAbortPerHost: 1 },
     );
     if (overrideAttempt.success) {
-      applyPdfSuccess(state, overrideAttempt, 'override');
+      applyPdfSuccess(state, overrideAttempt, 'override', company);
       state.notes.push('Tier 0 override accepted');
     } else {
       state.notes.push(...overrideAttempt.notes);
       state.notes.push('Tier 0 override exhausted');
+    }
+  }
+
+  // =========================================================================
+  // Tier 0.5: CMS API + trusted aggregator (before heavy IR crawl — fewer 429s)
+  // =========================================================================
+  if (!state.extractionResult.value && company.cmsApiUrls?.length) {
+    log.info(`[${name}] === Tier 0.5a: CMS API (early) ===`);
+    const cmsCandidates = await fetchCmsApiPdfCandidates(entity.searchAnchor, company.cmsApiUrls);
+    if (cmsCandidates.length > 0) {
+      const rankedCms = filterAndRankReportCandidatesForEntity(cmsCandidates, entity);
+      const cmsAttempt = await tryPdfCandidates(
+        rankedCms,
+        entity,
+        company,
+        force,
+        'cms-api',
+        MAX_CANDIDATES_PER_STEP,
+        shortNames,
+        CIRCUIT_PER_HOST,
+      );
+      if (cmsAttempt.success) {
+        applyPdfSuccess(state, cmsAttempt, 'cms-api', company);
+      } else {
+        state.notes.push(...cmsAttempt.notes);
+      }
+    } else {
+      state.notes.push('cms-api: no PDF candidates found');
+    }
+  }
+
+  if (!state.extractionResult.value && company.aggregatorUrls?.length) {
+    log.info(`[${name}] === Tier 0.5b: Trusted aggregator (early) ===`);
+    const aggregatorCandidates = await fetchAggregatorPdfCandidates(entity.searchAnchor, company.aggregatorUrls);
+    if (aggregatorCandidates.length > 0) {
+      const rankedAgg = filterAndRankReportCandidatesForEntity(aggregatorCandidates, entity);
+      const aggAttempt = await tryPdfCandidates(
+        rankedAgg,
+        entity,
+        company,
+        force,
+        'aggregator',
+        MAX_CANDIDATES_PER_STEP,
+        shortNames,
+        CIRCUIT_SEARCH_GUESSES,
+      );
+      if (aggAttempt.success) {
+        applyPdfSuccess(state, aggAttempt, 'aggregator', company);
+      } else {
+        state.notes.push(...aggAttempt.notes);
+      }
+    } else {
+      state.notes.push('aggregator: no trusted PDF candidates found');
     }
   }
 
@@ -678,12 +760,6 @@ async function processCompany(
     pushDomain(d);
   }
 
-  const CIRCUIT_PER_HOST = { maxFailuresPerHost: 3 as const };
-  const CIRCUIT_SEARCH_GUESSES = {
-    maxFailuresPerHost: 3 as const,
-    consecutiveForbiddenAbortPerHost: 2 as const,
-  };
-
   // =========================================================================
   // Step 2+3: Multi-domain Cheerio + Playwright cycling (before search-guessed PDFs)
   // =========================================================================
@@ -725,13 +801,13 @@ async function processCompany(
 
       if (irHigh.length > 0) {
         const cheerioAttempt = await tryPdfCandidates(
-          irHigh, entity, force, 'cheerio',
+          irHigh, entity, company, force, 'cheerio',
           MAX_CANDIDATES_PER_STEP, shortNames,
           CIRCUIT_PER_HOST,
         );
 
         if (cheerioAttempt.success) {
-          applyPdfSuccess(state, cheerioAttempt, 'cheerio');
+          applyPdfSuccess(state, cheerioAttempt, 'cheerio', company);
           return;
         }
         state.notes.push(...cheerioAttempt.notes);
@@ -739,13 +815,13 @@ async function processCompany(
 
       if (!state.extractionResult.value && irLow.length > 0) {
         const cheerioLowAttempt = await tryPdfCandidates(
-          irLow, entity, force, 'cheerio',
+          irLow, entity, company, force, 'cheerio',
           MAX_CANDIDATES_PER_STEP, shortNames,
           CIRCUIT_PER_HOST,
         );
 
         if (cheerioLowAttempt.success) {
-          applyPdfSuccess(state, cheerioLowAttempt, 'cheerio');
+          applyPdfSuccess(state, cheerioLowAttempt, 'cheerio', company);
           return;
         }
         state.notes.push(...cheerioLowAttempt.notes);
@@ -762,13 +838,13 @@ async function processCompany(
       if (playwrightCandidates.length > 0) {
         const rankedPw = filterAndRankReportCandidatesForEntity(playwrightCandidates, entity);
         const pwAttempt = await tryPdfCandidates(
-          rankedPw, entity, force, 'playwright',
+          rankedPw, entity, company, force, 'playwright',
           MAX_CANDIDATES_PER_STEP, shortNames,
           CIRCUIT_PER_HOST,
         );
 
         if (pwAttempt.success) {
-          applyPdfSuccess(state, pwAttempt, 'playwright');
+          applyPdfSuccess(state, pwAttempt, 'playwright', company);
         } else {
           state.notes.push(...pwAttempt.notes);
         }
@@ -790,12 +866,12 @@ async function processCompany(
 
         if (irHighDeep.length > 0) {
           const cheerioDeep = await tryPdfCandidates(
-            irHighDeep, entity, force, 'cheerio',
+            irHighDeep, entity, company, force, 'cheerio',
             MAX_CANDIDATES_PER_STEP, shortNames,
             CIRCUIT_PER_HOST,
           );
           if (cheerioDeep.success) {
-            applyPdfSuccess(state, cheerioDeep, 'cheerio');
+            applyPdfSuccess(state, cheerioDeep, 'cheerio', company);
             return;
           }
           state.notes.push(...cheerioDeep.notes);
@@ -803,12 +879,12 @@ async function processCompany(
 
         if (!state.extractionResult.value && irLowDeep.length > 0) {
           const cheerioLowDeep = await tryPdfCandidates(
-            irLowDeep, entity, force, 'cheerio',
+            irLowDeep, entity, company, force, 'cheerio',
             MAX_CANDIDATES_PER_STEP, shortNames,
             CIRCUIT_PER_HOST,
           );
           if (cheerioLowDeep.success) {
-            applyPdfSuccess(state, cheerioLowDeep, 'cheerio');
+            applyPdfSuccess(state, cheerioLowDeep, 'cheerio', company);
             return;
           }
           state.notes.push(...cheerioLowDeep.notes);
@@ -853,13 +929,13 @@ async function processCompany(
             entity,
           );
           const attempt = await tryPdfCandidates(
-            rankedSearch, entity, force, 'cheerio',
+            rankedSearch, entity, company, force, 'cheerio',
             MAX_CANDIDATES_PER_STEP, shortNames,
             CIRCUIT_PER_HOST,
           );
 
           if (attempt.success) {
-            applyPdfSuccess(state, attempt, 'cheerio');
+            applyPdfSuccess(state, attempt, 'cheerio', company);
           } else {
             state.notes.push(...attempt.notes);
           }
@@ -905,30 +981,6 @@ async function processCompany(
     await runSearchIrFallbackIfNeeded();
   }
 
-  if (!state.extractionResult.value && company.cmsApiUrls?.length) {
-    log.info(`[${name}] === Tier 4: CMS API fallback ===`);
-    const cmsCandidates = await fetchCmsApiPdfCandidates(entity.searchAnchor, company.cmsApiUrls);
-    if (cmsCandidates.length > 0) {
-      const rankedCms = filterAndRankReportCandidatesForEntity(cmsCandidates, entity);
-      const cmsAttempt = await tryPdfCandidates(
-        rankedCms,
-        entity,
-        force,
-        'cms-api',
-        MAX_CANDIDATES_PER_STEP,
-        shortNames,
-        CIRCUIT_PER_HOST,
-      );
-      if (cmsAttempt.success) {
-        applyPdfSuccess(state, cmsAttempt, 'cms-api');
-      } else {
-        state.notes.push(...cmsAttempt.notes);
-      }
-    } else {
-      state.notes.push('cms-api: no PDF candidates found');
-    }
-  }
-
   if (!state.extractionResult.value && hasTrustedOrigin) {
     log.info(`[${name}] === Step 1: Search engine discovery (deferred) ===`);
     const deferred = await searchDiscovery(
@@ -970,12 +1022,17 @@ async function processCompany(
   if (!state.extractionResult.value && searchResult.pdfCandidates.length > 0) {
     log.info(`[${name}] === Step 1b: Search PDF candidates (after IR crawl) ===`);
     const searchAttempt = await tryPdfCandidates(
-      searchResult.pdfCandidates, entity, force, 'search',
-      MAX_CANDIDATES_PER_STEP, shortNames,
+      searchResult.pdfCandidates,
+      entity,
+      company,
+      force,
+      'search',
+      MAX_CANDIDATES_PER_STEP,
+      shortNames,
       CIRCUIT_SEARCH_GUESSES,
     );
     if (searchAttempt.success) {
-      applyPdfSuccess(state, searchAttempt, 'search');
+      applyPdfSuccess(state, searchAttempt, 'search', company);
     } else {
       state.notes.push(...searchAttempt.notes);
     }
@@ -993,40 +1050,21 @@ async function processCompany(
     if (directCandidates.length > 0) {
       const rankedDirect = filterAndRankReportCandidatesForEntity(directCandidates, entity);
       const directAttempt = await tryPdfCandidates(
-        rankedDirect, entity, force, 'direct-pdf-search',
-        MAX_CANDIDATES_PER_STEP, shortNames,
-        CIRCUIT_SEARCH_GUESSES,
-      );
-
-      if (directAttempt.success) {
-        applyPdfSuccess(state, directAttempt, 'direct-pdf-search');
-      } else {
-        state.notes.push(...directAttempt.notes);
-      }
-    }
-  }
-
-  if (!state.extractionResult.value && company.aggregatorUrls?.length) {
-    log.info(`[${name}] === Tier 8: Trusted aggregator fallback ===`);
-    const aggregatorCandidates = await fetchAggregatorPdfCandidates(entity.searchAnchor, company.aggregatorUrls);
-    if (aggregatorCandidates.length > 0) {
-      const rankedAgg = filterAndRankReportCandidatesForEntity(aggregatorCandidates, entity);
-      const aggAttempt = await tryPdfCandidates(
-        rankedAgg,
+        rankedDirect,
         entity,
+        company,
         force,
-        'aggregator',
+        'direct-pdf-search',
         MAX_CANDIDATES_PER_STEP,
         shortNames,
         CIRCUIT_SEARCH_GUESSES,
       );
-      if (aggAttempt.success) {
-        applyPdfSuccess(state, aggAttempt, 'aggregator');
+
+      if (directAttempt.success) {
+        applyPdfSuccess(state, directAttempt, 'direct-pdf-search', company);
       } else {
-        state.notes.push(...aggAttempt.notes);
+        state.notes.push(...directAttempt.notes);
       }
-    } else {
-      state.notes.push('aggregator: no trusted PDF candidates found');
     }
   }
 
@@ -1046,6 +1084,9 @@ async function processCompany(
       state.fiscalYear = irHtmlResult.fiscalYear;
       state.dataSource = 'ir-html';
       confidence = irHtmlResult.confidence;
+      if (company.companyType) {
+        state.detectedCompanyType = company.companyType;
+      }
       state.notes.push(`Data sourced from IR page HTML (${irHtmlResult.sourceUrl})`);
       log.info(`[${name}] IR HTML provided data (confidence: ${irHtmlResult.confidence}%)`);
     }
@@ -1071,6 +1112,9 @@ async function processCompany(
       };
       state.fiscalYear = allabolagResult.fiscalYear;
       state.dataSource = 'allabolag';
+      if (company.companyType) {
+        state.detectedCompanyType = company.companyType;
+      }
       state.notes.push(`Data sourced from allabolag.se (${allabolagResult.sourceUrl})`);
       log.info(`[${name}] Allabolag provided partial data`);
     }
@@ -1111,6 +1155,51 @@ async function processCompany(
     }
 
     for (const w of validation.warnings) state.notes.push(w);
+
+    // When primary source is PDF/HTML but headline fields are still null, merge nulls only from allabolag.
+    if (
+      company.orgNumber &&
+      validationResult.value &&
+      determineStatus(validationResult.value) !== 'complete' &&
+      state.dataSource &&
+      state.dataSource !== 'allabolag'
+    ) {
+      log.info(`[${name}] Supplement: merging null fields from allabolag.se (secondary)`);
+      const ab = await extractFromAllabolag(name, company.legalName, company.orgNumber, shortNames);
+      if (ab) {
+        const merged = mergeExtractedPreferBase(validationResult.value, ab.data);
+        const v2 = validateExtractedData(
+          merged,
+          state.detectedCompanyType ?? company.companyType ?? undefined,
+          state.notes,
+        );
+        const pdfish =
+          state.dataSource === 'pdf' ||
+          state.dataSource === 'playwright+pdf' ||
+          state.dataSource === 'search+pdf';
+        validationResult = {
+          status:
+            determineStatus(v2.data) === 'complete' && pdfish
+              ? 'success'
+              : determineStatus(v2.data) === 'complete'
+                ? 'partial'
+                : validationResult.status,
+          value: v2.data,
+          durationMs: Date.now() - start,
+        };
+        state.extractionResult = {
+          status: state.extractionResult.status,
+          value: v2.data,
+          ...(state.extractionResult.error ? { error: state.extractionResult.error } : {}),
+          ...(state.extractionResult.durationMs !== undefined
+            ? { durationMs: state.extractionResult.durationMs }
+            : {}),
+        };
+        confidence = v2.confidence;
+        state.notes.push(`Secondary merge: null field(s) filled from allabolag.se (${ab.sourceUrl})`);
+        for (const w of v2.warnings) state.notes.push(w);
+      }
+    }
   }
 
   let dualTrackAdjudication: PipelineResult['dualTrackAdjudication'];

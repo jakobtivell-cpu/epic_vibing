@@ -110,7 +110,10 @@
             "https://www.swedbank.com"
         ],
         "isin": "SE0000242455",
-        "irEmail": "ir@swedbank.com"
+        "irEmail": "ir@swedbank.com",
+        "aggregatorUrls": [
+            "https://www.swedbank.com/investor-relations/reports-and-presentations/annual-reports.html"
+        ]
     },
     "ERIC-A.ST": {
         "name": "Telefonaktiebolaget LM Ericsson (publ)",
@@ -151,7 +154,11 @@
             "https://www.sebgroup.com"
         ],
         "isin": "SE0000148884",
-        "irEmail": "ir@seb.se"
+        "irEmail": "ir@seb.se",
+        "annualReportPdfUrls": [
+            "https://webapp.sebgroup.com/mb/mblib.nsf/alldocsbyunid/0C76B7571DFB23F5C1258C4900320544/$FILE/SEB_Annual_Report_2024_ENG.pdf"
+        ],
+        "overrideFiscalYear": 2024
     },
     "SEB-C.ST": {
         "name": "Skandinaviska Enskilda Banken AB (publ)",
@@ -162,7 +169,11 @@
             "https://www.sebgroup.com"
         ],
         "isin": "SE0000148884",
-        "irEmail": "ir@seb.se"
+        "irEmail": "ir@seb.se",
+        "annualReportPdfUrls": [
+            "https://webapp.sebgroup.com/mb/mblib.nsf/alldocsbyunid/0C76B7571DFB23F5C1258C4900320544/$FILE/SEB_Annual_Report_2024_ENG.pdf"
+        ],
+        "overrideFiscalYear": 2024
     },
     "EQT.ST": {
         "name": "EQT AB (publ)",
@@ -210,7 +221,10 @@
             "https://www.handelsbanken.com"
         ],
         "isin": "SE0007100599",
-        "irEmail": "ir@handelsbanken.se"
+        "irEmail": "ir@handelsbanken.se",
+        "aggregatorUrls": [
+            "https://www.handelsbanken.com/en/investor-relations/reports-and-presentations"
+        ]
     },
     "SHB-B.ST": {
         "name": "Svenska Handelsbanken AB (publ)",
@@ -220,7 +234,10 @@
             "https://www.handelsbanken.com"
         ],
         "isin": "SE0007100599",
-        "irEmail": "ir@handelsbanken.se"
+        "irEmail": "ir@handelsbanken.se",
+        "aggregatorUrls": [
+            "https://www.handelsbanken.com/en/investor-relations/reports-and-presentations"
+        ]
     },
     "HEXA-B.ST": {
         "name": "Hexagon AB (publ)",
@@ -261,7 +278,11 @@
         ],
         "irPage": "https://www.industrivarden.se/en-gb/investors/reports/Annual-reports",
         "isin": "SE0000190126",
-        "irEmail": "info@industrivarden.se"
+        "irEmail": "info@industrivarden.se",
+        "annualReportPdfUrls": [
+            "https://storage.mfn.se/90c9036f-9899-4746-96bd-443fcf07457c/ab-industrivarden-annual-report-2024.pdf"
+        ],
+        "overrideFiscalYear": 2024
     },
     "INDU-C.ST": {
         "name": "AB Industrivärden (publ)",
@@ -275,7 +296,11 @@
         ],
         "irPage": "https://www.industrivarden.se/en-gb/investors/reports/Annual-reports",
         "isin": "SE0000190126",
-        "irEmail": "info@industrivarden.se"
+        "irEmail": "info@industrivarden.se",
+        "annualReportPdfUrls": [
+            "https://storage.mfn.se/90c9036f-9899-4746-96bd-443fcf07457c/ab-industrivarden-annual-report-2024.pdf"
+        ],
+        "overrideFiscalYear": 2024
     },
     "TELIA.ST": {
         "name": "Telia Company AB (publ)",
@@ -489,7 +514,7 @@
     "BALD-B.ST": {
         "name": "Fastighets AB Balder (publ)",
         "companyType": "real_estate",
-        "irPage": "https://www.balder.se/en/investors/",
+        "irPage": "https://www.balder.se/investerare",
         "candidateDomains": [
             "https://www.balder.se"
         ]
@@ -588,6 +613,9 @@
         "candidateDomains": [
             "https://www.swecogroup.com",
             "https://www.sweco.com"
+        ],
+        "aggregatorUrls": [
+            "https://www.swecogroup.com/investor-relations/"
         ]
     },
     "SWEC-B.ST": {
@@ -596,13 +624,20 @@
         "candidateDomains": [
             "https://www.swecogroup.com",
             "https://www.sweco.com"
+        ],
+        "aggregatorUrls": [
+            "https://www.swecogroup.com/investor-relations/"
         ]
     },
     "SECT-B.ST": {
         "name": "Sectra AB (publ)",
         "irPage": "https://investor.sectra.com",
         "candidateDomains": [
-            "https://investor.sectra.com"
+            "https://investor.sectra.com",
+            "https://www.sectra.com"
+        ],
+        "aggregatorUrls": [
+            "https://investor.sectra.com/financial-reports/"
         ]
     },
     "MYCR.ST": "Mycronic AB (publ)",
@@ -862,7 +897,7 @@
         "name": "Beijer Alma AB (publ)",
         "irPage": "https://www.beijeralma.se/en/investors/",
         "candidateDomains": [
-            "www.beijeralma.se"
+            "https://www.beijeralma.se"
         ]
     },
     "SYSR.ST": {
@@ -896,6 +931,9 @@
         "irPage": "https://www.kinnevik.com/investors/",
         "candidateDomains": [
             "https://www.kinnevik.com"
+        ],
+        "aggregatorUrls": [
+            "https://www.kinnevik.com/investors/reports/"
         ]
     },
     "KINV-B.ST": {
@@ -904,6 +942,9 @@
         "irPage": "https://www.kinnevik.com/investors/",
         "candidateDomains": [
             "https://www.kinnevik.com"
+        ],
+        "aggregatorUrls": [
+            "https://www.kinnevik.com/investors/reports/"
         ]
     },
     "AFRY.ST": {
@@ -947,9 +988,13 @@
     },
     "VITR.ST": {
         "name": "Vitrolife AB (publ)",
-        "irPage": "https://www.vitrolife.com/en/investors",
+        "irPage": "https://www.vitrolife.com/investors/",
         "candidateDomains": [
-            "https://www.vitrolife.com"
+            "https://www.vitrolife.com",
+            "https://www.vitrolifegroup.com"
+        ],
+        "aggregatorUrls": [
+            "https://www.vitrolife.com/investors/"
         ]
     },
     "IVSO.ST": "Invisio AB (publ)",

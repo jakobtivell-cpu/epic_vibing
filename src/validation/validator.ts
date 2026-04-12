@@ -32,7 +32,7 @@ export function validateExtractedData(
     warnings.push(`Revenue non-positive (${cleaned.revenue_msek}) — discarded`);
     cleaned.revenue_msek = null;
     score -= 15;
-  } else if (cleaned.revenue_msek > 5_000_000) {
+  } else if (cleaned.revenue_msek > (companyType === 'bank' ? 50_000_000 : 5_000_000)) {
     warnings.push(`Revenue implausibly high (${cleaned.revenue_msek} MSEK) — discarded`);
     cleaned.revenue_msek = null;
     score -= 15;
@@ -98,6 +98,20 @@ export function validateExtractedData(
         );
         cleaned.ebit_msek = null;
         score -= 12;
+      }
+    } else if (companyType === 'real_estate') {
+      const ratio = cleaned.ebit_msek / Math.max(cleaned.revenue_msek, 1);
+      if (ratio <= 1.12) {
+        warnings.push(
+          `Real estate: operating metric (${cleaned.ebit_msek} MSEK) above revenue proxy (${cleaned.revenue_msek} MSEK) — kept; lines often not directly comparable`,
+        );
+        score -= 5;
+      } else {
+        warnings.push(
+          `EBIT (${cleaned.ebit_msek}) exceeds revenue (${cleaned.revenue_msek}) — likely extraction error, discarding EBIT`,
+        );
+        cleaned.ebit_msek = null;
+        score -= 15;
       }
     } else {
       warnings.push(

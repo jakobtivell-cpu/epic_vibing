@@ -34,8 +34,14 @@ export const DOMAIN_DELAY_JITTER_MS = 1_000;
 /** Base delay when --slow flag is active. */
 export const SLOW_MODE_DELAY_MS = 8_000;
 
-/** Exponential backoff sequence for 403/429 responses (ms). */
+/** Exponential backoff sequence for HTTP 403 responses (ms). */
 export const RATE_LIMIT_BACKOFF_SEQUENCE = [30_000, 60_000, 120_000, 300_000];
+
+/**
+ * Shorter backoff for HTTP 429 so a single host cannot burn most of
+ * `--timeout-per-company` wall-clock before the pipeline can fall back.
+ */
+export const RATE_LIMIT_BACKOFF_SEQUENCE_429 = [5_000, 12_000, 25_000, 45_000];
 
 /** Maximum retries per HTTP request before giving up. */
 export const MAX_RETRIES = 3;

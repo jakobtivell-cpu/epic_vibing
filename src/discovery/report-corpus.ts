@@ -37,12 +37,17 @@ function originFromDomainUrl(domainUrl: string): string {
 
 /**
  * Return hub URLs that respond OK (generic corpus seeds, not link enumeration).
+ * @param maxPathsToProbe — cap probes per domain to avoid long 429 storms on strict hosts.
  */
-export async function collectPublicationHubUrls(domainUrl: string): Promise<string[]> {
+export async function collectPublicationHubUrls(
+  domainUrl: string,
+  maxPathsToProbe: number = 8,
+): Promise<string[]> {
   const origin = originFromDomainUrl(domainUrl);
   const found: string[] = [];
+  const paths = PUBLICATION_HUB_PATHS.slice(0, Math.max(1, maxPathsToProbe));
 
-  for (const path of PUBLICATION_HUB_PATHS) {
+  for (const path of paths) {
     const url = `${origin}${path}`;
     try {
       const result = await fetchPage(url, 10_000);

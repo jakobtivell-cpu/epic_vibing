@@ -28,4 +28,18 @@ describe('validateExtractedData — implausible magnitudes', () => {
     expect(r.data.ebit_msek).toBeNull();
     expect(r.warnings.some((w) => w.includes('implausibly large'))).toBe(true);
   });
+
+  it('keeps real estate EBIT modestly above revenue proxy (presentation mismatch)', () => {
+    const r = validateExtractedData(
+      {
+        revenue_msek: 8_000,
+        ebit_msek: 8_500,
+        employees: 500,
+        ceo: 'A B',
+      },
+      'real_estate',
+    );
+    expect(r.data.ebit_msek).toBe(8_500);
+    expect(r.warnings.some((w) => /real estate.*kept/i.test(w))).toBe(true);
+  });
 });

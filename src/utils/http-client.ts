@@ -10,6 +10,7 @@ import {
   PDF_DOWNLOAD_TIMEOUT_MS,
   MAX_RETRIES,
   RATE_LIMIT_BACKOFF_SEQUENCE,
+  RATE_LIMIT_BACKOFF_SEQUENCE_429,
 } from '../config/settings';
 import { createLogger } from './logger';
 
@@ -227,7 +228,10 @@ export type HttpResult =
 // ---------------------------------------------------------------------------
 
 const domainTimestamps = new Map<string, number>();
-const domainBackoffIndex = new Map<string, number>();
+/** Backoff attempt index per host for HTTP 403 (and non-429 403 path). */
+const domainBackoffIndexForbidden = new Map<string, number>();
+/** Backoff attempt index per host for HTTP 429 only. */
+const domainBackoffIndex429 = new Map<string, number>();
 
 function randomIntInclusive(min: number, max: number): number {
   return min + Math.floor(Math.random() * (max - min + 1));
@@ -265,24 +269,29 @@ function sleep(ms: number): Promise<void> {
 // Exponential backoff for 403/429 (after first-response browser handoff for 403)
 // ---------------------------------------------------------------------------
 
-async function handleRateLimitBackoff(hostKey: string): Promise<boolean> {
-  const idx = domainBackoffIndex.get(hostKey) ?? 0;
-  if (idx >= RATE_LIMIT_BACKOFF_SEQUENCE.length) {
-    log.error(`RATE_LIMITED: all backoff retries exhausted for ${hostKey}`);
+type RateLimitKind = 'forbidden' | 'too_many_requests';
+
+async function handleRateLimitBackoff(hostKey: string, kind: RateLimitKind): Promise<boolean> {
+  const seq = kind === 'too_many_requests' ? RATE_LIMIT_BACKOFF_SEQUENCE_429 : RATE_LIMIT_BACKOFF_SEQUENCE;
+  const map = kind === 'too_many_requests' ? domainBackoffIndex429 : domainBackoffIndexForbidden;
+  const idx = map.get(hostKey) ?? 0;
+  if (idx >= seq.length) {
+    log.error(`RATE_LIMITED: all ${kind === 'too_many_requests' ? '429' : '403'} backoff retries exhausted for ${hostKey}`);
     return false;
   }
-  const delay = RATE_LIMIT_BACKOFF_SEQUENCE[idx];
-  log.warn(`RATE_LIMITED: ${hostKey} — backing off ${delay / 1000}s (attempt ${idx + 1}/${RATE_LIMIT_BACKOFF_SEQUENCE.length})`);
-  domainBackoffIndex.set(hostKey, idx + 1);
+  const delay = seq[idx]!;
+  log.warn(
+    `RATE_LIMITED: ${hostKey} — backing off ${delay / 1000}s (${kind === 'too_many_requests' ? '429' : '403'}, attempt ${idx + 1}/${seq.length})`,
+  );
+  map.set(hostKey, idx + 1);
   await sleep(delay);
   domainTimestamps.set(hostKey, Date.now());
   return true;
 }
 
 function resetBackoff(hostKey: string): void {
-  if (domainBackoffIndex.has(hostKey)) {
-    domainBackoffIndex.delete(hostKey);
-  }
+  domainBackoffIndexForbidden.delete(hostKey);
+  domainBackoffIndex429.delete(hostKey);
 }
 
 // ---------------------------------------------------------------------------
@@ -502,7 +511,7 @@ export async function headCheck(
         log.warn(
           `HTTP client: host "${hostKey}" returned 403 on first Axios response — Playwright unavailable; keeping Axios for this host`,
         );
-        const canRetry = await handleRateLimitBackoff(hostKey);
+        const canRetry = await handleRateLimitBackoff(hostKey, 'forbidden');
         if (canRetry) return headCheck(url, timeoutMs);
         return { exists: false, status };
       }
@@ -515,7 +524,10 @@ export async function headCheck(
     }
 
     if (status === 403 || status === 429) {
-      const canRetry = await handleRateLimitBackoff(hostKey);
+      const canRetry = await handleRateLimitBackoff(
+        hostKey,
+        status === 429 ? 'too_many_requests' : 'forbidden',
+      );
       if (canRetry) return headCheck(url, timeoutMs);
     }
     return { exists: false, status };
@@ -576,7 +588,7 @@ export async function fetchPage(
           log.warn(
             `HTTP client: host "${hostKey}" returned 403 — Playwright unavailable; continuing with Axios-only retries`,
           );
-          const canRetry = await handleRateLimitBackoff(hostKey);
+          const canRetry = await handleRateLimitBackoff(hostKey, 'forbidden');
           if (canRetry) {
             attempt--;
             continue;
@@ -593,7 +605,10 @@ export async function fetchPage(
 
       if (status === 403 || status === 429) {
         log.warn(`${url} returned ${status} — entering rate-limit backoff`);
-        const canRetry = await handleRateLimitBackoff(hostKey);
+        const canRetry = await handleRateLimitBackoff(
+          hostKey,
+          status === 429 ? 'too_many_requests' : 'forbidden',
+        );
         if (canRetry) {
           attempt--;
           continue;
@@ -684,7 +699,7 @@ export async function fetchBinary(
           log.warn(
             `HTTP client: host "${hostKey}" returned 403 on binary GET — Playwright unavailable; continuing with Axios-only retries`,
           );
-          const canRetry = await handleRateLimitBackoff(hostKey);
+          const canRetry = await handleRateLimitBackoff(hostKey, 'forbidden');
           if (canRetry) {
             attempt--;
             continue;
@@ -700,7 +715,10 @@ export async function fetchBinary(
       }
 
       if (status === 403 || status === 429) {
-        const canRetry = await handleRateLimitBackoff(hostKey);
+        const canRetry = await handleRateLimitBackoff(
+          hostKey,
+          status === 429 ? 'too_many_requests' : 'forbidden',
+        );
         if (canRetry) {
           attempt--;
           continue;

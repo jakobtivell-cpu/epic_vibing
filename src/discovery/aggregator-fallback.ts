@@ -12,6 +12,20 @@ const TRUSTED_AGGREGATOR_HOSTS = [
   'nasdaq.com',
   'news.cision.com',
   'cision.com',
+  'mb.cision.com',
+  /** Issuer IR domains when explicitly listed in ticker.json `aggregatorUrls` only. */
+  'handelsbanken.com',
+  'swedbank.com',
+  'swedbank.se',
+  'sebgroup.com',
+  'investorab.com',
+  'industrivarden.se',
+  'industrivarden.net',
+  'home.sandvik',
+  'kinnevik.com',
+  'bure.se',
+  'swecogroup.com',
+  'sectra.com',
 ];
 
 function hostAllowed(url: string): boolean {

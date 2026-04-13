@@ -4,7 +4,11 @@
         "irPage": "https://www.astrazeneca.com/investor-relations.html",
         "candidateDomains": [
             "https://www.astrazeneca.com"
-        ]
+        ],
+        "annualReportPdfUrls": [
+            "https://www.astrazeneca.com/content/dam/az/Investor_Relations/annual-report-2025/pdf/AstraZeneca_AR_2025.pdf"
+        ],
+        "overrideFiscalYear": 2025
     },
     "ABB.ST": "ABB Ltd",
     "INVE-A.ST": {
@@ -16,7 +20,11 @@
             "https://www.investorab.com"
         ],
         "isin": "SE0000107419",
-        "irEmail": "ir@investorab.com"
+        "irEmail": "ir@investorab.com",
+        "annualReportPdfUrls": [
+            "https://www.investorab.com/media/mjzjnq4d/investor_ar25_eng.pdf"
+        ],
+        "overrideFiscalYear": 2025
     },
     "INVE-B.ST": {
         "name": "Investor AB (publ)",
@@ -100,7 +108,11 @@
             "https://www.assaabloy.com"
         ],
         "isin": "SE0007100581",
-        "irEmail": "ir@assaabloy.com"
+        "irEmail": "ir@assaabloy.com",
+        "annualReportPdfUrls": [
+            "https://www.assaabloy.com/group/en/documents/investors/annual-reports/2025/Annual%20Report%202025.pdf"
+        ],
+        "overrideFiscalYear": 2025
     },
     "SWED-A.ST": {
         "name": "Swedbank AB (publ)",
@@ -358,7 +370,11 @@
         "irPage": "https://www.lundbergforetagen.se/en/investors",
         "candidateDomains": [
             "https://www.lundbergforetagen.se"
-        ]
+        ],
+        "annualReportPdfUrls": [
+            "https://www.lundbergforetagen.se/sites/default/files/2026-03/Lundbergs_Annual_Report_2025-4.pdf"
+        ],
+        "overrideFiscalYear": 2025
     },
     "LATO-B.ST": {
         "name": "Investment AB Latour (publ)",
@@ -410,7 +426,11 @@
         "candidateDomains": [
             "https://group.skanska.com",
             "https://www.skanska.com"
-        ]
+        ],
+        "annualReportPdfUrls": [
+            "https://group.skanska.com/493a91/siteassets/investors/reports-publications/annual-reports/2025/skanska-s-annual-and-sustainability-report-2025-pdf-.pdf"
+        ],
+        "overrideFiscalYear": 2025
     },
     "SECU-B.ST": {
         "name": "Securitas AB (publ)",
@@ -470,7 +490,11 @@
         "irPage": "https://www.sca.com/en/investors/",
         "candidateDomains": [
             "https://www.sca.com"
-        ]
+        ],
+        "annualReportPdfUrls": [
+            "https://www.sca.com/siteassets/investors/reports-and-presentations/annual-reports/2025/sca-annual-report-2025.pdf"
+        ],
+        "overrideFiscalYear": 2025
     },
     "SCA-B.ST": {
         "name": "Svenska Cellulosa Aktiebolaget SCA (publ)",
@@ -568,7 +592,11 @@
         "irPage": "https://www.aak.com/investors/",
         "candidateDomains": [
             "https://www.aak.com"
-        ]
+        ],
+        "annualReportPdfUrls": [
+            "https://storage.mfn.se/ad831c6a-a84b-479c-9522-58f8e7534ac5/aak-annual-report-2024.pdf"
+        ],
+        "overrideFiscalYear": 2024
     },
     "AZA.ST": {
         "name": "Avanza Bank Holding AB (publ)",
@@ -576,7 +604,11 @@
         "irPage": "https://investors.avanza.se",
         "candidateDomains": [
             "https://investors.avanza.se"
-        ]
+        ],
+        "annualReportPdfUrls": [
+            "https://investors.avanza.se/files/mfn/110491d0-0352-424a-9376-575b1b40c556/avanza-bank-holding-ab-publ-arsredovisning-och-hallbarhetsrapport-2025-pdf-169-navigering.pdf"
+        ],
+        "overrideFiscalYear": 2025
     },
     "CAST.ST": {
         "name": "Castellum AB (publ)",
@@ -584,14 +616,22 @@
         "irPage": "https://www.castellum.com/investors/",
         "candidateDomains": [
             "https://www.castellum.com"
-        ]
+        ],
+        "annualReportPdfUrls": [
+            "https://storage.mfn.se/963638c8-0fda-4368-85b6-1559341d193e/castellum-annual-report-2025.pdf"
+        ],
+        "overrideFiscalYear": 2025
     },
     "GETI-B.ST": {
         "name": "Getinge AB (publ)",
         "irPage": "https://www.getinge.com/int/investors/",
         "candidateDomains": [
             "https://www.getinge.com"
-        ]
+        ],
+        "annualReportPdfUrls": [
+            "https://www.getinge.com/dam/corporate/documents/investors/annual-reports/swedish/getinge__rsredovisning_2025-115629-sv.pdf"
+        ],
+        "overrideFiscalYear": 2025
     },
     "HOLM-A.ST": {
         "name": "Holmen AB (publ)",
@@ -719,7 +759,11 @@
         "candidateDomains": [
             "https://www.fabege.se",
             "https://www.fabege.com"
-        ]
+        ],
+        "annualReportPdfUrls": [
+            "https://www.fabege.se/siteassets/rapporter-och-kvartalspresenationer/arsredovisning/2025/fabege-annual_report-2025.pdf"
+        ],
+        "overrideFiscalYear": 2025
     },
     "CLAS-B.ST": {
         "name": "Clas Ohlson AB (publ)",
@@ -736,7 +780,11 @@
         "candidateDomains": [
             "https://www.hufvudstaden.se",
             "https://www.hufvudstaden.com"
-        ]
+        ],
+        "annualReportPdfUrls": [
+            "https://hufvudstaden.se/globalassets/finansiell-information/delarsrapporter/2025/uppdaterade-rapporter-svenska-mars-2026/svenska/hufvudstaden_arsredovisning-2025_v2.pdf"
+        ],
+        "overrideFiscalYear": 2025
     },
     "THULE.ST": {
         "name": "Thule Group AB (publ)",
@@ -840,7 +888,11 @@
         "irPage": "https://www.add.life/en/investors",
         "candidateDomains": [
             "https://www.add.life"
-        ]
+        ],
+        "annualReportPdfUrls": [
+            "https://www.add.life/media/2pbl1ybt/addlife-annual-report-2025.pdf"
+        ],
+        "overrideFiscalYear": 2025
     },
     "ELUX-A.ST": {
         "name": "AB Electrolux (publ)",
@@ -866,7 +918,11 @@
         "irPage": "https://www.bure.se/investerare/finansiella-rapporter",
         "candidateDomains": [
             "https://www.bure.se"
-        ]
+        ],
+        "annualReportPdfUrls": [
+            "https://storage.mfn.se/489506e1-9928-49a3-93a6-3cb87a51a0d5/arsredovisning-2024.pdf"
+        ],
+        "overrideFiscalYear": 2024
     },
     "GRNG.ST": {
         "name": "Gränges AB (publ)",
@@ -881,7 +937,11 @@
         "irPage": "https://www.np3fastigheter.se/en/investors/",
         "candidateDomains": [
             "https://www.np3fastigheter.se"
-        ]
+        ],
+        "annualReportPdfUrls": [
+            "https://www.np3fastigheter.se/files/mfn/067c9724-5d04-460c-92c7-aa05faf01622/annual-and-sustainability-report-2025.pdf"
+        ],
+        "overrideFiscalYear": 2025
     },
     "CLA-B.ST": {
         "name": "Cloetta AB (publ)",
@@ -934,7 +994,11 @@
         ],
         "aggregatorUrls": [
             "https://www.kinnevik.com/investors/reports/"
-        ]
+        ],
+        "annualReportPdfUrls": [
+            "https://www.kinnevik.com/files/mfn/59ab9d16-5d53-4ad8-abf3-71a6db358a9c/annual-sustainability-report-2025.pdf"
+        ],
+        "overrideFiscalYear": 2025
     },
     "KINV-B.ST": {
         "name": "Kinnevik AB",

@@ -7,7 +7,11 @@ import type { FieldExtractionResult, FieldProvenance } from '../extraction/field
 import { createLogger } from '../utils/logger';
 import { buildLlmContextWindows } from './evidence';
 import { shouldRunLlmChallenger, type ChallengerGateInput } from './gate';
-import { runLlmExtraction } from './llm-extract';
+import {
+  runLlmExtraction,
+  runLlmEbitRepair,
+  shouldUseNarrowEbitLlmRepair,
+} from './llm-extract';
 import { adjudicateDualTrack, errorAdjudication } from './adjudicate';
 import type { DualTrackAdjudication } from './types';
 
@@ -31,6 +35,8 @@ export interface RunChallengerParams {
   status: ResultStatus;
   detectedCompanyType: CompanyType | null;
   forceLlm: boolean;
+  /** Pipeline extraction notes — narrow EBIT LLM repair when validator discarded EBIT. */
+  extractionNotes?: string[];
 }
 
 /**
@@ -62,11 +68,31 @@ export async function runChallengerTrack(params: RunChallengerParams): Promise<D
   }
 
   const context = buildLlmContextWindows(params.fullPdfText);
-  const llmResult = await runLlmExtraction(
-    params.legalNameForPrompt,
-    params.fullPdfText,
-    context,
+  const narrowEbit = shouldUseNarrowEbitLlmRepair(
+    params.validatedData,
+    params.extractionNotes,
   );
+
+  let llmResult = narrowEbit
+    ? await runLlmEbitRepair(params.legalNameForPrompt, params.fullPdfText, context)
+    : await runLlmExtraction(params.legalNameForPrompt, params.fullPdfText, context);
+
+  const narrowAccepted =
+    llmResult.ok &&
+    llmResult.evidences.ebit_msek.quoteOk &&
+    llmResult.evidences.ebit_msek.evidence !== null &&
+    typeof llmResult.evidences.ebit_msek.evidence.value === 'number';
+
+  if (narrowEbit && (!narrowAccepted || !llmResult.ok)) {
+    log.debug(
+      `[${params.companyDisplayName}] Narrow EBIT repair inconclusive — falling back to full LLM extract`,
+    );
+    llmResult = await runLlmExtraction(
+      params.legalNameForPrompt,
+      params.fullPdfText,
+      context,
+    );
+  }
 
   if (!llmResult.ok) {
     log.warn(`[${params.companyDisplayName}] LLM challenger failed: ${llmResult.error}`);

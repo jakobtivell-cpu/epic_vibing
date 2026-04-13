@@ -16,7 +16,11 @@
     "test:e2e-all-tickers": "node scripts/run-all-ticker-e2e.cjs",
     "test:e2e-partial-subset": "node scripts/run-partial-subset-e2e.cjs",
     "analyze:quality": "node scripts/analyze-results-quality.cjs",
+    "analyze:null-ledger": "node scripts/analyze-results-quality.cjs --write-ledger",
+    "analyze:timeouts": "node scripts/profile-timeouts.cjs",
+    "review:queue": "node scripts/export-review-queue.cjs",
     "gate:canary-diff": "node scripts/check-canary-diff.cjs",
+    "gate:promotion": "node scripts/gate-promotion.cjs",
     "postinstall": "npx playwright install chromium"
   },
   "dependencies": {

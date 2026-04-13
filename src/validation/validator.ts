@@ -123,14 +123,26 @@ export function validateExtractedData(
     }
   }
 
+  const employeeIndustrialFloorRelaxed =
+    pipelineNotes?.some((n) =>
+      /segment-level|parent[\s-]company|moderbolag|non[\s-]consolidated|huvudkontor\s+only/i.test(n),
+    ) ?? false;
+
   // --- Employees ---
   if (cleaned.employees === null) {
     warnings.push('Employee count not extracted');
     score -= 15;
   } else if (companyType === 'industrial' && cleaned.employees < 100) {
-    warnings.push(`Employee count too low (${cleaned.employees}) for industrial large-cap — discarded`);
-    cleaned.employees = null;
-    score -= 15;
+    if (employeeIndustrialFloorRelaxed && cleaned.employees >= 20) {
+      warnings.push(
+        `Employee count ${cleaned.employees} below industrial large-cap floor — kept; pipeline notes indicate parent/segment/non-consolidated context`,
+      );
+      score -= 8;
+    } else {
+      warnings.push(`Employee count too low (${cleaned.employees}) for industrial large-cap — discarded`);
+      cleaned.employees = null;
+      score -= 15;
+    }
   } else if (cleaned.employees < 50) {
     warnings.push(`Employee count too low (${cleaned.employees}) — discarded`);
     cleaned.employees = null;

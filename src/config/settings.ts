@@ -22,6 +22,13 @@ function resolveProjectRoot(): string {
   return path.resolve(__dirname, '../..');
 }
 
+function envInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+}
+
 /** Repo / deployment root (see `resolveProjectRoot`). Exported for `data/ticker.json` and similar. */
 export const PROJECT_ROOT = resolveProjectRoot();
 
@@ -85,3 +92,12 @@ export const CACHE_DIR = path.join(PROJECT_ROOT, 'cache');
 
 /** After SIGTERM, wait this long before SIGKILL on a per-company pipeline child (see --timeout-per-company). */
 export const TIMEOUT_CHILD_SIGKILL_GRACE_MS = 5_000;
+
+/** Upper bound of candidate domains processed in multi-domain IR cycle. */
+export const MAX_CANDIDATE_DOMAINS = envInt('MAX_CANDIDATE_DOMAINS', 8);
+
+/** Soft per-stage budget for IR/report discovery blocks (ms). */
+export const STAGE_DISCOVERY_BUDGET_MS = envInt('STAGE_DISCOVERY_BUDGET_MS', 90_000);
+
+/** Soft per-stage budget for fallback source fetches (ms). */
+export const STAGE_FALLBACK_BUDGET_MS = envInt('STAGE_FALLBACK_BUDGET_MS', 35_000);

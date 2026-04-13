@@ -4,8 +4,13 @@
 const fs = require('fs');
 const path = require('path');
 
-const RESULTS_PATH = process.argv[2]
-  ? path.resolve(process.argv[2])
+const { buildLedger } = require('./lib/null-reasons-infer.cjs');
+
+const args = process.argv.slice(2).filter((a) => a !== '--write-ledger');
+const WRITE_LEDGER = process.argv.includes('--write-ledger');
+
+const RESULTS_PATH = args[0]
+  ? path.resolve(args[0])
   : path.resolve(process.cwd(), 'output', 'results.json');
 
 function loadRows(filePath) {
@@ -105,9 +110,18 @@ function main() {
     nullHeadlineFields: countNullHeadlineFields(rows),
     discardReasons: collectDiscardReasons(rows),
     wrongReportClassCandidates: wrongReportClassCandidates(rows),
+    nullFieldTallies: buildLedger(rows).tallies,
   };
 
   console.log(JSON.stringify(summary, null, 2));
+
+  if (WRITE_LEDGER) {
+    const outPath = path.join(path.dirname(RESULTS_PATH), 'results_null_ledger.json');
+    const ledger = buildLedger(rows);
+    ledger.source = RESULTS_PATH;
+    fs.writeFileSync(outPath, JSON.stringify(ledger, null, 2), 'utf-8');
+    console.error(`Wrote ${outPath}`);
+  }
 }
 
 main();

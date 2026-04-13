@@ -37,39 +37,63 @@ function emptyField(): LlmRawField {
   };
 }
 
+function pickRawField(obj: Record<string, unknown>, k: string): LlmRawField {
+  const v = obj[k];
+  if (!v || typeof v !== 'object') return emptyField();
+  const o = v as Record<string, unknown>;
+  return {
+    value:
+      typeof o.value === 'number' || typeof o.value === 'string'
+        ? o.value
+        : o.value === null
+          ? null
+          : null,
+    page: typeof o.page === 'number' && o.page >= 1 ? Math.floor(o.page) : null,
+    source_quote: typeof o.source_quote === 'string' ? o.source_quote : null,
+    unit_stated: typeof o.unit_stated === 'string' ? o.unit_stated : null,
+    reporting_scope: typeof o.reporting_scope === 'string' ? o.reporting_scope : null,
+    normalization: Array.isArray(o.normalization)
+      ? o.normalization.filter((x): x is string => typeof x === 'string')
+      : [],
+  };
+}
+
 function parseLlmJson(text: string): LlmExtractJson | null {
   try {
     const obj = JSON.parse(text) as Record<string, unknown>;
-    const pick = (k: string): LlmRawField => {
-      const v = obj[k];
-      if (!v || typeof v !== 'object') return emptyField();
-      const o = v as Record<string, unknown>;
-      return {
-        value:
-          typeof o.value === 'number' || typeof o.value === 'string'
-            ? o.value
-            : o.value === null
-              ? null
-              : null,
-        page: typeof o.page === 'number' && o.page >= 1 ? Math.floor(o.page) : null,
-        source_quote: typeof o.source_quote === 'string' ? o.source_quote : null,
-        unit_stated: typeof o.unit_stated === 'string' ? o.unit_stated : null,
-        reporting_scope: typeof o.reporting_scope === 'string' ? o.reporting_scope : null,
-        normalization: Array.isArray(o.normalization)
-          ? o.normalization.filter((x): x is string => typeof x === 'string')
-          : [],
-      };
-    };
     return {
-      revenue_msek: pick('revenue_msek'),
-      ebit_msek: pick('ebit_msek'),
-      employees: pick('employees'),
-      ceo: pick('ceo'),
-      fiscal_year: pick('fiscal_year'),
+      revenue_msek: pickRawField(obj, 'revenue_msek'),
+      ebit_msek: pickRawField(obj, 'ebit_msek'),
+      employees: pickRawField(obj, 'employees'),
+      ceo: pickRawField(obj, 'ceo'),
+      fiscal_year: pickRawField(obj, 'fiscal_year'),
     };
   } catch {
     return null;
   }
+}
+
+/** Narrow repair: only ebit_msek (+ optional revenue_msek) with citation requirement. */
+function parseEbitRepairJson(text: string): { ebit: LlmRawField; revenue: LlmRawField } | null {
+  try {
+    const obj = JSON.parse(text) as Record<string, unknown>;
+    return {
+      ebit: pickRawField(obj, 'ebit_msek'),
+      revenue: pickRawField(obj, 'revenue_msek'),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function shouldUseNarrowEbitLlmRepair(
+  validated: { revenue_msek: number | null; ebit_msek: number | null },
+  extractionNotes?: string[],
+): boolean {
+  if (validated.ebit_msek !== null) return false;
+  if (validated.revenue_msek === null) return false;
+  const blob = (extractionNotes ?? []).join(' | ');
+  return /discarding ebit|semantic mismatch|assignment safety|exceeds revenue/i.test(blob);
 }
 
 function buildPrompt(companyLegalName: string, context: string): string {
@@ -96,6 +120,45 @@ JSON schema (all keys required):
 
 EXCERPT:
 ${context}`;
+}
+
+function buildEbitRepairPrompt(companyLegalName: string, context: string): string {
+  return `The deterministic extractor likely discarded EBIT due to semantic mismatch between operating earnings and revenue (or a similar validation rule).
+
+Task: From the excerpt ONLY, identify the consolidated primary operating result / EBIT / operating profit line and express it in millions of SEK (MSEK).
+
+Rules:
+- Return ONLY valid JSON. No markdown or commentary.
+- Include keys "ebit_msek" (required) and optionally "revenue_msek" only if you must fix an obvious unit inconsistency. Do not include employees, CEO, or fiscal_year.
+- Use null for any numeric value you cannot support with a verbatim source_quote from the excerpt (>= 12 characters) that includes BOTH the line label context AND the reported figure (or an unambiguous table fragment).
+- page: 1-based page number when page markers appear in the excerpt; otherwise null.
+- Document unit conversion in the normalization array (e.g. SEK thousands → MSEK).
+
+JSON shape:
+{
+  "ebit_msek": { "value": number|null, "page": number|null, "source_quote": string|null, "unit_stated": string|null, "reporting_scope": string|null, "normalization": string[] },
+  "revenue_msek": { "value": number|null, "page": number|null, "source_quote": string|null, "unit_stated": string|null, "reporting_scope": string|null, "normalization": string[] }
+}
+
+Company: "${companyLegalName}"
+
+EXCERPT:
+${context}`;
+}
+
+function packageLlmResult(fullText: string, parsed: LlmExtractJson): LlmExtractResult {
+  const mapField = (raw: LlmRawField) => rawToEvidence(raw, 'llm', fullText);
+  return {
+    ok: true,
+    parsed,
+    evidences: {
+      revenue_msek: mapField(parsed.revenue_msek),
+      ebit_msek: mapField(parsed.ebit_msek),
+      employees: mapField(parsed.employees),
+      ceo: mapField(parsed.ceo),
+      fiscalYear: mapField(parsed.fiscal_year),
+    },
+  };
 }
 
 function rawToEvidence(
@@ -149,41 +212,93 @@ export interface LlmExtractError {
   error: string;
 }
 
+async function openAiJsonCompletion(prompt: string): Promise<string | null> {
+  const key = process.env.OPENAI_API_KEY?.trim();
+  if (!key) {
+    return null;
+  }
+  const base =
+    process.env.OPENAI_BASE_URL?.trim()?.replace(/\/$/, '') ?? 'https://api.openai.com/v1';
+  const model = process.env.LLM_MODEL?.trim() || 'gpt-4o-mini';
+
+  const resp = await axios.post(
+    `${base}/chat/completions`,
+    {
+      model,
+      temperature: 0,
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: 120_000,
+    },
+  );
+
+  const content = resp.data?.choices?.[0]?.message?.content;
+  return typeof content === 'string' ? content : null;
+}
+
+/**
+ * Narrow-schema EBIT repair — citation-gated in adjudication (quote must verify in full PDF).
+ */
+export async function runLlmEbitRepair(
+  companyLegalName: string,
+  fullText: string,
+  context: string,
+): Promise<LlmExtractResult | LlmExtractError> {
+  if (!process.env.OPENAI_API_KEY?.trim()) {
+    return { ok: false, error: 'OPENAI_API_KEY not set' };
+  }
+
+  try {
+    const prompt = buildEbitRepairPrompt(companyLegalName, context);
+    const content = await openAiJsonCompletion(prompt);
+    if (!content) {
+      return { ok: false, error: 'Empty LLM response' };
+    }
+
+    const partial = parseEbitRepairJson(content);
+    if (!partial) {
+      return { ok: false, error: 'LLM returned non-JSON or invalid shape (EBIT repair)' };
+    }
+
+    const parsed: LlmExtractJson = {
+      revenue_msek: partial.revenue.value !== null ? partial.revenue : emptyField(),
+      ebit_msek: partial.ebit,
+      employees: emptyField(),
+      ceo: emptyField(),
+      fiscal_year: emptyField(),
+    };
+
+    log.info('LLM EBIT repair pass: narrow schema (ebit_msek + optional revenue_msek)');
+    return packageLlmResult(fullText, parsed);
+  } catch (e) {
+    const ax = e as AxiosError;
+    const msg = ax.response?.data
+      ? JSON.stringify(ax.response.data).slice(0, 500)
+      : ax.message;
+    log.warn(`LLM EBIT repair failed: ${msg}`);
+    return { ok: false, error: msg };
+  }
+}
+
 export async function runLlmExtraction(
   companyLegalName: string,
   fullText: string,
   context: string,
 ): Promise<LlmExtractResult | LlmExtractError> {
-  const key = process.env.OPENAI_API_KEY?.trim();
-  if (!key) {
+  if (!process.env.OPENAI_API_KEY?.trim()) {
     return { ok: false, error: 'OPENAI_API_KEY not set' };
   }
 
-  const base =
-    process.env.OPENAI_BASE_URL?.trim()?.replace(/\/$/, '') ?? 'https://api.openai.com/v1';
-  const model = process.env.LLM_MODEL?.trim() || 'gpt-4o-mini';
-  const prompt = buildPrompt(companyLegalName, context);
-
   try {
-    const resp = await axios.post(
-      `${base}/chat/completions`,
-      {
-        model,
-        temperature: 0,
-        messages: [{ role: 'user', content: prompt }],
-        response_format: { type: 'json_object' },
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${key}`,
-          'Content-Type': 'application/json',
-        },
-        timeout: 120_000,
-      },
-    );
-
-    const content = resp.data?.choices?.[0]?.message?.content;
-    if (typeof content !== 'string') {
+    const prompt = buildPrompt(companyLegalName, context);
+    const content = await openAiJsonCompletion(prompt);
+    if (!content) {
       return { ok: false, error: 'Empty LLM response' };
     }
 
@@ -192,19 +307,7 @@ export async function runLlmExtraction(
       return { ok: false, error: 'LLM returned non-JSON or invalid shape' };
     }
 
-    const mapField = (raw: LlmRawField) => rawToEvidence(raw, 'llm', fullText);
-
-    return {
-      ok: true,
-      parsed,
-      evidences: {
-        revenue_msek: mapField(parsed.revenue_msek),
-        ebit_msek: mapField(parsed.ebit_msek),
-        employees: mapField(parsed.employees),
-        ceo: mapField(parsed.ceo),
-        fiscalYear: mapField(parsed.fiscal_year),
-      },
-    };
+    return packageLlmResult(fullText, parsed);
   } catch (e) {
     const ax = e as AxiosError;
     const msg = ax.response?.data

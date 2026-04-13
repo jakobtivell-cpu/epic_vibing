@@ -219,12 +219,25 @@ function selectBestNumericFromCells(
 
   for (const hdr of yearHeaderLinesAbove(lines, lineIndex)) {
     const seq = parseYearSequenceFromHeaderLine(hdr);
-    if (seq.length < 2 || !pick?.preferredFiscalYear) continue;
-    const yIdx = seq.lastIndexOf(pick.preferredFiscalYear);
-    if (yIdx < 0) continue;
-    const dataIdx = Math.min(yIdx, candidates.length - 1);
-    const chosen = candidates.find((c) => c.idx === dataIdx);
-    if (chosen) return chosen;
+    if (seq.length < 2) continue;
+
+    const tryYearColumn = (year: number): { cell: string; value: number } | null => {
+      const yIdx = seq.lastIndexOf(year);
+      if (yIdx < 0) return null;
+      const dataIdx = Math.min(yIdx, candidates.length - 1);
+      const chosen = candidates.find((c) => c.idx === dataIdx);
+      return chosen ?? null;
+    };
+
+    // Prefer the latest fiscal year column in the header (often rightmost current year).
+    const latestYear = Math.max(...seq);
+    const fromLatest = tryYearColumn(latestYear);
+    if (fromLatest) return fromLatest;
+
+    if (pick?.preferredFiscalYear) {
+      const fromPreferred = tryYearColumn(pick.preferredFiscalYear);
+      if (fromPreferred) return fromPreferred;
+    }
   }
 
   if (pick?.revenueRawHintForEbit != null && Math.abs(pick.revenueRawHintForEbit) > 0) {
@@ -972,6 +985,25 @@ function findAllLabeledNumbers(
   }
 
   return results;
+}
+
+/** When the first employee hit is implausibly low vs revenue, try another labeled row. */
+function pickBetterEmployeeMatchForRevenue(
+  matches: NumberMatch[],
+  currentEmployees: number,
+  revenueMsek: number,
+): NumberMatch | null {
+  const minOk = Math.max(100, Math.floor(revenueMsek / 50));
+  if (currentEmployees >= minOk) return null;
+  const candidates = matches.filter((m) => {
+    const e = Math.round(m.value);
+    return e >= minOk && e <= 700_000 && e !== currentEmployees;
+  });
+  if (candidates.length === 0) return null;
+  const target = revenueMsek / 25;
+  return candidates.reduce((a, b) =>
+    Math.abs(Math.round(a.value) - target) <= Math.abs(Math.round(b.value) - target) ? a : b,
+  );
 }
 
 /**
@@ -2237,11 +2269,43 @@ export function extractFields(
         `Employees ${parsedEmployees} likely portfolio-level for investment company ${companyName} — discarding`,
       );
     } else {
-      employees = parsedEmployees;
+      let empVal = parsedEmployees;
+      const lineText = lines[empMatch.lineIndex] ?? '';
+      const lineWindow = `${lineText} ${lines[empMatch.lineIndex + 1] ?? ''}`.toLowerCase();
+      if (
+        empVal >= 50_000 &&
+        /\b(in\s+thousands|tusental|employees.*thousand|anställda.*tusen)\b/i.test(lineWindow)
+      ) {
+        const scaled = Math.round(empVal / 1000);
+        if (scaled >= 100 && scaled <= 1_000_000) {
+          notes.push(`Employee count scaled ÷1000 (thousands context near employee label)`);
+          empVal = scaled;
+        }
+      }
+      employees = empVal;
       empProvenance = numMatchToProvenance(empMatch);
       log.info(`Employees: ${employees}`);
 
-      // Plausibility: at least 1 employee per 10 MSEK of revenue
+      if (revenue !== null && revenue >= 1000 && employees > 0 && employees < revenue / 50) {
+        const scan = detectedType === 'bank' ? bankScan : SCAN_DEFAULT;
+        const allEmp = findAllLabeledNumbers(
+          lines,
+          labels.employees,
+          { minValue: 100, maxValue: 1_000_000 },
+          tablePickBase,
+          scan.loose.maxLineLen,
+          scan.loose.maxLabelOffset,
+        );
+        const alt = pickBetterEmployeeMatchForRevenue(allEmp, employees, revenue);
+        if (alt !== null) {
+          notes.push(
+            `Employee count revised from ${employees} to ${Math.round(alt.value)} — alternate label row vs revenue plausibility`,
+          );
+          employees = Math.round(alt.value);
+          empProvenance = numMatchToProvenance(alt);
+        }
+      }
+
       if (revenue !== null && employees > 0 && employees < revenue / 10) {
         notes.push(`SUSPECT_LOW: ${employees} employees vs ${revenue} MSEK revenue (< 1 per 10 MSEK)`);
         log.warn(`Employee count ${employees} suspiciously low relative to revenue ${revenue} MSEK`);
@@ -2360,4 +2424,123 @@ export function extractFields(
     },
     notes,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Second-pass EBIT (consolidated income sections only) — pre-validation repair
+// ---------------------------------------------------------------------------
+
+/**
+ * Re-scan labeled EBIT/operating lines only inside detected consolidated income-statement
+ * windows (skips highlights / front-matter picks that often mis-scale).
+ */
+export function extractEbitSecondPassFromIncomeSections(
+  text: string,
+  companyType: CompanyType,
+  fallbackFiscalYear: number | null,
+  revenueMsek: number | null,
+): { ebit_msek: number | null; notes: string[] } {
+  const notes: string[] = [];
+  if (companyType === 'investment_company') {
+    return { ebit_msek: null, notes };
+  }
+
+  const lines = text
+    .split(/\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+  const unitContext = detectUnitContext(text);
+  const sections = findIncomeStatementSections(lines);
+  if (sections.length === 0) {
+    notes.push('Second-pass EBIT: no consolidated income statement window found');
+    return { ebit_msek: null, notes };
+  }
+
+  const revAbs = revenueMsek !== null ? Math.abs(revenueMsek) : 0;
+  const ebitMax =
+    companyType === 'bank' ? 1_000_000 : Math.max(500_000, revAbs * 50 + 1, 50_000);
+  const ebitOpts: NumberSearchOpts = {
+    minValue: companyType === 'bank' ? -1_000_000 : -500_000,
+    maxValue: ebitMax,
+    exclusions: EBIT_EXCLUSIONS,
+  };
+  const ebitPick: NumberPickContext = {
+    preferredFiscalYear: fallbackFiscalYear,
+    revenueRawHintForEbit: null,
+  };
+
+  const sorted = [...sections].sort((a, b) => b.end - b.start - (a.end - a.start));
+
+  for (const sec of sorted) {
+    const slice = lines.slice(sec.start, sec.end);
+    let match: NumberMatch | null = null;
+
+    if (companyType === 'bank') {
+      match = findLabeledNumber(
+        slice,
+        BANK_EBIT_LABELS_PRIMARY,
+        { ...ebitOpts, exclusions: EBIT_EXCLUSIONS_BANK },
+        ebitPick,
+        SCAN_BANK,
+      );
+      if (match === null) {
+        match = findLabeledNumber(
+          slice,
+          getLabels('bank').ebit,
+          { ...ebitOpts, exclusions: EBIT_EXCLUSIONS_BANK },
+          ebitPick,
+          SCAN_BANK,
+        );
+      }
+    } else if (companyType === 'real_estate') {
+      match = extractRealEstateEbitProxy(slice, ebitOpts, ebitPick);
+    } else {
+      match = findLabeledNumber(slice, INDUSTRIAL_LABELS.ebit, ebitOpts, ebitPick, SCAN_DEFAULT);
+    }
+
+    if (match === null) continue;
+
+    const globalIdx = sec.start + match.lineIndex;
+    const globalMatch: NumberMatch = {
+      ...match,
+      lineIndex: globalIdx,
+      sectionRange: { start: sec.start, end: sec.end },
+      context: 'income-statement',
+    };
+
+    if (hasFusedYearRawArtifact(globalMatch.rawCell)) continue;
+    if (isGhostSegmentEbitHeaderMatch(globalMatch, lines)) continue;
+    if (isInSegmentSection(globalIdx, lines)) continue;
+
+    let msek = normalizeEbitMatchToMsek(globalMatch, lines, unitContext);
+    const ebitGuard = applyEbitMegascaleGuard(msek, revenueMsek);
+    if (ebitGuard.adjusted) {
+      notes.push(`Second-pass EBIT unit guard: ${msek} → ${ebitGuard.ebit} MSEK`);
+      msek = ebitGuard.ebit;
+    }
+
+    if (revenueMsek !== null && revenueMsek > 0) {
+      if (companyType === 'bank') {
+        const ratio = msek / revenueMsek;
+        const absDelta = msek - revenueMsek;
+        if (ratio > 1.35 || absDelta > 20_000) {
+          continue;
+        }
+      } else if (companyType === 'real_estate') {
+        if (msek > revenueMsek * 3) {
+          continue;
+        }
+      } else if (msek > revenueMsek * 1.05) {
+        continue;
+      }
+    }
+
+    notes.push(
+      `Second-pass EBIT from consolidated income section (${globalMatch.label}): ${msek} MSEK`,
+    );
+    return { ebit_msek: msek, notes };
+  }
+
+  notes.push('Second-pass EBIT: no acceptable line in income statement windows');
+  return { ebit_msek: null, notes };
 }

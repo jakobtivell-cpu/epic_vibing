@@ -19,6 +19,7 @@ import {
   resolveOverrideFiscalYear,
   resolveCmsApiUrls,
   resolveAggregatorUrls,
+  resolveManualHeadlineFields,
 } from './ticker-map';
 
 /** Wall-clock cap per company when using `runCompaniesWithOptionalChildTimeout` (3 minutes). */
@@ -57,6 +58,7 @@ export function buildCompanyProfilesForTickers(tickers: string[]): CompanyProfil
     const overrideFiscalYear = resolveOverrideFiscalYear(rawTicker) ?? undefined;
     const cmsApiUrls = resolveCmsApiUrls(rawTicker) ?? undefined;
     const aggregatorUrls = resolveAggregatorUrls(rawTicker) ?? undefined;
+    const manualHeadlineFields = resolveManualHeadlineFields(rawTicker) ?? undefined;
 
     if (legalName) {
       profiles.push({
@@ -73,6 +75,7 @@ export function buildCompanyProfilesForTickers(tickers: string[]): CompanyProfil
         ...(overrideFiscalYear ? { overrideFiscalYear } : {}),
         ...(cmsApiUrls?.length ? { cmsApiUrls } : {}),
         ...(aggregatorUrls?.length ? { aggregatorUrls } : {}),
+        ...(manualHeadlineFields ? { manualHeadlineFields } : {}),
       });
     } else {
       profiles.push({ name: rawTicker.trim() });

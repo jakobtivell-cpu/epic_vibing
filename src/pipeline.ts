@@ -28,10 +28,17 @@ import {
   ResultStatus,
   FallbackStep,
   ReportCandidate,
+  ManualHeadlineFields,
   SOURCE_PLAYWRIGHT_FALLBACK,
   SOURCE_SEARCH_DISCOVERY,
 } from './types';
-import { MAX_CANDIDATES_PER_STEP, RESULTS_PATH } from './config/settings';
+import {
+  MAX_CANDIDATES_PER_STEP,
+  MAX_CANDIDATE_DOMAINS,
+  RESULTS_PATH,
+  STAGE_DISCOVERY_BUDGET_MS,
+  STAGE_FALLBACK_BUDGET_MS,
+} from './config/settings';
 import {
   searchDiscovery,
   directPdfSearch,
@@ -48,6 +55,7 @@ import { tryPlaywrightFallback } from './discovery/playwright-fallback';
 import { buildEntityProfile, type EntityProfile } from './entity';
 import { downloadPdf } from './download';
 import { extractTextFromPdf, extractFields, extractFromAllabolag } from './extraction';
+import { repairEbitBeforeValidation } from './extraction/ebit-repair';
 import { extractFromIrHtml } from './extraction/ir-html-extractor';
 import { extractSustainabilityData } from './extraction/sustainability-extractor';
 import {
@@ -75,6 +83,32 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function withStageBudget<T>(
+  label: string,
+  budgetMs: number,
+  fn: () => Promise<T>,
+  notes?: string[],
+): Promise<T | null> {
+  let timedOut = false;
+  try {
+    return await Promise.race([
+      fn(),
+      new Promise<null>((resolve) => {
+        setTimeout(() => {
+          timedOut = true;
+          resolve(null);
+        }, budgetMs);
+      }),
+    ]);
+  } catch {
+    return null;
+  } finally {
+    if (timedOut && notes && budgetMs > 0) {
+      notes.push(`Stage budget exhausted for ${label} (${budgetMs}ms)`);
+    }
+  }
+}
+
 /** Fill nulls in `base` from `supplement` without overwriting non-null values (PDF primary). */
 function mergeExtractedPreferBase(base: ExtractedData, supplement: ExtractedData): ExtractedData {
   return {
@@ -83,6 +117,35 @@ function mergeExtractedPreferBase(base: ExtractedData, supplement: ExtractedData
     employees: base.employees ?? supplement.employees,
     ceo: base.ceo ?? supplement.ceo,
   };
+}
+
+function applyManualHeadlineOverrides(
+  base: ExtractedData,
+  override?: ManualHeadlineFields,
+): { data: ExtractedData; notes: string[] } {
+  if (!override) return { data: base, notes: [] };
+  const out: ExtractedData = { ...base };
+  const notes: string[] = [];
+  const source = override.source ?? 'manual_review';
+  const reviewedAt = override.reviewedAt ? ` (${override.reviewedAt})` : '';
+
+  if (override.revenue_msek !== undefined) {
+    out.revenue_msek = override.revenue_msek;
+    notes.push(`Manual override applied: revenue_msek from ${source}${reviewedAt}`);
+  }
+  if (override.ebit_msek !== undefined) {
+    out.ebit_msek = override.ebit_msek;
+    notes.push(`Manual override applied: ebit_msek from ${source}${reviewedAt}`);
+  }
+  if (override.employees !== undefined) {
+    out.employees = override.employees;
+    notes.push(`Manual override applied: employees from ${source}${reviewedAt}`);
+  }
+  if (override.ceo !== undefined) {
+    out.ceo = override.ceo;
+    notes.push(`Manual override applied: ceo from ${source}${reviewedAt}`);
+  }
+  return { data: out, notes };
 }
 
 // ---------------------------------------------------------------------------
@@ -249,6 +312,34 @@ type CandidateRejectReason =
   | 'revenue-too-high'
   | 'revenue-too-low-warning';
 
+/** Prefer PDFs that yield coherent revenue+EBIT and more headline fields (multi-candidate tournament). */
+function pdfCandidateMerit(data: ExtractedData, detected: CompanyType): number {
+  let m = 0;
+  if (data.revenue_msek !== null) m += 10;
+  if (data.ebit_msek !== null) m += 10;
+  if (data.employees !== null) m += 4;
+  if (data.ceo !== null) m += 4;
+  if (data.revenue_msek !== null && data.ebit_msek !== null) {
+    const r = data.revenue_msek;
+    const e = data.ebit_msek;
+    if (detected === 'bank') {
+      const ratio = e / Math.max(r, 1);
+      const absDelta = e - r;
+      if (ratio <= 1.35 && absDelta <= 20_000) m += 14;
+      else m += 4;
+    } else if (detected === 'real_estate') {
+      m += 10;
+    } else if (e <= r) {
+      m += 14;
+    } else if (e <= r * 1.08) {
+      m += 6;
+    } else {
+      m -= 8;
+    }
+  }
+  return m;
+}
+
 /** Optional circuit breaking for PDF download storms (search-guessed URLs, rate limits). */
 interface TryPdfCircuitOptions {
   /** After this many download failures on a host, skip remaining candidates on that host. */
@@ -303,6 +394,9 @@ async function tryPdfCandidates(
   const recordReject = (reason: CandidateRejectReason): void => {
     rejectReasonCount.set(reason, (rejectReasonCount.get(reason) ?? 0) + 1);
   };
+
+  let bestMerit = -Infinity;
+  let bestSuccess: PdfExtractionSuccess | null = null;
 
   for (const candidate of ranked) {
     if (downloadAttempts >= maxAttempts) break;
@@ -445,7 +539,8 @@ async function tryPdfCandidates(
       dataSource = 'pdf';
     }
 
-    return {
+    const merit = pdfCandidateMerit(extraction.data, extraction.detectedCompanyType);
+    const successPayload: PdfExtractionSuccess = {
       success: true,
       reportUrl: candidate.url,
       downloadPath: downloadResult.value,
@@ -453,11 +548,33 @@ async function tryPdfCandidates(
       extraction,
       dataSource,
       discoveryFiscalYear,
-      notes,
+      notes: [],
       contentCheck: gateResult.contentCheck!,
       pdfPageCount: pdfText.pageCount,
       suspiciouslyShortPdf: pdfText.suspiciouslyShort,
     };
+
+    const allFourHeadlines =
+      extraction.data.revenue_msek !== null &&
+      extraction.data.ebit_msek !== null &&
+      extraction.data.employees !== null &&
+      extraction.data.ceo !== null;
+
+    if (allFourHeadlines) {
+      return { ...successPayload, notes };
+    }
+
+    if (merit > bestMerit) {
+      bestMerit = merit;
+      bestSuccess = successPayload;
+    }
+  }
+
+  if (bestSuccess) {
+    notes.push(
+      `${stepName}: multi-PDF merit tournament — selected best candidate (merit=${bestMerit}); no single PDF yielded all four headline fields`,
+    );
+    return { ...bestSuccess, notes };
   }
 
   if (rejectReasonCount.size > 0) {
@@ -714,11 +831,18 @@ async function processCompany(
     searchResult = emptySearchDiscoveryResult();
   } else {
     log.info(`[${name}] === Step 1: Search engine discovery ===`);
-    searchResult = await searchDiscovery(
-      entity.searchAnchor,
-      company.ticker,
-      entity.seedCandidateDomains,
-    );
+    searchResult =
+      (await withStageBudget(
+        'search-discovery',
+        STAGE_DISCOVERY_BUDGET_MS,
+        async () =>
+          searchDiscovery(
+            entity.searchAnchor,
+            company.ticker,
+            entity.seedCandidateDomains,
+          ),
+        state.notes,
+      )) ?? emptySearchDiscoveryResult();
   }
 
   if (!website && searchResult.discoveredWebsite) {
@@ -900,7 +1024,13 @@ async function processCompany(
       log.info(`[${name}] HTTP for ${hk}: using browser transport (first Axios response was 403)`);
     }
 
-    const domainIrResult = await discoverIrPage(entity.searchAnchor, domain);
+    const domainIrResult = await withStageBudget(
+      `discoverIrPage:${domain}`,
+      STAGE_DISCOVERY_BUDGET_MS,
+      async () => discoverIrPage(entity.searchAnchor, domain),
+      state.notes,
+    );
+    if (!domainIrResult) return;
 
     if (domainIrResult.status === 'success' && domainIrResult.value) {
       const domainIrUrl = domainIrResult.value;
@@ -919,7 +1049,13 @@ async function processCompany(
         const w = website ?? candidateDomains[0];
         if (!w) continue;
 
-        const searchIrReport = await discoverAnnualReport(entity.searchAnchor, w, candidateIr);
+        const searchIrReport = await withStageBudget(
+          `search-ir-report:${candidateIr}`,
+          STAGE_DISCOVERY_BUDGET_MS,
+          async () => discoverAnnualReport(entity.searchAnchor, w, candidateIr),
+          state.notes,
+        );
+        if (!searchIrReport) continue;
         if (searchIrReport.value?.allCandidates && searchIrReport.value.allCandidates.length > 0) {
           irPageUrl = candidateIr;
           reportResult = searchIrReport;
@@ -949,7 +1085,13 @@ async function processCompany(
       log.info(
         `[${name}] === Step 2+3: Multi-domain cycling (${domains.length} domains)${phaseSuffix} ===`,
       );
-      for (const domain of domains) {
+      const limitedDomains = domains.slice(0, MAX_CANDIDATE_DOMAINS);
+      if (domains.length > limitedDomains.length) {
+        state.notes.push(
+          `Domain crawl cap: processing ${limitedDomains.length}/${domains.length} candidate domains`,
+        );
+      }
+      for (const domain of limitedDomains) {
         if (state.extractionResult.value) break;
         const hk = originHostKey(domain);
         if (!hk) continue;
@@ -1043,9 +1185,13 @@ async function processCompany(
   // =========================================================================
   if (!state.extractionResult.value) {
     log.info(`[${name}] === Step 4: Direct PDF search (reverse discovery) ===`);
-    const directCandidates = await directPdfSearch(
-      entity.searchAnchor, company.ticker, candidateDomains,
-    );
+    const directCandidates =
+      (await withStageBudget(
+        'direct-pdf-search',
+        STAGE_DISCOVERY_BUDGET_MS,
+        async () => directPdfSearch(entity.searchAnchor, company.ticker, candidateDomains),
+        state.notes,
+      )) ?? [];
 
     if (directCandidates.length > 0) {
       const rankedDirect = filterAndRankReportCandidatesForEntity(directCandidates, entity);
@@ -1073,7 +1219,13 @@ async function processCompany(
   // =========================================================================
   if (!state.extractionResult.value && irPageUrl) {
     log.info(`[${name}] === Step 5: IR page HTML key figures ===`);
-    const irHtmlResult = await extractFromIrHtml(irPageUrl, entity.searchAnchor);
+    const irUrl = irPageUrl;
+    const irHtmlResult = await withStageBudget(
+      'ir-html-primary',
+      STAGE_FALLBACK_BUDGET_MS,
+      async () => extractFromIrHtml(irUrl, entity.searchAnchor),
+      state.notes,
+    );
 
     if (irHtmlResult) {
       state.fallbackStep = 'ir-html';
@@ -1098,8 +1250,11 @@ async function processCompany(
   if (!state.extractionResult.value) {
     log.info(`[${name}] === Step 6: Allabolag.se fallback ===`);
     const start = Date.now();
-    const allabolagResult = await extractFromAllabolag(
-      name, company.legalName, company.orgNumber, shortNames,
+    const allabolagResult = await withStageBudget(
+      'allabolag-primary',
+      STAGE_FALLBACK_BUDGET_MS,
+      async () => extractFromAllabolag(name, company.legalName, company.orgNumber, shortNames),
+      state.notes,
     );
 
     if (allabolagResult) {
@@ -1135,8 +1290,34 @@ async function processCompany(
 
   if (hasExtractedData) {
     const start = Date.now();
+    let preValidationData = state.extractionResult.value!;
+    const pdfLikeForRepair: DataSource[] = ['pdf', 'playwright+pdf', 'search+pdf'];
+    if (state.dataSource && pdfLikeForRepair.includes(state.dataSource)) {
+      const repaired = repairEbitBeforeValidation(
+        preValidationData,
+        state.detectedCompanyType ?? company.companyType ?? 'industrial',
+        state.notes,
+        {
+          pdfText: state.annualReportText,
+          fiscalYear: state.fiscalYear,
+          reportingModelHint: entity.reportingModelHint,
+          fieldExtraction: state.lastFieldExtraction,
+        },
+      );
+      preValidationData = repaired.data;
+      for (const n of repaired.notes) state.notes.push(n);
+      state.extractionResult = {
+        ...state.extractionResult,
+        status: state.extractionResult.status,
+        value: preValidationData,
+        ...(state.extractionResult.error ? { error: state.extractionResult.error } : {}),
+        ...(state.extractionResult.durationMs !== undefined
+          ? { durationMs: state.extractionResult.durationMs }
+          : {}),
+      };
+    }
     const validation = validateExtractedData(
-      state.extractionResult.value!,
+      preValidationData,
       state.detectedCompanyType ?? undefined,
       state.notes,
     );
@@ -1156,6 +1337,58 @@ async function processCompany(
 
     for (const w of validation.warnings) state.notes.push(w);
 
+    const pdfishForChase =
+      state.dataSource === 'pdf' ||
+      state.dataSource === 'playwright+pdf' ||
+      state.dataSource === 'search+pdf';
+
+    // Completeness chase: IR HTML null-fill after PDF partial (before allabolag).
+    if (
+      irPageUrl &&
+      validationResult.value &&
+      determineStatus(validationResult.value) !== 'complete' &&
+      pdfishForChase
+    ) {
+      log.info(`[${name}] Completeness chase: IR HTML supplement for remaining nulls`);
+      const irUrl = irPageUrl;
+      const irChase = await withStageBudget(
+        'ir-html-chase',
+        STAGE_FALLBACK_BUDGET_MS,
+        async () => extractFromIrHtml(irUrl, entity.searchAnchor),
+        state.notes,
+      );
+      if (irChase) {
+        const mergedIr = mergeExtractedPreferBase(validationResult.value, irChase.data);
+        const vIr = validateExtractedData(
+          mergedIr,
+          state.detectedCompanyType ?? company.companyType ?? undefined,
+          state.notes,
+        );
+        validationResult = {
+          status:
+            determineStatus(vIr.data) === 'complete' && pdfishForChase
+              ? 'success'
+              : determineStatus(vIr.data) === 'complete'
+                ? 'partial'
+                : validationResult.status,
+          value: vIr.data,
+          durationMs: Date.now() - start,
+        };
+        state.extractionResult = {
+          ...state.extractionResult,
+          status: state.extractionResult.status,
+          value: vIr.data,
+          ...(state.extractionResult.error ? { error: state.extractionResult.error } : {}),
+          ...(state.extractionResult.durationMs !== undefined
+            ? { durationMs: state.extractionResult.durationMs }
+            : {}),
+        };
+        confidence = vIr.confidence;
+        state.notes.push(`Completeness chase: IR HTML merged (${irChase.sourceUrl})`);
+        for (const w of vIr.warnings) state.notes.push(w);
+      }
+    }
+
     // When primary source is PDF/HTML but headline fields are still null, merge nulls only from allabolag.
     if (
       company.orgNumber &&
@@ -1165,7 +1398,12 @@ async function processCompany(
       state.dataSource !== 'allabolag'
     ) {
       log.info(`[${name}] Supplement: merging null fields from allabolag.se (secondary)`);
-      const ab = await extractFromAllabolag(name, company.legalName, company.orgNumber, shortNames);
+      const ab = await withStageBudget(
+        'allabolag-merge',
+        STAGE_FALLBACK_BUDGET_MS,
+        async () => extractFromAllabolag(name, company.legalName, company.orgNumber, shortNames),
+        state.notes,
+      );
       if (ab) {
         const merged = mergeExtractedPreferBase(validationResult.value, ab.data);
         const v2 = validateExtractedData(
@@ -1200,6 +1438,45 @@ async function processCompany(
         for (const w of v2.warnings) state.notes.push(w);
       }
     }
+
+    if (validationResult.value && company.manualHeadlineFields) {
+      const manual = applyManualHeadlineOverrides(
+        validationResult.value,
+        company.manualHeadlineFields,
+      );
+      if (manual.notes.length > 0) {
+        const vManual = validateExtractedData(
+          manual.data,
+          state.detectedCompanyType ?? company.companyType ?? undefined,
+          state.notes,
+        );
+        validationResult = {
+          status:
+            determineStatus(vManual.data) === 'complete' &&
+            (state.dataSource === 'pdf' ||
+              state.dataSource === 'playwright+pdf' ||
+              state.dataSource === 'search+pdf')
+              ? 'success'
+              : determineStatus(vManual.data) === 'complete'
+                ? 'partial'
+                : validationResult.status,
+          value: vManual.data,
+          durationMs: Date.now() - start,
+        };
+        state.extractionResult = {
+          ...state.extractionResult,
+          status: state.extractionResult.status,
+          value: vManual.data,
+          ...(state.extractionResult.error ? { error: state.extractionResult.error } : {}),
+          ...(state.extractionResult.durationMs !== undefined
+            ? { durationMs: state.extractionResult.durationMs }
+            : {}),
+        };
+        confidence = vManual.confidence;
+        state.notes.push(...manual.notes);
+        for (const w of vManual.warnings) state.notes.push(w);
+      }
+    }
   }
 
   let dualTrackAdjudication: PipelineResult['dualTrackAdjudication'];
@@ -1225,6 +1502,7 @@ async function processCompany(
       status: rowStatus,
       detectedCompanyType: state.detectedCompanyType,
       forceLlm: Boolean(pipelineOpts?.llmChallengerForce),
+      extractionNotes: state.notes,
     });
     if (dt) {
       dualTrackAdjudication = dt;

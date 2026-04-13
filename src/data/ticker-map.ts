@@ -11,7 +11,7 @@ import * as fs from 'fs';
 import { join } from 'path';
 import { createLogger } from '../utils/logger';
 import { toAbsoluteHttpUrl } from '../utils/url-helpers';
-import type { CompanyType } from '../types';
+import type { CompanyType, ManualHeadlineFields } from '../types';
 
 const log = createLogger('ticker-map');
 
@@ -28,6 +28,22 @@ function resolveTickersJsonPath(): string {
   return cwdPath;
 }
 
+function coerceManualHeadlineFields(raw: unknown): ManualHeadlineFields | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const o = raw as Record<string, unknown>;
+  const out: ManualHeadlineFields = {};
+  for (const k of ['revenue_msek', 'ebit_msek', 'employees'] as const) {
+    const v = o[k];
+    if (v === null) out[k] = null;
+    else if (typeof v === 'number' && Number.isFinite(v)) out[k] = v;
+  }
+  if (typeof o.ceo === 'string') out.ceo = o.ceo;
+  else if (o.ceo === null) out.ceo = null;
+  if (typeof o.source === 'string' && o.source.trim()) out.source = o.source.trim();
+  if (typeof o.reviewedAt === 'string' && o.reviewedAt.trim()) out.reviewedAt = o.reviewedAt.trim();
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 interface TickerEntry {
   name: string;
   orgNumber?: string;
@@ -42,6 +58,7 @@ interface TickerEntry {
   overrideFiscalYear?: number;
   cmsApiUrls?: string[];
   aggregatorUrls?: string[];
+  manualHeadlineFields?: ManualHeadlineFields;
 }
 
 /** Raw map: ticker symbol → canonical legal entity name. */
@@ -83,6 +100,7 @@ export function loadTickerMap(): void {
         const irRaw = o.irPage;
         const irNormalized =
           typeof irRaw === 'string' && irRaw.trim() ? toAbsoluteHttpUrl(irRaw.trim()) : undefined;
+        const manualHeadlineFields = coerceManualHeadlineFields(o.manualHeadlineFields);
         tickerMap[key] = {
           name: String(o.name),
           ...(typeof o.orgNumber === 'string' ? { orgNumber: o.orgNumber } : {}),
@@ -129,6 +147,7 @@ export function loadTickerMap(): void {
                   .filter((x): x is string => x !== null),
               }
             : {}),
+          ...(manualHeadlineFields ? { manualHeadlineFields } : {}),
         };
       }
     }
@@ -205,6 +224,11 @@ export function resolveAggregatorUrls(ticker: string): string[] | null {
   const entry = resolveTickerEntry(ticker);
   const d = entry?.aggregatorUrls;
   return d && d.length > 0 ? d : null;
+}
+
+export function resolveManualHeadlineFields(ticker: string): ManualHeadlineFields | null {
+  const entry = resolveTickerEntry(ticker);
+  return entry?.manualHeadlineFields ?? null;
 }
 
 /**

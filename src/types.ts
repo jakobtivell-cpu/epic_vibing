@@ -14,6 +14,19 @@ export type { DualTrackAdjudication };
 export type CompanyType = 'industrial' | 'bank' | 'investment_company' | 'real_estate';
 
 /**
+ * Human-reviewed headline values — merged last when automation is untrusted.
+ * Optional fields omitted are left unchanged from the pipeline.
+ */
+export interface ManualHeadlineFields {
+  revenue_msek?: number | null;
+  ebit_msek?: number | null;
+  employees?: number | null;
+  ceo?: string | null;
+  source?: string;
+  reviewedAt?: string;
+}
+
+/**
  * Minimal runtime description of one company to scrape.
  * Only `name` is required — everything else is discovered at runtime.
  */
@@ -55,6 +68,8 @@ export interface CompanyProfile {
   cmsApiUrls?: string[];
   /** Optional trusted aggregator page/PDF URLs (e.g. MFN / Nasdaq issuer pages). */
   aggregatorUrls?: string[];
+  /** Optional overrides from `data/ticker.json` after manual review. */
+  manualHeadlineFields?: ManualHeadlineFields;
 }
 
 /** The 4 core financial fields the assignment requires. */

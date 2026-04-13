@@ -37,7 +37,8 @@ const KEY_FIGURES_SUBPAGES = [
 
 const REVENUE_LABELS = /\b(revenue|net\s*sales|nettoomsättning|omsättning|total\s*revenue|net\s*revenue|total\s*income)\b/i;
 const EBIT_LABELS = /\b(operating\s*(?:profit|income|result)|ebit|rörelseresultat)\b/i;
-const EMPLOYEE_LABELS = /\b(employees|number\s*of\s*employees|antal\s*anställda|medarbetare|headcount|fte)\b/i;
+const EMPLOYEE_LABELS =
+  /\b(employees|number\s*of\s*employees|our\s+people|workforce|antal\s*anställda|medelantal|medarbetare|headcount|average\s*fte|full[\s-]*time\s*equivalents?|heltidsekvivalenter|fte)\b/i;
 const CEO_LABELS = /\b(ceo|president|chief\s*executive|verkställande\s*direktör|vd)\b/i;
 
 function parseNumber(raw: string): number | null {

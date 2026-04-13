@@ -282,53 +282,68 @@ function isSkippableCell(cell: string): boolean {
 
 type UnitContext = 'msek' | 'bsek' | 'ksek' | 'sek' | 'eur_m';
 
+function firstMatchIndex(text: string, pattern: RegExp): number {
+  const m = text.match(pattern);
+  return m?.index ?? Number.POSITIVE_INFINITY;
+}
+
 function detectUnitContext(text: string): UnitContext | null {
   const lower = text.toLowerCase();
-  // SEK units before EUR — many PDFs mention EUR/FX in notes but report in SEK.
-  if (
-    /amounts?\s+in\s+sek\s*m\b/.test(lower) ||
-    /belopp\s+i\s+msek\b/.test(lower) ||
-    /amounts?\s+in\s+msek\b/.test(lower) ||
-    /sek\s+millions?\b/.test(lower) ||
-    /\bmkr\b/.test(lower)
-  ) {
-    return 'msek';
-  }
+  // Choose the earliest explicit denomination marker to avoid global-heading bleed
+  // in mixed-unit documents (e.g., page heading MSEK but table body KSEK).
+  const candidates: Array<{ unit: UnitContext; idx: number }> = [
+    {
+      unit: 'ksek',
+      idx: Math.min(
+        firstMatchIndex(lower, /amounts?\s+in\s+ksek\b/),
+        firstMatchIndex(lower, /amounts?\s+in\s+sek\s*k\b/),
+        firstMatchIndex(lower, /\bksek\b/),
+        firstMatchIndex(lower, /\btkr\b/),
+      ),
+    },
+    {
+      unit: 'bsek',
+      idx: Math.min(
+        firstMatchIndex(lower, /amounts?\s+in\s+sek\s*bn\b/),
+        firstMatchIndex(lower, /amounts?\s+in\s+bsek\b/),
+        firstMatchIndex(lower, /\bmdkr\b/),
+        firstMatchIndex(lower, /amounts?\s+in\s+sek\s+billion\b/),
+        firstMatchIndex(lower, /\bbillion\s+sek\b/),
+        firstMatchIndex(lower, /\bmiljard(er)?\s+sek\b/),
+        firstMatchIndex(lower, /\bsek\s*billion\b/),
+      ),
+    },
+    {
+      unit: 'msek',
+      idx: Math.min(
+        firstMatchIndex(lower, /amounts?\s+in\s+sek\s*m\b/),
+        firstMatchIndex(lower, /belopp\s+i\s+msek\b/),
+        firstMatchIndex(lower, /amounts?\s+in\s+msek\b/),
+        firstMatchIndex(lower, /\bmsek\b/),
+        firstMatchIndex(lower, /sek\s+millions?\b/),
+        firstMatchIndex(lower, /\bmkr\b/),
+      ),
+    },
+    {
+      unit: 'eur_m',
+      idx: Math.min(
+        firstMatchIndex(lower, /amounts?\s+in\s+(?:million\s+)?euros?\b/),
+        firstMatchIndex(lower, /\bin\s+eur\s*m\b/),
+        firstMatchIndex(lower, /\bmeur\b/),
+        firstMatchIndex(lower, /\b€\s*m\b/),
+        firstMatchIndex(lower, /\beur\s*million\b/),
+        firstMatchIndex(lower, /\bmillion\s+euros?\b/),
+        firstMatchIndex(lower, /\belopp\s+i\s+meur\b/),
+        firstMatchIndex(lower, /\bi\s+miljoner\s+euro\b/),
+      ),
+    },
+  ];
 
-  if (
-    /amounts?\s+in\s+sek\s*bn\b/.test(lower) ||
-    /amounts?\s+in\s+bsek\b/.test(lower) ||
-    /\bmdkr\b/.test(lower) ||
-    /\bamounts?\s+in\s+sek\s*billion/i.test(lower) ||
-    /\bbillion\s+sek\b/.test(lower) ||
-    /\bmiljard(er)?\s+sek\b/.test(lower) ||
-    /\bsek\s*billion\b/.test(lower)
-  ) {
-    return 'bsek';
-  }
+  const best = candidates
+    .filter((c) => Number.isFinite(c.idx))
+    .sort((a, b) => a.idx - b.idx)[0];
 
-  if (
-    /amounts?\s+in\s+ksek\b/.test(lower) ||
-    /amounts?\s+in\s+sek\s*k\b/.test(lower) ||
-    /\btkr\b/.test(lower)
-  ) {
-    return 'ksek';
-  }
-
-  if (
-    /\bamounts?\s+in\s+(?:million\s+)?euros?\b/.test(lower) ||
-    /\bin\s+eur\s*m\b/.test(lower) ||
-    /\bmeur\b/.test(lower) ||
-    /\b€\s*m\b/.test(lower) ||
-    /\beur\s*million/i.test(lower) ||
-    /\bmillion\s+euros?\b/.test(lower) ||
-    /\belopp\s+i\s+meur\b/.test(lower) ||
-    /\bi\s+miljoner\s+euro\b/.test(lower)
-  ) {
-    return 'eur_m';
-  }
-
-  return null;
+  return best?.unit ?? null;
 }
 
 /** Parsed BSEK-style revenue from narrative / infographic text (not tables). */
@@ -449,6 +464,11 @@ function applyEbitMegascaleGuard(
   return { ebit, adjusted: false };
 }
 
+function hasFusedYearRawArtifact(rawCell: string): boolean {
+  const compact = rawCell.replace(/[^\d]/g, '');
+  return /(20\d{2}){2,}/.test(compact);
+}
+
 /**
  * Detect unit context within a specific line range (e.g., an income
  * statement section). Falls back to the global context if no local
@@ -461,9 +481,11 @@ function detectSectionUnitContext(
   end: number,
   globalUnit: UnitContext | null,
 ): UnitContext | null {
-  const window = Math.min(start + 5, end);
-  for (let i = Math.max(0, start - 3); i < window; i++) {
-    const lineUnit = detectUnitContext(lines[i]);
+  const windowEnd = Math.min(end, start + 6);
+  for (let i = Math.max(0, start - 3); i <= windowEnd; i++) {
+    const line = lines[i];
+    if (!line) continue;
+    const lineUnit = detectUnitContext(line);
     if (lineUnit) {
       if (lineUnit !== globalUnit) {
         log.debug(
@@ -1742,7 +1764,12 @@ function normalizeEbitMatchToMsek(
         m.sectionRange.end,
         unitContext,
       )
-    : unitContext;
+    : detectSectionUnitContext(
+        lines,
+        Math.max(0, m.lineIndex - 2),
+        Math.min(lines.length - 1, m.lineIndex + 2),
+        unitContext,
+      );
   return Math.round(normalizeToMsek(m.value, ebitUnit));
 }
 
@@ -2040,7 +2067,7 @@ export function extractFields(
   if (detectedType === 'investment_company') {
     notes.push('Investment company — standard revenue not applicable');
   } else {
-    const revMin = detectedType === 'bank' ? 50 : 100;
+    const revMin = unitContext === 'eur_m' ? 5 : detectedType === 'bank' ? 50 : 100;
     if (detectedType === 'bank') {
       revMatch = findFinancialNumberPhased(
         lines,
@@ -2069,9 +2096,20 @@ export function extractFields(
       );
     }
     if (revMatch !== null) {
+      if (hasFusedYearRawArtifact(revMatch.rawCell)) {
+        notes.push(`Revenue candidate "${revMatch.rawCell}" discarded — fused-year artifact in raw cell`);
+        revMatch = null;
+      }
+    }
+    if (revMatch !== null) {
       const revUnit = revMatch.sectionRange
         ? detectSectionUnitContext(lines, revMatch.sectionRange.start, revMatch.sectionRange.end, unitContext)
-        : unitContext;
+        : detectSectionUnitContext(
+            lines,
+            Math.max(0, revMatch.lineIndex - 2),
+            Math.min(lines.length - 1, revMatch.lineIndex + 2),
+            unitContext,
+          );
       revenue = Math.round(normalizeToMsek(revMatch.value, revUnit));
       revProvenance = numMatchToProvenance(revMatch);
       log.info(`Revenue: ${revenue} MSEK`);
@@ -2138,6 +2176,10 @@ export function extractFields(
     notes.push(n);
   }
   if (ebitOutcome.msek !== null && ebitOutcome.match !== null) {
+    if (hasFusedYearRawArtifact(ebitOutcome.match.rawCell)) {
+      notes.push(`EBIT candidate "${ebitOutcome.match.rawCell}" discarded — fused-year artifact in raw cell`);
+      ebit = null;
+    } else {
     ebit = ebitOutcome.msek;
     ebitProvenance = numMatchToProvenance(ebitOutcome.match);
     log.info(`EBIT: ${ebit} MSEK`);
@@ -2158,6 +2200,7 @@ export function extractFields(
       notes.push(
         `EBIT converted from EUR millions using approximate EUR/SEK ${EUR_MILLIONS_TO_MSEK_APPROX} — verify report footnote`,
       );
+    }
     }
   } else {
     notes.push(`EBIT not found for ${companyName}`);

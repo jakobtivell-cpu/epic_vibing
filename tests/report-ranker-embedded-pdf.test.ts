@@ -1,4 +1,8 @@
-import { scoreEmbeddedPdfUrl } from '../src/discovery/report-ranker';
+import {
+  classifyReportCandidateClass,
+  rankReportCandidatesForSelection,
+  scoreEmbeddedPdfUrl,
+} from '../src/discovery/report-ranker';
 
 describe('report-ranker embedded PDF scoring', () => {
   const baseUrl = 'https://eqtgroup.com/en/shareholders/reports-and-presentations';
@@ -24,5 +28,39 @@ describe('report-ranker embedded PDF scoring', () => {
     const html = `<a href="${pdf}">x</a>`;
     const idx = html.indexOf(pdf);
     expect(scoreEmbeddedPdfUrl(pdf, 12, html, idx, baseUrl)).toBe(12);
+  });
+
+  it('classifies policy/governance PDFs as non-annual-like', () => {
+    expect(
+      classifyReportCandidateClass(
+        'Corporate governance report 2025',
+        'https://example.com/files/corporate-governance-report-2025.pdf',
+      ),
+    ).toBe('non_annual_like');
+  });
+
+  it('prefers annual report over higher-scoring governance/policy candidates', () => {
+    const ranked = rankReportCandidatesForSelection([
+      {
+        url: 'https://example.com/governance-report-2025.pdf',
+        score: 40,
+        text: 'Corporate governance report 2025',
+        source: 'ir-page',
+      },
+      {
+        url: 'https://example.com/policy-update-2025.pdf',
+        score: 45,
+        text: 'Policy update 2025',
+        source: 'ir-page',
+      },
+      {
+        url: 'https://example.com/annual-report-2025.pdf',
+        score: 20,
+        text: 'Annual report 2025',
+        source: 'ir-page',
+      },
+    ]);
+
+    expect(ranked[0].url).toContain('annual-report-2025.pdf');
   });
 });

@@ -32,6 +32,16 @@ export function buildCompanyProfilesForEveryTickerEntry(): CompanyProfile[] {
   loadTickerMap();
   const tickerMap = getTickerMap();
   const keys = Object.keys(tickerMap).sort((a, b) => a.localeCompare(b));
+  return buildCompanyProfilesForTickers(keys);
+}
+
+/**
+ * Build CompanyProfile[] from a selected ticker subset and dedupe by legal
+ * entity (same dedupe rule as `scrape.ts`).
+ */
+export function buildCompanyProfilesForTickers(tickers: string[]): CompanyProfile[] {
+  loadTickerMap();
+  const keys = [...tickers].sort((a, b) => a.localeCompare(b));
   const profiles: CompanyProfile[] = [];
 
   for (const rawTicker of keys) {

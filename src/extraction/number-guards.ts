@@ -15,8 +15,8 @@ const MEGASCALE_MSEK_THRESHOLD: Record<'industrial' | 'bank' | 'investment_compa
   // Large Cap industrials rarely exceed ~1M MSEK; 1M was too aggressive (wrong table picks were mangled).
   industrial: 3_000_000,
   bank: 80_000_000,
-  investment_company: 3_000_000,
-  real_estate: 3_000_000,
+  investment_company: 2_000_000,
+  real_estate: 5_000_000,
 };
 
 /**

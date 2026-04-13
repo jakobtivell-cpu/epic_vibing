@@ -94,6 +94,10 @@ export const BANK_REVENUE_LABELS_PRIMARY: string[] = [
   'summa rörelseintäkter',
   'totala rörelseintäkter',
   'total operating income',
+  'net operating income',
+  'net commission income',
+  'provision net',
+  'net result of financial transactions',
   'räntenetto',
   'net interest income',
 ];
@@ -104,6 +108,8 @@ export const BANK_REVENUE_LABELS_PRIMARY: string[] = [
 export const BANK_EBIT_LABELS_PRIMARY: string[] = [
   'operating profit',
   'rörelseresultat',
+  'profit before credit losses',
+  'operating profit before credit losses',
   'profit before impairments',
   'profit before loan losses',
   'operating profit before impairments',
@@ -155,17 +161,25 @@ export const INVESTMENT_LABELS: LabelSet = {
 export const REAL_ESTATE_REVENUE_LABELS_PRIMARY: string[] = [
   'hyresintäkter',
   'rental income',
+  'rental revenue',
+  'lease income',
   'hyror',
   'property income',
   'intäkter från fastigheter',
+  'property management income',
   'nettoomsättning',
 ];
 
 export const REAL_ESTATE_EBIT_LABELS_PRIMARY: string[] = [
   'förvaltningsresultat',
+  'resultat från fastighetsförvaltning',
   'driftnetto',
+  'rental surplus',
   'överskott fastigheter',
   'income from property management',
+  'profit from property management',
+  'property management result',
+  'net operating income (noi)',
   'operating surplus',
 ];
 

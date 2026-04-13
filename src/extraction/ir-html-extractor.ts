@@ -55,11 +55,11 @@ function parseNumber(raw: string): number | null {
 
 function detectUnit(text: string): string {
   const lower = text.toLowerCase();
+  if (/\bksek\b|\btkr\b|\bthousand/i.test(lower)) return 'ksek';
   if (/\bbsek\b|\bmdr\b|\bmdkr\b|\bbillion/i.test(lower)) return 'bsek';
   if (/\bmsek\b|\bmkr\b|\bmillion/i.test(lower)) return 'msek';
-  if (/\bksek\b|\btkr\b|\bthousand/i.test(lower)) return 'ksek';
   if (/\bsek\b|\bkr\b/i.test(lower)) return 'sek';
-  if (/\beur\b|\b€/i.test(lower)) return 'eur';
+  if (/\beur\b|\b€/i.test(lower)) return /\bmillion\b|\bm\b/.test(lower) ? 'eur' : 'eur_raw';
   return 'msek';
 }
 
@@ -70,8 +70,13 @@ function toMsek(value: number, unit: string): number {
     case 'ksek': return Math.round(value / 1_000);
     case 'sek': return Math.round(value / 1_000_000);
     case 'eur': return Math.round(value * 11.5);
+    case 'eur_raw': return Math.round(value * 11.5 / 1_000_000);
     default: return Math.round(value);
   }
+}
+
+function likelyYear(value: number): boolean {
+  return value >= 1900 && value <= 2100;
 }
 
 /**
@@ -168,7 +173,7 @@ export async function extractFromIrHtml(
         log.debug(`[${companyName}] IR HTML EBIT (table): ${ebit} MSEK`);
       }
       if (employees === null && EMPLOYEE_LABELS.test(label)) {
-        if (num >= 50 && num < 1_000_000) {
+        if (num >= 50 && num < 1_000_000 && !likelyYear(num)) {
           employees = Math.round(num);
           log.debug(`[${companyName}] IR HTML employees (table): ${employees}`);
         }
@@ -197,7 +202,7 @@ export async function extractFromIrHtml(
         log.debug(`[${companyName}] IR HTML EBIT (dl/div): ${ebit} MSEK`);
       }
       if (employees === null && EMPLOYEE_LABELS.test(label)) {
-        if (num >= 50 && num < 1_000_000) {
+        if (num >= 50 && num < 1_000_000 && !likelyYear(num)) {
           employees = Math.round(num);
           log.debug(`[${companyName}] IR HTML employees (dl/div): ${employees}`);
         }

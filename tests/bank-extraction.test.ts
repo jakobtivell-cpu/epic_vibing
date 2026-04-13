@@ -79,4 +79,15 @@ describe('bank field extraction', () => {
       ),
     ).toBe(true);
   });
+
+  it('accepts IFRS-style bank terms net commission income and profit before credit losses', () => {
+    const text = [
+      'Consolidated income statement',
+      'Net commission income  18 200',
+      'Profit before credit losses  7 600',
+    ].join('\n');
+    const r = extractFields(text, 'BankIFRSTerms', 2025, 'bank');
+    expect(r.data.revenue_msek).toBe(18_200);
+    expect(r.data.ebit_msek).toBe(7_600);
+  });
 });

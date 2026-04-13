@@ -87,7 +87,8 @@ export function validateExtractedData(
       score -= 4;
     } else if (companyType === 'bank') {
       const ratio = cleaned.ebit_msek / Math.max(cleaned.revenue_msek, 1);
-      if (ratio <= 1.25) {
+      const absDelta = cleaned.ebit_msek - cleaned.revenue_msek;
+      if (ratio <= 1.3 && absDelta <= 15_000) {
         warnings.push(
           `Bank: operating result (${cleaned.ebit_msek}) above revenue-equivalent (${cleaned.revenue_msek}) — may reflect credit-loss / line definitions; kept`,
         );
@@ -101,7 +102,7 @@ export function validateExtractedData(
       }
     } else if (companyType === 'real_estate') {
       const ratio = cleaned.ebit_msek / Math.max(cleaned.revenue_msek, 1);
-      if (ratio <= 1.12) {
+      if (realEstateForvaltEbitFromNotes || ratio <= 1.05) {
         warnings.push(
           `Real estate: operating metric (${cleaned.ebit_msek} MSEK) above revenue proxy (${cleaned.revenue_msek} MSEK) — kept; lines often not directly comparable`,
         );
@@ -125,6 +126,10 @@ export function validateExtractedData(
   // --- Employees ---
   if (cleaned.employees === null) {
     warnings.push('Employee count not extracted');
+    score -= 15;
+  } else if (companyType === 'industrial' && cleaned.employees < 100) {
+    warnings.push(`Employee count too low (${cleaned.employees}) for industrial large-cap — discarded`);
+    cleaned.employees = null;
     score -= 15;
   } else if (cleaned.employees < 50) {
     warnings.push(`Employee count too low (${cleaned.employees}) — discarded`);

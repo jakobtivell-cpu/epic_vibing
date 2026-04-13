@@ -91,7 +91,41 @@ const TEXT_NEGATIVE: { pattern: RegExp; points: number }[] = [
   { pattern: /\bremuneration\s+report\b/i, points: -18 },
   { pattern: /bolagsstyrningsrapport/i, points: -26 },
   { pattern: /corporate\s+governance\s+report/i, points: -26 },
+  { pattern: /\bpolicy\b/i, points: -20 },
+  { pattern: /\bfact\s*book\b/i, points: -20 },
+  { pattern: /\bgovernance\s+statement\b/i, points: -24 },
 ];
+
+const REPORT_CLASS_ANNUAL_RE =
+  /\b(annual\s+(and\s+sustainability\s+)?report|årsredovisning|integrated\s+annual\s+report|annual\s+financial\s+report)\b/i;
+const REPORT_CLASS_NON_ANNUAL_RE =
+  /\b(corporate\s+governance|governance\s+report|governance\s+statement|policy|presentation|factbook|remuneration\s+report|annual\s+general\s+meeting|agm|notice\s+of\s+meeting)\b/i;
+
+export type ReportClass = 'annual_like' | 'non_annual_like' | 'unknown';
+
+export function classifyReportCandidateClass(text: string, url: string): ReportClass {
+  const haystack = `${text} ${url}`;
+  if (REPORT_CLASS_ANNUAL_RE.test(haystack)) return 'annual_like';
+  if (REPORT_CLASS_NON_ANNUAL_RE.test(haystack)) return 'non_annual_like';
+  return 'unknown';
+}
+
+export function rankReportCandidatesForSelection(cands: ReportCandidate[]): ReportCandidate[] {
+  const annualLike = cands.filter(
+    (c) => classifyReportCandidateClass(c.text, c.url) === 'annual_like',
+  );
+  const rankPool = annualLike.length > 0 ? [...annualLike] : [...cands];
+  rankPool.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    const aPdf = isPdfUrl(a.url) ? 1 : 0;
+    const bPdf = isPdfUrl(b.url) ? 1 : 0;
+    return bPdf - aPdf;
+  });
+  if (annualLike.length === 0) return rankPool;
+  const nonAnnual = cands.filter((c) => classifyReportCandidateClass(c.text, c.url) !== 'annual_like');
+  nonAnnual.sort((a, b) => b.score - a.score);
+  return [...rankPool, ...nonAnnual];
+}
 
 function sustainabilityPenalty(text: string): number {
   if (/sustainability|hållbarhet/i.test(text) && !/annual|årsredovisning/i.test(text)) {
@@ -121,6 +155,9 @@ function urlScore(href: string): number {
   }
   if (/corpgov|bolagsstyrn|corp[-_]gov|governance[-_]report/i.test(lower)) {
     score -= 28;
+  }
+  if (/policy|factbook|presentation|remuneration[-_]report/i.test(lower)) {
+    score -= 18;
   }
 
   const urlYear = extractYear(href);
@@ -871,28 +908,22 @@ export async function discoverAnnualReport(
     log.info(`[${companyName}] Sustainability report found: "${sustainCandidate.text}" — ${sustainCandidate.url}`);
   }
 
-  const finalCandidates = Array.from(dedupMap.values()).filter((c) => {
+  let finalCandidates = Array.from(dedupMap.values()).filter((c) => {
     if (isPdfUrl(c.url)) return true;
     if (c.score >= 25) return true;
     return false;
   });
+  let finalRankedCandidates = rankReportCandidatesForSelection(finalCandidates);
 
-  finalCandidates.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    const aPdf = isPdfUrl(a.url) ? 1 : 0;
-    const bPdf = isPdfUrl(b.url) ? 1 : 0;
-    return bPdf - aPdf;
-  });
-
-  log.info(`[${companyName}] IR page scan: ${finalCandidates.length} PDF candidates found`);
-  for (const c of finalCandidates.slice(0, 5)) {
+  log.info(`[${companyName}] IR page scan: ${finalRankedCandidates.length} PDF candidates found`);
+  for (const c of finalRankedCandidates.slice(0, 5)) {
     log.info(`[${companyName}]   ${c.score}pts — "${c.text}" — ${c.url}`);
   }
 
   // --- Internal fallback ladder (only when primary path found zero PDFs) ---
   let fallbackWinner: ReportCandidate | null = null;
 
-  if (finalCandidates.length === 0 && !options?.skipFallbackLadder) {
+  if (finalRankedCandidates.length === 0 && !options?.skipFallbackLadder) {
     log.info(`[${companyName}] Primary scan found no PDFs — starting fallback ladder`);
 
     const deepCrawlCandidates = await fallbackDeepSubPageCrawl(
@@ -915,26 +946,21 @@ export async function discoverAnnualReport(
     }
 
     if (finalCandidates.length > 0) {
-      finalCandidates.sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
-        const aPdf = isPdfUrl(a.url) ? 1 : 0;
-        const bPdf = isPdfUrl(b.url) ? 1 : 0;
-        return bPdf - aPdf;
-      });
-      fallbackWinner = finalCandidates[0];
+      finalRankedCandidates = rankReportCandidatesForSelection(finalCandidates);
+      fallbackWinner = finalRankedCandidates[0];
     } else {
       log.warn(`[${companyName}] All Cheerio-based fallbacks exhausted — no PDFs found`);
     }
-  } else if (finalCandidates.length === 0 && options?.skipFallbackLadder) {
+  } else if (finalRankedCandidates.length === 0 && options?.skipFallbackLadder) {
     log.info(
       `[${companyName}] Primary scan found no PDFs — skipping internal fallback ladder (pipeline will try Playwright / deep scan later)`,
     );
   }
 
   // --- Final result assembly ---
-  let { confidence, explanation } = assessConfidence(finalCandidates);
+  let { confidence, explanation } = assessConfidence(finalRankedCandidates);
 
-  const winner = finalCandidates.length > 0 ? finalCandidates[0] : null;
+  const winner = finalRankedCandidates.length > 0 ? finalRankedCandidates[0] : null;
 
   if (winner && fallbackWinner && winner.url === fallbackWinner.url) {
     if (confidence === 'high') confidence = 'medium';
@@ -953,8 +979,8 @@ export async function discoverAnnualReport(
     fiscalYear: winner ? inferFiscalYear(winner) : null,
     confidence,
     explanation,
-    candidatesConsidered: finalCandidates.length,
-    allCandidates: finalCandidates.slice(0, 10),
+    candidatesConsidered: finalRankedCandidates.length,
+    allCandidates: finalRankedCandidates.slice(0, 10),
   };
 
   if (!winner) {

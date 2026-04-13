@@ -26,6 +26,10 @@ export interface AllabolagResult {
 
 const CURRENT_YEAR = new Date().getFullYear();
 
+function likelyYear(value: number): boolean {
+  return value >= 1900 && value <= 2100;
+}
+
 function parseSwedishNumber(raw: string): { value: number; unit: string } | null {
   let s = raw.trim();
 
@@ -274,7 +278,7 @@ export async function extractFromAllabolag(
       scriptText.match(/"numberOfEmployees"\s*:\s*(\d+)/i);
     if (empMatch && employees === null) {
       const val = parseInt(empMatch[1], 10);
-      if (val >= 100 && val < 1_000_000) {
+      if (val >= 50 && val < 1_000_000 && !likelyYear(val)) {
         employees = val;
         log.debug(`[${companyName}] allabolag employees (inline JS): ${employees}`);
       }
@@ -311,7 +315,7 @@ export async function extractFromAllabolag(
       const empMatch = rowText.match(/(\d[\d\s]*\d|\d+)\s*(?:st|personer|anställda)?/i);
       if (empMatch) {
         const empValue = parseInt(empMatch[1].replace(/\s/g, ''), 10);
-        if (empValue >= 100 && empValue < 1_000_000) {
+        if (empValue >= 50 && empValue < 1_000_000 && !likelyYear(empValue)) {
           employees = empValue;
           log.debug(`[${companyName}] allabolag employees (table): ${employees}`);
         }
@@ -365,7 +369,7 @@ export async function extractFromAllabolag(
         const empMatch = line.match(/(\d[\d\s]+\d|\d{3,})/);
         if (empMatch) {
           const val = parseInt(empMatch[1].replace(/\s/g, ''), 10);
-          if (val >= 100 && val < 1_000_000) {
+          if (val >= 50 && val < 1_000_000 && !likelyYear(val)) {
             employees = val;
             log.debug(`[${companyName}] allabolag employees (text): ${employees}`);
           }

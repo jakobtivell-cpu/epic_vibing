@@ -66,4 +66,23 @@ describe('validateExtractedData reporting model', () => {
     expect(r.data.ebit_msek).toBeNull();
     expect(r.warnings.some((w) => /exceeds revenue/i.test(w))).toBe(true);
   });
+
+  it('real_estate: allows near-parity EBIT/revenue even without förvaltningsresultat note', () => {
+    const r = validateExtractedData(
+      { revenue_msek: 10_000, ebit_msek: 10_300, employees: 5000, ceo: 'A B' },
+      'real_estate',
+      [],
+    );
+    expect(r.data.ebit_msek).toBe(10_300);
+  });
+
+  it('industrial: discards employee counts below 100', () => {
+    const r = validateExtractedData(
+      { revenue_msek: 10_000, ebit_msek: 1_200, employees: 80, ceo: 'A B' },
+      'industrial',
+      [],
+    );
+    expect(r.data.employees).toBeNull();
+    expect(r.warnings.some((w) => /too low .*industrial large-cap/i.test(w))).toBe(true);
+  });
 });

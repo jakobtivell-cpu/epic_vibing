@@ -13,6 +13,7 @@
     "start:server": "ts-node server.ts",
     "typecheck": "tsc --noEmit",
     "test": "jest",
+    "test:e2e-all-tickers": "node scripts/run-all-ticker-e2e.cjs",
     "postinstall": "npx playwright install chromium"
   },
   "dependencies": {

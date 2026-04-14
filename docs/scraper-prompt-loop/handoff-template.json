@@ -1,0 +1,104 @@
+{
+  "run_id": "run-YYYYMMDD-HHMMSS",
+  "dataset_id": "latest_batch",
+  "timestamp_utc": "YYYY-MM-DDTHH:mm:ssZ",
+  "assumptions": [],
+  "blocking_questions": [],
+  "baseline": {
+    "results_source": "output/results.json",
+    "companies_total": 0,
+    "companies_100pct": 0,
+    "completeness_rate": 0.0,
+    "status_counts": {
+      "complete": 0,
+      "partial": 0,
+      "failed": 0,
+      "timeout": 0
+    },
+    "critical_failures": [],
+    "confidence": 0.0
+  },
+  "diagnosis": {
+    "failure_classes": [],
+    "root_causes": [],
+    "data_quality_signals": [],
+    "regression_signals": [],
+    "priority_order": [],
+    "expected_lift_estimate": [],
+    "confidence": 0.0
+  },
+  "plan": {
+    "phases": [],
+    "tasks": [],
+    "owner_role": [],
+    "dependencies": [],
+    "success_metrics": [],
+    "rollback_points": [],
+    "time_cost_estimates": [],
+    "final_actionable": {
+      "ordered_tasks": [],
+      "pre_checks": [],
+      "implementation_steps": [],
+      "post_checks": [],
+      "abort_conditions": [],
+      "rollback_steps": [],
+      "definition_of_done": {
+        "completeness_target": 1.0,
+        "min_consecutive_full_passes": 2,
+        "accuracy_constraints": [],
+        "regression_constraints": []
+      }
+    }
+  },
+  "risk_review": {
+    "risk_matrix": [],
+    "task_scores": [],
+    "scenario_simulation": {
+      "best_case": {},
+      "base_case": {},
+      "worst_case": {}
+    },
+    "go_no_go": [],
+    "mitigations": [],
+    "confidence": 0.0
+  },
+  "execution": {
+    "completed_tasks": [],
+    "deviations": [],
+    "blocked_items": [],
+    "artifacts": [],
+    "change_summary": [],
+    "confidence": 0.0
+  },
+  "validation": {
+    "checks_run": [],
+    "failures": [],
+    "fixes_applied": [],
+    "residual_risks": [],
+    "ready_for_test": false,
+    "confidence": 0.0
+  },
+  "test_results": {
+    "companies_total": 0,
+    "companies_100pct": 0,
+    "completeness_rate": 0.0,
+    "formula_used": "companies_100pct / companies_total",
+    "field_level_accuracy": [],
+    "error_distributions": [],
+    "diff_vs_baseline": [],
+    "confidence": 0.0
+  },
+  "iteration": {
+    "count": 0,
+    "decision": "full_loop",
+    "continue": true,
+    "reason": "initial_run",
+    "next_focus": [],
+    "loop_thresholds": {
+      "full_loop_below": 0.8,
+      "targeted_loop_below": 1.0,
+      "stop_at_or_above": 1.0
+    }
+  },
+  "history": []
+}

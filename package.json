@@ -13,6 +13,7 @@
     "start:server": "ts-node server.ts",
     "typecheck": "tsc --noEmit",
     "test": "jest",
+    "test:all-companies": "node scripts/test-all-companies.cjs",
     "test:e2e-all-tickers": "node scripts/run-all-ticker-e2e.cjs",
     "test:e2e-partial-subset": "node scripts/run-partial-subset-e2e.cjs",
     "analyze:quality": "node scripts/analyze-results-quality.cjs",

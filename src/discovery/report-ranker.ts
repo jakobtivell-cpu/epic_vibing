@@ -80,6 +80,12 @@ const TEXT_NEGATIVE: { pattern: RegExp; points: number }[] = [
   { pattern: /\binstructions\s+for\s+(?:voting|shareholders)\b/i, points: -16 },
   { pattern: /\bsummary\b/i, points: -3 },
   { pattern: /\bsammandrag\b/i, points: -3 },
+  { pattern: /\byear\s+in\s+brief\b/i, points: -22 },
+  { pattern: /\bhighlights?\b/i, points: -10 },
+  { pattern: /\bholdings?\b/i, points: -8 },
+  { pattern: /\bsustainability\s+report\b/i, points: -14 },
+  { pattern: /\bhållbarhetsrapport\b/i, points: -14 },
+  { pattern: /\bhållbarhetsredovisning\b/i, points: -14 },
   { pattern: /\besef\b/i, points: -3 },
   { pattern: /\bcopy[\s-]+of[\s-]+the[\s-]+official\b/i, points: -5 },
   { pattern: /\bpillar[\s-]*3\b/i, points: -24 },
@@ -99,7 +105,7 @@ const TEXT_NEGATIVE: { pattern: RegExp; points: number }[] = [
 const REPORT_CLASS_ANNUAL_RE =
   /\b(annual\s+(and\s+sustainability\s+)?report|årsredovisning|integrated\s+annual\s+report|annual\s+financial\s+report)\b/i;
 const REPORT_CLASS_NON_ANNUAL_RE =
-  /\b(corporate\s+governance|governance\s+report|governance\s+statement|policy|presentation|factbook|remuneration\s+report|annual\s+general\s+meeting|agm|notice\s+of\s+meeting)\b/i;
+  /\b(corporate\s+governance|governance\s+report|governance\s+statement|policy|presentation|factbook|year\s+in\s+brief|remuneration\s+report|annual\s+general\s+meeting|agm|notice\s+of\s+meeting|sustainability\s+report|hållbarhetsrapport|hållbarhetsredovisning)\b/i;
 
 export type ReportClass = 'annual_like' | 'non_annual_like' | 'unknown';
 

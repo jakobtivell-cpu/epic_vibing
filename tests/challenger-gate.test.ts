@@ -16,6 +16,7 @@ describe('shouldRunLlmChallenger', () => {
     companyName: 'TestCo',
     ticker: null,
     detectedCompanyType: 'industrial' as const,
+    extractionNotes: [] as string[],
     forceLlm: false,
   };
 
@@ -32,13 +33,20 @@ describe('shouldRunLlmChallenger', () => {
     ).toBe(false);
   });
 
-  it('runs when confidence is low', () => {
-    expect(shouldRunLlmChallenger({ ...base, confidence: 70 }, true)).toBe(true);
+  it('does not run for complete rows', () => {
+    expect(shouldRunLlmChallenger(base, true)).toBe(false);
   });
 
-  it('runs when a core field is missing', () => {
+  it('runs for recoverable partial with missing EBIT', () => {
     expect(
-      shouldRunLlmChallenger({ ...base, extractedData: { ...base.extractedData!, ceo: null } }, true),
+      shouldRunLlmChallenger(
+        {
+          ...base,
+          status: 'partial',
+          extractedData: { ...base.extractedData!, ebit_msek: null },
+        },
+        true,
+      ),
     ).toBe(true);
   });
 
@@ -46,6 +54,48 @@ describe('shouldRunLlmChallenger', () => {
     expect(
       shouldRunLlmChallenger(
         { ...base, detectedCompanyType: 'investment_company', forceLlm: true },
+        true,
+      ),
+    ).toBe(true);
+  });
+
+  it('does not run when confidence is below gate threshold', () => {
+    expect(
+      shouldRunLlmChallenger(
+        {
+          ...base,
+          status: 'partial',
+          confidence: 70,
+          extractedData: { ...base.extractedData!, ebit_msek: null },
+        },
+        true,
+      ),
+    ).toBe(false);
+  });
+
+  it('does not run when notes indicate wrong document class', () => {
+    expect(
+      shouldRunLlmChallenger(
+        {
+          ...base,
+          status: 'partial',
+          extractedData: { ...base.extractedData!, ebit_msek: null },
+          extractionNotes: ['No income statement / resultaträkning found in PDF'],
+        },
+        true,
+      ),
+    ).toBe(false);
+  });
+
+  it('still runs when notes only mention sustainability content', () => {
+    expect(
+      shouldRunLlmChallenger(
+        {
+          ...base,
+          status: 'partial',
+          extractedData: { ...base.extractedData!, ebit_msek: null },
+          extractionNotes: ['Annual report includes sustainability content'],
+        },
         true,
       ),
     ).toBe(true);

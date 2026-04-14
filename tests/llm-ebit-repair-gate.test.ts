@@ -1,4 +1,7 @@
-import { shouldUseNarrowEbitLlmRepair } from '../src/challenger/llm-extract';
+import {
+  shouldUseNarrowEbitLlmRepair,
+  shouldUseNarrowPeopleLlmRepair,
+} from '../src/challenger/llm-extract';
 
 describe('shouldUseNarrowEbitLlmRepair', () => {
   it('is true when EBIT null, revenue present, and notes show discard', () => {
@@ -23,5 +26,19 @@ describe('shouldUseNarrowEbitLlmRepair', () => {
     expect(
       shouldUseNarrowEbitLlmRepair({ revenue_msek: 1000, ebit_msek: null }, ['EBIT not extracted']),
     ).toBe(false);
+  });
+});
+
+describe('shouldUseNarrowPeopleLlmRepair', () => {
+  it('is true when employees are missing', () => {
+    expect(shouldUseNarrowPeopleLlmRepair({ employees: null, ceo: 'Jane Doe' })).toBe(true);
+  });
+
+  it('is true when ceo is missing', () => {
+    expect(shouldUseNarrowPeopleLlmRepair({ employees: 1000, ceo: null })).toBe(true);
+  });
+
+  it('is false when both people fields are present', () => {
+    expect(shouldUseNarrowPeopleLlmRepair({ employees: 1000, ceo: 'Jane Doe' })).toBe(false);
   });
 });

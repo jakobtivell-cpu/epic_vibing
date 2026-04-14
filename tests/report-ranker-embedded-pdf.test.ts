@@ -39,6 +39,15 @@ describe('report-ranker embedded PDF scoring', () => {
     ).toBe('non_annual_like');
   });
 
+  it('classifies year-in-brief PDFs as non-annual-like', () => {
+    expect(
+      classifyReportCandidateClass(
+        'Year in Brief 2025',
+        'https://example.com/files/year-in-brief-2025.pdf',
+      ),
+    ).toBe('non_annual_like');
+  });
+
   it('prefers annual report over higher-scoring governance/policy candidates', () => {
     const ranked = rankReportCandidatesForSelection([
       {
@@ -56,6 +65,25 @@ describe('report-ranker embedded PDF scoring', () => {
       {
         url: 'https://example.com/annual-report-2025.pdf',
         score: 20,
+        text: 'Annual report 2025',
+        source: 'ir-page',
+      },
+    ]);
+
+    expect(ranked[0].url).toContain('annual-report-2025.pdf');
+  });
+
+  it('prefers annual report over year-in-brief candidate', () => {
+    const ranked = rankReportCandidatesForSelection([
+      {
+        url: 'https://example.com/year-in-brief-2025.pdf',
+        score: 41,
+        text: 'Year in Brief 2025',
+        source: 'ir-page',
+      },
+      {
+        url: 'https://example.com/annual-report-2025.pdf',
+        score: 18,
         text: 'Annual report 2025',
         source: 'ir-page',
       },

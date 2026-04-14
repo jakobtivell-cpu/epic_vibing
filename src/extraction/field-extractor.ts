@@ -2492,10 +2492,34 @@ export function extractEbitSecondPassFromIncomeSections(
           SCAN_BANK,
         );
       }
+      if (match === null) {
+        match = findLabeledNumber(
+          slice,
+          ADJUSTED_EBIT_LABELS,
+          { ...ebitOpts, exclusions: EBIT_EXCLUSIONS_ADJUSTED_PASS },
+          ebitPick,
+          SCAN_BANK,
+        );
+        if (match !== null) {
+          notes.push('Second-pass EBIT: using adjusted operating result line (bank)');
+        }
+      }
     } else if (companyType === 'real_estate') {
       match = extractRealEstateEbitProxy(slice, ebitOpts, ebitPick);
     } else {
       match = findLabeledNumber(slice, INDUSTRIAL_LABELS.ebit, ebitOpts, ebitPick, SCAN_DEFAULT);
+      if (match === null) {
+        match = findLabeledNumber(
+          slice,
+          ADJUSTED_EBIT_LABELS,
+          { ...ebitOpts, exclusions: EBIT_EXCLUSIONS_ADJUSTED_PASS },
+          ebitPick,
+          SCAN_DEFAULT,
+        );
+        if (match !== null) {
+          notes.push('Second-pass EBIT: using adjusted operating result line');
+        }
+      }
     }
 
     if (match === null) continue;

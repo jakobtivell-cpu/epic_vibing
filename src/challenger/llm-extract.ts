@@ -86,6 +86,19 @@ function parseEbitRepairJson(text: string): { ebit: LlmRawField; revenue: LlmRaw
   }
 }
 
+/** Narrow repair: people fields only (employees + ceo). */
+function parsePeopleRepairJson(text: string): { employees: LlmRawField; ceo: LlmRawField } | null {
+  try {
+    const obj = JSON.parse(text) as Record<string, unknown>;
+    return {
+      employees: pickRawField(obj, 'employees'),
+      ceo: pickRawField(obj, 'ceo'),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function shouldUseNarrowEbitLlmRepair(
   validated: { revenue_msek: number | null; ebit_msek: number | null },
   extractionNotes?: string[],
@@ -94,6 +107,16 @@ export function shouldUseNarrowEbitLlmRepair(
   if (validated.revenue_msek === null) return false;
   const blob = (extractionNotes ?? []).join(' | ');
   return /discarding ebit|semantic mismatch|assignment safety|exceeds revenue/i.test(blob);
+}
+
+export function shouldUseNarrowPeopleLlmRepair(
+  validated: { employees: number | null; ceo: string | null },
+): boolean {
+  const missingEmployees = validated.employees === null;
+  const missingCeo = validated.ceo === null;
+  if (!missingEmployees && !missingCeo) return false;
+  // Keep narrow pass for "people-only" holes.
+  return true;
 }
 
 function buildPrompt(companyLegalName: string, context: string): string {
@@ -141,6 +164,29 @@ JSON shape:
 }
 
 Company: "${companyLegalName}"
+
+EXCERPT:
+${context}`;
+}
+
+function buildPeopleRepairPrompt(companyLegalName: string, context: string): string {
+  return `Extract ONLY people fields from the annual report excerpt for company "${companyLegalName}".
+
+Task:
+- Find employees (headcount/FTE) and CEO name with direct quote support.
+
+Rules:
+- Return ONLY valid JSON with keys "employees" and "ceo". No markdown or commentary.
+- Use null for any field you cannot support with a verbatim source_quote from the excerpt (>= 12 characters).
+- For employees: prefer total year-end employees or average employees/FTE. Return integer headcount only.
+- For CEO: quote must be from a leadership/title context (CEO, VD, President and CEO, etc.), not random names.
+- page: 1-based page number if page markers appear in excerpt; otherwise null.
+
+JSON shape:
+{
+  "employees": { "value": number|null, "page": number|null, "source_quote": string|null, "unit_stated": string|null, "reporting_scope": string|null, "normalization": string[] },
+  "ceo": { "value": string|null, "page": number|null, "source_quote": string|null, "unit_stated": string|null, "reporting_scope": string|null, "normalization": string[] }
+}
 
 EXCERPT:
 ${context}`;
@@ -282,6 +328,50 @@ export async function runLlmEbitRepair(
       ? JSON.stringify(ax.response.data).slice(0, 500)
       : ax.message;
     log.warn(`LLM EBIT repair failed: ${msg}`);
+    return { ok: false, error: msg };
+  }
+}
+
+/**
+ * Narrow-schema people repair — employees + CEO only, citation-gated in adjudication.
+ */
+export async function runLlmPeopleRepair(
+  companyLegalName: string,
+  fullText: string,
+  context: string,
+): Promise<LlmExtractResult | LlmExtractError> {
+  if (!process.env.OPENAI_API_KEY?.trim()) {
+    return { ok: false, error: 'OPENAI_API_KEY not set' };
+  }
+
+  try {
+    const prompt = buildPeopleRepairPrompt(companyLegalName, context);
+    const content = await openAiJsonCompletion(prompt);
+    if (!content) {
+      return { ok: false, error: 'Empty LLM response' };
+    }
+
+    const partial = parsePeopleRepairJson(content);
+    if (!partial) {
+      return { ok: false, error: 'LLM returned non-JSON or invalid shape (people repair)' };
+    }
+
+    const parsed: LlmExtractJson = {
+      revenue_msek: emptyField(),
+      ebit_msek: emptyField(),
+      employees: partial.employees,
+      ceo: partial.ceo,
+      fiscal_year: emptyField(),
+    };
+
+    log.info('LLM people repair pass: narrow schema (employees + ceo)');
+    return packageLlmResult(fullText, parsed);
+  } catch (e) {
+    const ax = e as AxiosError;
+    const msg = ax.response?.data
+      ? JSON.stringify(ax.response.data).slice(0, 500)
+      : ax.message;
+    log.warn(`LLM people repair failed: ${msg}`);
     return { ok: false, error: msg };
   }
 }

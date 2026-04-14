@@ -10,7 +10,9 @@ import { shouldRunLlmChallenger, type ChallengerGateInput } from './gate';
 import {
   runLlmExtraction,
   runLlmEbitRepair,
+  runLlmPeopleRepair,
   shouldUseNarrowEbitLlmRepair,
+  shouldUseNarrowPeopleLlmRepair,
 } from './llm-extract';
 import { adjudicateDualTrack, errorAdjudication } from './adjudicate';
 import type { DualTrackAdjudication } from './types';
@@ -59,6 +61,7 @@ export async function runChallengerTrack(params: RunChallengerParams): Promise<D
     companyName: params.companyDisplayName,
     ticker: params.ticker,
     detectedCompanyType: params.detectedCompanyType,
+    extractionNotes: params.extractionNotes,
     forceLlm: params.forceLlm,
   };
 
@@ -72,10 +75,16 @@ export async function runChallengerTrack(params: RunChallengerParams): Promise<D
     params.validatedData,
     params.extractionNotes,
   );
+  const narrowPeople = shouldUseNarrowPeopleLlmRepair({
+    employees: params.validatedData.employees,
+    ceo: params.validatedData.ceo,
+  });
 
   let llmResult = narrowEbit
     ? await runLlmEbitRepair(params.legalNameForPrompt, params.fullPdfText, context)
-    : await runLlmExtraction(params.legalNameForPrompt, params.fullPdfText, context);
+    : narrowPeople
+      ? await runLlmPeopleRepair(params.legalNameForPrompt, params.fullPdfText, context)
+      : await runLlmExtraction(params.legalNameForPrompt, params.fullPdfText, context);
 
   const narrowAccepted =
     llmResult.ok &&
@@ -86,6 +95,17 @@ export async function runChallengerTrack(params: RunChallengerParams): Promise<D
   if (narrowEbit && (!narrowAccepted || !llmResult.ok)) {
     log.debug(
       `[${params.companyDisplayName}] Narrow EBIT repair inconclusive — falling back to full LLM extract`,
+    );
+    llmResult = await runLlmExtraction(
+      params.legalNameForPrompt,
+      params.fullPdfText,
+      context,
+    );
+  }
+
+  if (narrowPeople && !narrowEbit && !llmResult.ok) {
+    log.debug(
+      `[${params.companyDisplayName}] Narrow people repair inconclusive — falling back to full LLM extract`,
     );
     llmResult = await runLlmExtraction(
       params.legalNameForPrompt,

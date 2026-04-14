@@ -13,6 +13,54 @@ function run(cmd, args) {
   return status == null ? 1 : status;
 }
 
+function printHelp() {
+  console.log(
+    [
+      'Usage: node scripts/test-all-companies.cjs [options]',
+      '',
+      'Options:',
+      '  --concurrency <n>  Number of concurrent company subprocesses during full scrape',
+      '  --help             Show this help and exit',
+      '',
+      'Thresholds (env vars):',
+      '  MIN_COMPLETE_PCT, MAX_FAILED_PCT, MAX_TIMEOUT_PCT',
+    ].join('\n'),
+  );
+}
+
+function parsePositiveInt(value, flagName) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`${flagName} must be a positive integer`);
+  }
+  return parsed;
+}
+
+function parseArgs(argv) {
+  let concurrency;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--help' || arg === '-h') {
+      printHelp();
+      process.exit(0);
+    }
+    if (arg === '--concurrency') {
+      const value = argv[i + 1];
+      if (!value) throw new Error('--concurrency requires a value');
+      concurrency = parsePositiveInt(value, '--concurrency');
+      i++;
+      continue;
+    }
+    if (arg.startsWith('--concurrency=')) {
+      const value = arg.slice('--concurrency='.length);
+      concurrency = parsePositiveInt(value, '--concurrency');
+      continue;
+    }
+    throw new Error(`Unknown option: ${arg}`);
+  }
+  return { concurrency };
+}
+
 function readResults(resultsPath) {
   if (!fs.existsSync(resultsPath)) {
     throw new Error(`results.json not found at ${resultsPath}`);
@@ -39,6 +87,15 @@ function statusCounts(rows) {
 const root = process.cwd();
 const resultsPath = path.resolve(root, 'output', 'results.json');
 
+let cli;
+try {
+  cli = parseArgs(process.argv.slice(2));
+} catch (err) {
+  console.error(err instanceof Error ? err.message : String(err));
+  console.error('Use --help to see available options.');
+  process.exit(2);
+}
+
 const minCompletePct = Number(process.env.MIN_COMPLETE_PCT ?? '0');
 const maxFailedPct = Number(process.env.MAX_FAILED_PCT ?? '100');
 const maxTimeoutPct = Number(process.env.MAX_TIMEOUT_PCT ?? '100');
@@ -49,7 +106,11 @@ if (!Number.isFinite(minCompletePct) || !Number.isFinite(maxFailedPct) || !Numbe
 }
 
 console.log('== Full all-company E2E scrape ==');
-let status = run('node', ['scripts/run-all-ticker-e2e.cjs']);
+const e2eArgs = ['scripts/run-all-ticker-e2e.cjs'];
+if (cli.concurrency != null) {
+  e2eArgs.push('--concurrency', String(cli.concurrency));
+}
+let status = run('node', e2eArgs);
 if (status !== 0) process.exit(status);
 
 console.log('== Analyze quality ==');

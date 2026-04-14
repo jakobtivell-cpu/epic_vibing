@@ -27,6 +27,47 @@ interface ChildInput {
   options?: RunPipelineOptions;
 }
 
+function createPool(concurrency: number) {
+  let active = 0;
+  const queue: Array<() => void> = [];
+
+  const schedule = () => {
+    if (active >= concurrency) return;
+    const next = queue.shift();
+    if (!next) return;
+    active++;
+    next();
+  };
+
+  return {
+    run<T>(task: () => Promise<T>): Promise<T> {
+      return new Promise<T>((resolve, reject) => {
+        queue.push(async () => {
+          try {
+            resolve(await task());
+          } catch (err) {
+            reject(err);
+          } finally {
+            active--;
+            schedule();
+          }
+        });
+        schedule();
+      });
+    },
+  };
+}
+
+function normalizeConcurrency(
+  requestedConcurrency: number | undefined,
+  totalCompanies: number,
+): number {
+  if (totalCompanies <= 1) return 1;
+  const raw = Math.trunc(requestedConcurrency ?? 1);
+  if (!Number.isFinite(raw) || raw <= 1) return 1;
+  return Math.min(raw, totalCompanies);
+}
+
 function resolveChildScript(): { script: string; execArgv: string[] } {
   const tsPath = path.join(PROJECT_ROOT, 'src/cli/run-single-company.ts');
   const jsPath = path.join(PROJECT_ROOT, 'dist/src/cli/run-single-company.js');
@@ -132,26 +173,61 @@ export async function runCompaniesWithOptionalChildTimeout(
   force: boolean,
   options: RunPipelineOptions | undefined,
   timeoutPerCompanyMs: number | undefined,
+  childConcurrency?: number,
 ): Promise<PipelineResult[]> {
   if (timeoutPerCompanyMs == null || timeoutPerCompanyMs <= 0) {
     return runPipeline(companies, force, options);
   }
 
-  const results: PipelineResult[] = [];
-  for (let i = 0; i < companies.length; i++) {
-    const company = companies[i];
-    log.info(
-      `Processing ${company.name} [${i + 1}/${companies.length}] (subprocess, timeout ${timeoutPerCompanyMs}ms)`,
-    );
-    try {
-      results.push(
-        await runSingleCompanyChild(company, force, options, timeoutPerCompanyMs),
+  const concurrency = normalizeConcurrency(childConcurrency, companies.length);
+
+  if (concurrency === 1) {
+    const results: PipelineResult[] = [];
+    for (let i = 0; i < companies.length; i++) {
+      const company = companies[i];
+      log.info(
+        `Processing ${company.name} [${i + 1}/${companies.length}] (subprocess, timeout ${timeoutPerCompanyMs}ms)`,
       );
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      log.error(`[${company.name}] Fatal: ${message}`);
-      results.push(buildFailedResult(company, message));
+      try {
+        results.push(
+          await runSingleCompanyChild(company, force, options, timeoutPerCompanyMs),
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        log.error(`[${company.name}] Fatal: ${message}`);
+        results.push(buildFailedResult(company, message));
+      }
     }
+    return results;
   }
+
+  log.info(
+    `Processing ${companies.length} companies with subprocess concurrency ${concurrency} (timeout ${timeoutPerCompanyMs}ms each)`,
+  );
+
+  const pool = createPool(concurrency);
+  const results: PipelineResult[] = [];
+  results.length = companies.length;
+  await Promise.all(
+    companies.map((company, i) =>
+      pool.run(async () => {
+        log.info(
+          `Processing ${company.name} [${i + 1}/${companies.length}] (subprocess, timeout ${timeoutPerCompanyMs}ms)`,
+        );
+        try {
+          results[i] = await runSingleCompanyChild(
+            company,
+            force,
+            options,
+            timeoutPerCompanyMs,
+          );
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          log.error(`[${company.name}] Fatal: ${message}`);
+          results[i] = buildFailedResult(company, message);
+        }
+      }),
+    ),
+  );
   return results;
 }

@@ -22,6 +22,20 @@ import { runCompaniesWithOptionalChildTimeout } from '../src/cli/child-runner';
 import type { PipelineResult } from '../src/types';
 
 const RUN_E2E = process.env.RUN_ALL_TICKERS_SCRAPE_E2E === '1';
+const E2E_CONCURRENCY = readPositiveIntEnv(
+  'RUN_ALL_TICKERS_CONCURRENCY',
+  1,
+);
+
+function readPositiveIntEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw == null || raw.trim().length === 0) return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be a positive integer when set`);
+  }
+  return parsed;
+}
 
 describe('all ticker companies (from ticker.json)', () => {
   it('builds a non-empty deduped list after loadTickerMap', () => {
@@ -47,6 +61,7 @@ describeE2e('E2E: scrape every ticker (3 min cap per company)', () => {
       false,
       { sequential: true, llmChallengerForce: false },
       SCRAPE_TIMEOUT_PER_COMPANY_MS,
+      E2E_CONCURRENCY,
     );
   }, 24 * 60 * 60 * 1000);
 

@@ -1,7 +1,7 @@
-# Iteration 7
-- Target: Bonesupport Holding AB (publ) / employees
-- Root cause: Employee extraction missed narrative sentence formats where employee count precedes the label keyword.
-- Code change: Added narrative employee fallback patterns (for "the Group had ... employees" and "average number of employees") and applied this fallback when labeled table extraction returns no match.
-- Verification: logic confirmed via cached text (`cache/bonesupport_holding_ab_publ-2025.txt`) and wrapper type-check (`node scripts/run-wrapped.cjs "npx tsc --noEmit --pretty false"`).
+# Iteration 8
+- Target: AB Industrivarden (publ) / revenue_msek
+- Root cause: Revenue extraction could stop after one fused-year artifact candidate instead of evaluating alternate labeled rows.
+- Code change: Added alternate revenue-candidate retry logic after fused-year rejection, selecting the first non-fused labeled revenue match from a broader pool.
+- Verification: logic confirmed via cached text (`cache/ab_industriv_rden_publ-2024.txt`) and wrapper type-check (`node scripts/run-wrapped.cjs "npx tsc --noEmit --pretty false"`).
 - Files changed: src/extraction/field-extractor.ts
 - Completeness: 0.7318840579710145 (101/138) - awaiting next scrape cycle

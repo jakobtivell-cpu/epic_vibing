@@ -1,5 +1,5 @@
 {
-  "iteration": 7,
+  "iteration": 8,
   "completeness_rate": 0.7318840579710145,
   "companies_total": 138,
   "companies_100pct": 101,
@@ -11,23 +11,24 @@
     "Betsson AB (publ)/ebit_msek",
     "Svenska Cellulosa Aktiebolaget SCA (publ)/revenue_msek",
     "HMS Networks AB (publ)/ebit_msek",
-    "Bonesupport Holding AB (publ)/employees"
+    "Bonesupport Holding AB (publ)/employees",
+    "AB Industrivarden (publ)/revenue_msek"
   ],
   "last_fix": {
-    "company": "Bonesupport Holding AB (publ)",
-    "field": "employees",
-    "root_cause": "Employee extraction relied on label-led table rows and missed narrative phrasing where the value appears before the word employees (\"the Group had 148 ... employees\").",
+    "company": "AB Industrivarden (publ)",
+    "field": "revenue_msek",
+    "root_cause": "When a first revenue hit looked like a fused-year artifact, extraction nulled revenue immediately without trying alternate labeled revenue rows in the same document.",
     "files_changed": [
       "src/extraction/field-extractor.ts"
     ],
     "result": "code_fix_applied",
-    "verification_method": "Cached-text regex verification on cache/bonesupport_holding_ab_publ-2025.txt plus wrapped TypeScript check.",
-    "verification_output": "Confirmed narrative line \"On average, the Group had 148 (135) employees\" is present and new fallback regex captures employee count 148.",
+    "verification_method": "Cached-text label verification on cache/ab_industriv_rden_publ-2024.txt plus wrapped TypeScript check.",
+    "verification_output": "Confirmed multiple alternate revenue-like rows exist (e.g. \"Dividend income28,5856,4184,7393,853\", \"Dividend income8,585...6,418\"). New logic now retries with non-fused labeled candidates instead of returning null after first fused-year rejection.",
     "companies_also_helped": [
-      "Camurus AB (publ)",
-      "Hoist Finance AB (publ)",
-      "Invisio AB (publ)",
-      "Nordnet AB (publ)"
+      "Fabege AB (publ)",
+      "Getinge AB (publ)",
+      "Electrolux Professional AB (publ)",
+      "Svenska Cellulosa Aktiebolaget SCA (publ)"
     ]
   },
   "regressions": [],
@@ -100,6 +101,16 @@
       "iteration": 7,
       "timestamp": "2026-04-15T08:27:05Z",
       "fix": "Bonesupport Holding AB (publ)/employees",
+      "result": "code_fix_applied",
+      "completeness_before": 0.7318840579710145,
+      "files_changed": [
+        "src/extraction/field-extractor.ts"
+      ]
+    },
+    {
+      "iteration": 8,
+      "timestamp": "2026-04-15T08:31:13Z",
+      "fix": "AB Industrivarden (publ)/revenue_msek",
       "result": "code_fix_applied",
       "completeness_before": 0.7318840579710145,
       "files_changed": [

@@ -2506,8 +2506,25 @@ export function extractFields(
     }
     if (revMatch !== null) {
       if (hasFusedYearRawArtifact(revMatch.rawCell)) {
-        notes.push(`Revenue candidate "${revMatch.rawCell}" discarded — fused-year artifact in raw cell`);
-        revMatch = null;
+        const badRaw = revMatch.rawCell;
+        notes.push(`Revenue candidate "${badRaw}" discarded — fused-year artifact in raw cell`);
+        const revenuePool = findAllLabeledNumbers(
+          lines,
+          labels.revenue,
+          { minValue: revMin },
+          tablePickBase,
+          detectedType === 'bank' ? bankScan.loose.maxLineLen : SCAN_DEFAULT.loose.maxLineLen,
+          detectedType === 'bank' ? bankScan.loose.maxLabelOffset : SCAN_DEFAULT.loose.maxLabelOffset,
+        );
+        const altRevenue = revenuePool.find((m) => !hasFusedYearRawArtifact(m.rawCell)) ?? null;
+        if (altRevenue !== null) {
+          revMatch = altRevenue;
+          notes.push(
+            `Revenue: using alternate labeled hit (${altRevenue.rawCell}) after skipping fused-year artifact`,
+          );
+        } else {
+          revMatch = null;
+        }
       }
     }
     if (revMatch !== null) {

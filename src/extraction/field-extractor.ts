@@ -1147,7 +1147,11 @@ function pickBetterEmployeeMatchForRevenue(
  */
 function extractNumberTokens(text: string): string[] {
   const tokens: string[] = [];
-  const numberRe = /[-–−]?\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|[-–−]?\d{4,}(?:\.\d{1,2})?/g;
+  // Require hard token boundaries so we do not pick synthetic middle values from
+  // OCR-collapsed decimal sequences such as "253.1256.7210.5" (where "1256.7"
+  // is not a real column value, but a glue artifact between 253.1 and 256.7).
+  const numberRe =
+    /(?<![\d.])[-–−]?(?:\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d{4,}(?:\.\d{1,2})?)(?![\d.])/g;
   let m;
   while ((m = numberRe.exec(text)) !== null) {
     tokens.push(m[0]);

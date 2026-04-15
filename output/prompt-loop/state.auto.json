@@ -1,5 +1,5 @@
 {
-  "iteration": 3,
+  "iteration": 4,
   "completeness_rate": 0.7318840579710145,
   "companies_total": 138,
   "companies_100pct": 101,
@@ -7,24 +7,24 @@
   "attempted_targets": [
     "Skandinaviska Enskilda Banken AB (publ)/ebit_msek",
     "Beijer Ref AB (publ)/ebit_msek",
-    "Bure Equity AB (publ)/revenue_msek"
+    "Bure Equity AB (publ)/revenue_msek",
+    "Betsson AB (publ)/ebit_msek"
   ],
   "last_fix": {
-    "company": "Bure Equity AB (publ)",
-    "field": "revenue_msek",
-    "root_cause": "Revenue extraction was hard-disabled for detected investment companies, so valid lines like \"Intakter fran investeringsverksamheten\"/\"Summa intakter\" were never parsed.",
+    "company": "Betsson AB (publ)",
+    "field": "ebit_msek",
+    "root_cause": "Fallback token extraction accepted synthetic numbers from OCR-collapsed decimal runs (e.g. \"Operating income253.1256.7210.5\"), producing inflated EBIT candidates that were later discarded.",
     "files_changed": [
-      "src/extraction/field-extractor.ts",
-      "src/extraction/labels.ts"
+      "src/extraction/field-extractor.ts"
     ],
     "result": "code_fix_applied",
-    "verification_method": "Cached-text label verification in cache/bure_equity_ab_publ-2024.txt plus wrapped TypeScript check.",
-    "verification_output": "Confirmed target labels exist in cached report (\"Intakter fran investeringsverksamheten var 6 323 Mkr\", \"Summa intakter6 3234 384\") and extractor now attempts revenue for investment_company instead of skipping.",
+    "verification_method": "Cached-text regex verification on cache/betsson_ab_publ-2025.txt plus wrapped TypeScript check.",
+    "verification_output": "On line \"Operating income253.1256.7210.5131.2117.6\", old fallback regex returned synthetic tokens [\"1256.72\",\"5131.21\"]; new boundary-aware regex returns no synthetic token, so bogus inflated EBIT pick path is removed.",
     "companies_also_helped": [
-      "Investor AB (publ)",
-      "Kinnevik AB",
-      "L E Lundbergforetagen AB (publ)",
-      "Modern Times Group MTG AB"
+      "HMS Networks AB (publ)",
+      "NCAB Group AB (publ)",
+      "BioGaia AB (publ)",
+      "Tele2 AB (publ)"
     ]
   },
   "regressions": [],
@@ -61,6 +61,16 @@
       "files_changed": [
         "src/extraction/field-extractor.ts",
         "src/extraction/labels.ts"
+      ]
+    },
+    {
+      "iteration": 4,
+      "timestamp": "2026-04-15T08:19:27Z",
+      "fix": "Betsson AB (publ)/ebit_msek",
+      "result": "code_fix_applied",
+      "completeness_before": 0.7318840579710145,
+      "files_changed": [
+        "src/extraction/field-extractor.ts"
       ]
     }
   ]

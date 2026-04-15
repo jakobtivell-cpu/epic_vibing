@@ -1,5 +1,5 @@
 {
-  "iteration": 4,
+  "iteration": 5,
   "completeness_rate": 0.7318840579710145,
   "companies_total": 138,
   "companies_100pct": 101,
@@ -8,23 +8,24 @@
     "Skandinaviska Enskilda Banken AB (publ)/ebit_msek",
     "Beijer Ref AB (publ)/ebit_msek",
     "Bure Equity AB (publ)/revenue_msek",
-    "Betsson AB (publ)/ebit_msek"
+    "Betsson AB (publ)/ebit_msek",
+    "Svenska Cellulosa Aktiebolaget SCA (publ)/revenue_msek"
   ],
   "last_fix": {
-    "company": "Betsson AB (publ)",
-    "field": "ebit_msek",
-    "root_cause": "Fallback token extraction accepted synthetic numbers from OCR-collapsed decimal runs (e.g. \"Operating income253.1256.7210.5\"), producing inflated EBIT candidates that were later discarded.",
+    "company": "Svenska Cellulosa Aktiebolaget SCA (publ)",
+    "field": "revenue_msek",
+    "root_cause": "Narrative revenue fallback only handled BSEK/billion phrasing, so OCR-broken table rows left revenue null even when clear \"Net sales amounted to SEK ...m\" text existed.",
     "files_changed": [
       "src/extraction/field-extractor.ts"
     ],
     "result": "code_fix_applied",
-    "verification_method": "Cached-text regex verification on cache/betsson_ab_publ-2025.txt plus wrapped TypeScript check.",
-    "verification_output": "On line \"Operating income253.1256.7210.5131.2117.6\", old fallback regex returned synthetic tokens [\"1256.72\",\"5131.21\"]; new boundary-aware regex returns no synthetic token, so bogus inflated EBIT pick path is removed.",
+    "verification_method": "Cached-text regex verification on cache/svenska_cellulosa_aktiebolaget_sca_publ-2025.txt plus wrapped TypeScript check.",
+    "verification_output": "Confirmed SCA line \"Net sales amounted to SEK 20,427m\" is present and new MSEK narrative pattern captures 20,427 -> 20427 MSEK.",
     "companies_also_helped": [
-      "HMS Networks AB (publ)",
-      "NCAB Group AB (publ)",
-      "BioGaia AB (publ)",
-      "Tele2 AB (publ)"
+      "Fabege AB (publ)",
+      "Getinge AB (publ)",
+      "Electrolux Professional AB (publ)",
+      "AB Industrivarden (publ)"
     ]
   },
   "regressions": [],
@@ -67,6 +68,16 @@
       "iteration": 4,
       "timestamp": "2026-04-15T08:19:27Z",
       "fix": "Betsson AB (publ)/ebit_msek",
+      "result": "code_fix_applied",
+      "completeness_before": 0.7318840579710145,
+      "files_changed": [
+        "src/extraction/field-extractor.ts"
+      ]
+    },
+    {
+      "iteration": 5,
+      "timestamp": "2026-04-15T08:22:11Z",
+      "fix": "Svenska Cellulosa Aktiebolaget SCA (publ)/revenue_msek",
       "result": "code_fix_applied",
       "completeness_before": 0.7318840579710145,
       "files_changed": [

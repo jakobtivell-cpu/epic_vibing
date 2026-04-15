@@ -490,6 +490,20 @@ function findNarrativeBsekRevenueHit(text: string): NarrativeBsekHit | null {
     },
   ];
 
+  // Some annual reports summarize consolidated revenue in MSEK-style narrative,
+  // e.g. "Net sales amounted to SEK 20,427m", which is a strong fallback when
+  // table OCR collapses multi-year columns.
+  const msekNarrativePatterns: Pat[] = [
+    {
+      re: /\bnet\s+sales\s+amounted\s+to\s+SEK\s*(\d{1,3}(?:,\d{3})+)\s*m\b/gi,
+      label: 'net sales … SEK … m',
+    },
+    {
+      re: /\brevenue\s+amounted\s+to\s+SEK\s*(\d{1,3}(?:,\d{3})+)\s*m\b/gi,
+      label: 'revenue … SEK … m',
+    },
+  ];
+
   const tryPatterns = (patterns: Pat[]): NarrativeBsekHit | null => {
     for (const { re, label } of patterns) {
       re.lastIndex = 0;
@@ -512,8 +526,30 @@ function findNarrativeBsekRevenueHit(text: string): NarrativeBsekHit | null {
     }
     return null;
   };
+  const tryMsekPatterns = (patterns: Pat[]): NarrativeBsekHit | null => {
+    for (const { re, label } of patterns) {
+      re.lastIndex = 0;
+      let match;
+      while ((match = re.exec(text)) !== null) {
+        const contextStart = Math.max(0, match.index - 80);
+        const ctx = text.substring(contextStart, match.index + match[0].length + 40);
+        if (NARRATIVE_REVENUE_BAD_CONTEXT.test(ctx)) continue;
 
-  return tryPatterns(salesPatterns) ?? tryPatterns(genericPatterns);
+        const raw = match[1].replace(/,/g, '');
+        const val = parseFloat(raw);
+        if (!isNaN(val) && isFinite(val) && val >= 1_000 && val <= 5_000_000) {
+          return {
+            msek: Math.round(val),
+            matchedLabel: label,
+            rawSnippet: match[0].trim().substring(0, 160),
+          };
+        }
+      }
+    }
+    return null;
+  };
+
+  return tryPatterns(salesPatterns) ?? tryPatterns(genericPatterns) ?? tryMsekPatterns(msekNarrativePatterns);
 }
 
 

@@ -436,9 +436,19 @@ interface NarrativeBsekHit {
   rawSnippet: string;
 }
 
+interface NarrativeEmployeeHit {
+  employees: number;
+  matchedLabel: string;
+  rawSnippet: string;
+}
+
 
 function isPlausibleBsekBillions(val: number): boolean {
   return !isNaN(val) && val >= 1 && val <= 2_000;
+}
+
+function isPlausibleNarrativeEmployees(val: number): boolean {
+  return Number.isFinite(val) && val >= 50 && val <= 700_000;
 }
 
 const NARRATIVE_REVENUE_BAD_CONTEXT =
@@ -550,6 +560,40 @@ function findNarrativeBsekRevenueHit(text: string): NarrativeBsekHit | null {
   };
 
   return tryPatterns(salesPatterns) ?? tryPatterns(genericPatterns) ?? tryMsekPatterns(msekNarrativePatterns);
+}
+
+function findNarrativeEmployeeHit(text: string): NarrativeEmployeeHit | null {
+  type Pat = { re: RegExp; label: string };
+  const patterns: Pat[] = [
+    {
+      re: /\bon\s+average,\s+the\s+group\s+had\s+(\d{2,3}(?:,\d{3})*|\d{2,6})(?:\s*\([\d,\s]{2,12}\))?\s+employees\b/gi,
+      label: 'on average, the group had ... employees',
+    },
+    {
+      re: /\bthe\s+group\s+had\s+(\d{2,3}(?:,\d{3})*|\d{2,6})(?:\s*\([\d,\s]{2,12}\))?\s+employees\b/gi,
+      label: 'the group had ... employees',
+    },
+    {
+      re: /\baverage\s+number\s+of\s+employees(?:\s+was|\s+were|\s*[:=])?\s*(\d{2,3}(?:,\d{3})*|\d{2,6})\b/gi,
+      label: 'average number of employees',
+    },
+  ];
+
+  for (const { re, label } of patterns) {
+    re.lastIndex = 0;
+    let match;
+    while ((match = re.exec(text)) !== null) {
+      const raw = match[1].replace(/,/g, '');
+      const val = parseInt(raw, 10);
+      if (!isPlausibleNarrativeEmployees(val)) continue;
+      return {
+        employees: val,
+        matchedLabel: label,
+        rawSnippet: match[0].trim().substring(0, 180),
+      };
+    }
+  }
+  return null;
 }
 
 
@@ -2709,6 +2753,20 @@ export function extractFields(
   } else {
     notes.push(`Employee count not found for ${companyName}`);
     log.warn(`Employees not found for ${companyName}`);
+    const narrativeEmp = findNarrativeEmployeeHit(text);
+    if (narrativeEmp !== null) {
+      employees = narrativeEmp.employees;
+      empProvenance = {
+        matchedLabel: narrativeEmp.matchedLabel,
+        rawSnippet: narrativeEmp.rawSnippet,
+        lineIndex: 0,
+        context: 'management-section',
+      };
+      notes.push(
+        `Employees from narrative (${narrativeEmp.matchedLabel}): ${narrativeEmp.employees}`,
+      );
+      log.info(`Employees from narrative fallback: ${narrativeEmp.employees}`);
+    }
   }
 
   // --- CEO ---

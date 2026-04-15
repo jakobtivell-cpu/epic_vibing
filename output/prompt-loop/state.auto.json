@@ -1,5 +1,5 @@
 {
-  "iteration": 6,
+  "iteration": 7,
   "completeness_rate": 0.7318840579710145,
   "companies_total": 138,
   "companies_100pct": 101,
@@ -10,23 +10,24 @@
     "Bure Equity AB (publ)/revenue_msek",
     "Betsson AB (publ)/ebit_msek",
     "Svenska Cellulosa Aktiebolaget SCA (publ)/revenue_msek",
-    "HMS Networks AB (publ)/ebit_msek"
+    "HMS Networks AB (publ)/ebit_msek",
+    "Bonesupport Holding AB (publ)/employees"
   ],
   "last_fix": {
-    "company": "HMS Networks AB (publ)",
-    "field": "ebit_msek",
-    "root_cause": "EBIT matcher could select narrative sensitivity lines like \"positive impact on operating profit of SEK ...\" instead of the income-statement EBIT row, producing inflated proxy values that were discarded.",
+    "company": "Bonesupport Holding AB (publ)",
+    "field": "employees",
+    "root_cause": "Employee extraction relied on label-led table rows and missed narrative phrasing where the value appears before the word employees (\"the Group had 148 ... employees\").",
     "files_changed": [
       "src/extraction/field-extractor.ts"
     ],
     "result": "code_fix_applied",
-    "verification_method": "Cached-text pattern verification on cache/hms_networks_ab_publ-2025.txt plus wrapped TypeScript check.",
-    "verification_output": "Confirmed line \"positive impact on operating profit of SEK 46,740\" exists in HMS cache and new EBIT exclusion regex now flags this narrative context, preventing it from being selected as EBIT.",
+    "verification_method": "Cached-text regex verification on cache/bonesupport_holding_ab_publ-2025.txt plus wrapped TypeScript check.",
+    "verification_output": "Confirmed narrative line \"On average, the Group had 148 (135) employees\" is present and new fallback regex captures employee count 148.",
     "companies_also_helped": [
-      "NCAB Group AB (publ)",
-      "Tele2 AB (publ)",
-      "Trelleborg AB (publ)",
-      "Alleima AB (publ)"
+      "Camurus AB (publ)",
+      "Hoist Finance AB (publ)",
+      "Invisio AB (publ)",
+      "Nordnet AB (publ)"
     ]
   },
   "regressions": [],
@@ -89,6 +90,16 @@
       "iteration": 6,
       "timestamp": "2026-04-15T08:24:48Z",
       "fix": "HMS Networks AB (publ)/ebit_msek",
+      "result": "code_fix_applied",
+      "completeness_before": 0.7318840579710145,
+      "files_changed": [
+        "src/extraction/field-extractor.ts"
+      ]
+    },
+    {
+      "iteration": 7,
+      "timestamp": "2026-04-15T08:27:05Z",
+      "fix": "Bonesupport Holding AB (publ)/employees",
       "result": "code_fix_applied",
       "completeness_before": 0.7318840579710145,
       "files_changed": [

@@ -566,6 +566,14 @@ function findNarrativeEmployeeHit(text: string): NarrativeEmployeeHit | null {
   type Pat = { re: RegExp; label: string };
   const patterns: Pat[] = [
     {
+      re: /\b(?:in\s+\d{4},\s+)?the\s+number\s+of\s+employees\s+increased\s+from\s+(?:\d{2,3}(?:,\d{3})*|\d{2,6})\s+to\s+(\d{2,3}(?:,\d{3})*|\d{2,6})\b/gi,
+      label: 'number of employees increased from ... to ...',
+    },
+    {
+      re: /\bantalet\s+anst[aä]llda\s+[oö]kade\s+fr[aå]n\s+(?:\d{2,3}(?:,\d{3})*|\d{2,6})\s+till\s+(\d{2,3}(?:,\d{3})*|\d{2,6})\b/gi,
+      label: 'antalet anställda ökade från ... till ...',
+    },
+    {
       re: /\bon\s+average,\s+the\s+group\s+had\s+(\d{2,3}(?:,\d{3})*|\d{2,6})(?:\s*\([\d,\s]{2,12}\))?\s+employees\b/gi,
       label: 'on average, the group had ... employees',
     },

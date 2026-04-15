@@ -1,5 +1,5 @@
 {
-  "iteration": 10,
+  "iteration": 11,
   "completeness_rate": 0.7318840579710145,
   "companies_total": 138,
   "companies_100pct": 101,
@@ -14,23 +14,24 @@
     "Bonesupport Holding AB (publ)/employees",
     "AB Industrivarden (publ)/revenue_msek",
     "Nordnet AB (publ)/employees",
-    "Kinnevik AB/revenue_msek"
+    "Kinnevik AB/revenue_msek",
+    "Camurus AB (publ)/employees"
   ],
   "last_fix": {
-    "company": "Kinnevik AB",
-    "field": "revenue_msek",
-    "root_cause": "Investment-company revenue labels missed \"other operating income\" wording, so valid revenue-equivalent lines in annual reports were not matched.",
+    "company": "Camurus AB (publ)",
+    "field": "employees",
+    "root_cause": "Narrative employee fallback missed common \"number of employees increased from X to Y\" phrasing, so employee counts stayed null when table hits were unusable.",
     "files_changed": [
-      "src/extraction/labels.ts"
+      "src/extraction/field-extractor.ts"
     ],
     "result": "code_fix_applied",
-    "verification_method": "Cached-text label verification on cache/kinnevik_ab-2025.txt plus wrapped TypeScript check.",
-    "verification_output": "Confirmed Kinnevik cached report contains \"Other Operating Income1019\" and new investment labels now include both \"other operating income\" and \"ovriga rorelseintakter\" for matching this pattern.",
+    "verification_method": "Cached-text regex verification on cache/camurus_ab_publ-2024.txt plus wrapped TypeScript check.",
+    "verification_output": "Confirmed cache contains \"In 2024, the number of employees increased from 213 to 256\" and new narrative patterns capture the trailing value (256) from this wording.",
     "companies_also_helped": [
-      "AB Industrivarden (publ)",
-      "Bure Equity AB (publ)",
-      "L E Lundbergforetagen AB (publ)",
-      "Modern Times Group MTG AB"
+      "Atrium Ljungberg AB (publ)",
+      "Hoist Finance AB (publ)",
+      "Invisio AB (publ)",
+      "Nokia Oyj"
     ]
   },
   "regressions": [],
@@ -137,6 +138,16 @@
       "completeness_before": 0.7318840579710145,
       "files_changed": [
         "src/extraction/labels.ts"
+      ]
+    },
+    {
+      "iteration": 11,
+      "timestamp": "2026-04-15T08:58:02Z",
+      "fix": "Camurus AB (publ)/employees",
+      "result": "code_fix_applied",
+      "completeness_before": 0.7318840579710145,
+      "files_changed": [
+        "src/extraction/field-extractor.ts"
       ]
     }
   ]

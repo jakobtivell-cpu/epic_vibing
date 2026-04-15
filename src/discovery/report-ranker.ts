@@ -35,10 +35,10 @@ function extractYear(text: string): number | null {
 
 function yearScore(year: number | null): number {
   if (year === null) return 0;
-  if (year === MOST_RECENT_FISCAL_YEAR || year === CURRENT_YEAR) return 5;
-  if (year === MOST_RECENT_FISCAL_YEAR - 1) return 2;
+  if (year === MOST_RECENT_FISCAL_YEAR || year === CURRENT_YEAR) return 50;
+  if (year === MOST_RECENT_FISCAL_YEAR - 1) return 20;
   const age = MOST_RECENT_FISCAL_YEAR - year;
-  if (age > 2) return -5 * (age - 2);
+  if (age > 2) return -30;
   return 0;
 }
 
@@ -168,7 +168,7 @@ function urlScore(href: string): number {
 
   const urlYear = extractYear(href);
   if (urlYear !== null) {
-    if (urlYear === MOST_RECENT_FISCAL_YEAR || urlYear === CURRENT_YEAR) score += 2;
+    if (urlYear === MOST_RECENT_FISCAL_YEAR || urlYear === CURRENT_YEAR) score += 10;
   }
 
   return score;
@@ -225,7 +225,11 @@ function scoreLinkCandidate(
   score += sustainabilityPenalty(text);
 
   const textYear = extractYear(text);
-  score += yearScore(textYear);
+  const textYearPts = yearScore(textYear);
+  score += textYearPts;
+  if (textYear !== null) {
+    log.debug(`Candidate year=${textYear} textYearScore=${textYearPts} — "${text.substring(0, 80)}"`);
+  }
 
   score += urlScore(resolved);
   score += contextScore($, el);

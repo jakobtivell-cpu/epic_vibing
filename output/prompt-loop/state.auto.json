@@ -1,5 +1,5 @@
 {
-  "iteration": 11,
+  "iteration": 12,
   "completeness_rate": 0.7318840579710145,
   "companies_total": 138,
   "companies_100pct": 101,
@@ -15,23 +15,24 @@
     "AB Industrivarden (publ)/revenue_msek",
     "Nordnet AB (publ)/employees",
     "Kinnevik AB/revenue_msek",
-    "Camurus AB (publ)/employees"
+    "Camurus AB (publ)/employees",
+    "Avanza Bank Holding AB (publ)/ebit_msek"
   ],
   "last_fix": {
-    "company": "Camurus AB (publ)",
-    "field": "employees",
-    "root_cause": "Narrative employee fallback missed common \"number of employees increased from X to Y\" phrasing, so employee counts stayed null when table hits were unusable.",
+    "company": "Avanza Bank Holding AB (publ)",
+    "field": "ebit_msek",
+    "root_cause": "Bank revenue-equivalent labels missed \"rorelsens intakter\" phrasing, so low lines like net interest income were picked and downstream EBIT plausibility checks became over-restrictive.",
     "files_changed": [
-      "src/extraction/field-extractor.ts"
+      "src/extraction/labels.ts"
     ],
     "result": "code_fix_applied",
-    "verification_method": "Cached-text regex verification on cache/camurus_ab_publ-2024.txt plus wrapped TypeScript check.",
-    "verification_output": "Confirmed cache contains \"In 2024, the number of employees increased from 213 to 256\" and new narrative patterns capture the trailing value (256) from this wording.",
+    "verification_method": "Cached-text label verification on cache/avanza_bank_holding_ab_publ-2025.txt plus wrapped TypeScript check.",
+    "verification_output": "Confirmed Avanza cache contains \"R?relsens int?kter4 495...\" and bank primary revenue labels now include \"r?relsens int?kter\"/\"summa r?relsens int?kter\"/\"totala r?relsens int?kter\" plus \"operating income\".",
     "companies_also_helped": [
-      "Atrium Ljungberg AB (publ)",
-      "Hoist Finance AB (publ)",
-      "Invisio AB (publ)",
-      "Nokia Oyj"
+      "Nordea Bank Abp",
+      "Skandinaviska Enskilda Banken AB (publ)",
+      "Noba Bank Group AB (publ)",
+      "Swedbank AB (publ)"
     ]
   },
   "regressions": [],
@@ -148,6 +149,16 @@
       "completeness_before": 0.7318840579710145,
       "files_changed": [
         "src/extraction/field-extractor.ts"
+      ]
+    },
+    {
+      "iteration": 12,
+      "timestamp": "2026-04-15T09:02:33Z",
+      "fix": "Avanza Bank Holding AB (publ)/ebit_msek",
+      "result": "code_fix_applied",
+      "completeness_before": 0.7318840579710145,
+      "files_changed": [
+        "src/extraction/labels.ts"
       ]
     }
   ]

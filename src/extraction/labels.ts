@@ -101,9 +101,13 @@ export const INDUSTRIAL_LABELS: LabelSet = {
  */
 export const BANK_REVENUE_LABELS_PRIMARY: string[] = [
   'rörelseintäkter',
+  'rörelsens intäkter',
   'summa rörelseintäkter',
+  'summa rörelsens intäkter',
   'totala rörelseintäkter',
+  'totala rörelsens intäkter',
   'total operating income',
+  'operating income',
   'net operating income',
   'net commission income',
   'provision net',

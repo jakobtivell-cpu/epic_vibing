@@ -5,6 +5,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { createHash } from 'crypto';
 import { StageResult } from '../types';
 import { DOWNLOADS_DIR, PDF_DOWNLOAD_TIMEOUT_MS } from '../config/settings';
 import { fetchBinary } from '../utils/http-client';
@@ -19,10 +20,16 @@ function sanitizeTicker(ticker: string): string {
     .replace(/[^a-z0-9_]/g, '');
 }
 
-function buildFilename(ticker: string, year: number | null, suffix: string): string {
+function urlHash8(url: string): string {
+  return createHash('sha256').update(url).digest('hex').substring(0, 8);
+}
+
+function buildFilename(ticker: string, year: number | null, suffix: string, url: string): string {
   const slug = sanitizeTicker(ticker);
-  const yearStr = year !== null ? String(year) : 'unknown_year';
-  return `${slug}_${yearStr}_${suffix}.pdf`;
+  if (year !== null) {
+    return `${slug}_${String(year)}_${suffix}.pdf`;
+  }
+  return `${slug}_unknown_year_${urlHash8(url)}_${suffix}.pdf`;
 }
 
 export async function downloadPdf(
@@ -33,7 +40,7 @@ export async function downloadPdf(
   suffix: string = 'annual_report',
 ): Promise<StageResult<string>> {
   const start = Date.now();
-  const filename = buildFilename(ticker, fiscalYear, suffix);
+  const filename = buildFilename(ticker, fiscalYear, suffix, url);
   const filepath = path.join(DOWNLOADS_DIR, filename);
 
   if (!fs.existsSync(DOWNLOADS_DIR)) {

@@ -15,6 +15,7 @@
     "test": "jest",
     "test:all-companies": "node scripts/test-all-companies.cjs",
     "test:e2e-all-tickers": "node scripts/run-all-ticker-e2e.cjs",
+    "test:overnight": "node scripts/run-overnight-scrape.cjs",
     "test:e2e-partial-subset": "node scripts/run-partial-subset-e2e.cjs",
     "analyze:quality": "node scripts/analyze-results-quality.cjs",
     "analyze:null-ledger": "node scripts/analyze-results-quality.cjs --write-ledger",

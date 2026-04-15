@@ -1,0 +1,54 @@
+{
+  "iteration": 2,
+  "completeness_rate": 0.7318840579710145,
+  "companies_total": 138,
+  "companies_100pct": 101,
+  "stage": "fix",
+  "attempted_targets": [
+    "Skandinaviska Enskilda Banken AB (publ)/ebit_msek",
+    "Beijer Ref AB (publ)/ebit_msek"
+  ],
+  "last_fix": {
+    "company": "Beijer Ref AB (publ)",
+    "field": "ebit_msek",
+    "root_cause": "OCR-collapsed two-year KSEK rows (e.g. \"Operating profit 567 114 481 414\") were interpreted as a single inflated EBIT token; year headers with single spaces were also under-detected.",
+    "files_changed": [
+      "src/extraction/field-extractor.ts"
+    ],
+    "result": "code_fix_applied",
+    "verification_method": "Cached-text verification on cache/beijer_ref_ab_publ-unknown_year.txt plus wrapped TypeScript check.",
+    "verification_output": "Confirmed target row \"Operating profit 567 114 481 414\" and \"Financial review 2015 2014\" header shape; new year-token parsing captures [2015,2014], and new EBIT megascale guard converts 481414 -> 481 when revenue is 6595.",
+    "companies_also_helped": [
+      "Betsson AB (publ)",
+      "NCAB Group AB (publ)",
+      "BioGaia AB (publ)",
+      "HMS Networks AB (publ)"
+    ]
+  },
+  "regressions": [],
+  "history": [
+    {
+      "iteration": 1,
+      "timestamp": "2026-04-15T05:29:00.000Z",
+      "fix": "Skandinaviska Enskilda Banken AB (publ)/ebit_msek",
+      "result": "fixed",
+      "completeness_before": 0.463768115942029,
+      "completeness_after": 0.4782608695652174,
+      "files_changed": [
+        "src/extraction/field-extractor.ts",
+        "src/extraction/ebit-repair.ts",
+        "src/validation/validator.ts"
+      ]
+    },
+    {
+      "iteration": 2,
+      "timestamp": "2026-04-15T08:10:26Z",
+      "fix": "Beijer Ref AB (publ)/ebit_msek",
+      "result": "code_fix_applied",
+      "completeness_before": 0.7318840579710145,
+      "files_changed": [
+        "src/extraction/field-extractor.ts"
+      ]
+    }
+  ]
+}

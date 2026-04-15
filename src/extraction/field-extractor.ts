@@ -21,7 +21,10 @@ import {
   LabelSet,
 } from './labels';
 import { createLogger } from '../utils/logger';
-import { EUR_MILLIONS_TO_MSEK_APPROX } from '../config/settings';
+import {
+  EUR_MILLIONS_TO_MSEK_APPROX,
+  USD_MILLIONS_TO_MSEK_APPROX,
+} from '../config/settings';
 import { parseNumber } from './number-parse';
 import { applyRevenueMegascaleMsekGuard, isFusedYearIntegerCorruption } from './number-guards';
 import {
@@ -167,13 +170,29 @@ export interface NumberPickContext {
 function parseYearSequenceFromHeaderLine(line: string): number[] {
   const t = line.trim();
   if (t.length > 220) return [];
+  // OCR / tight tables: "20242023" on one token (no whitespace between fiscal years).
+  if (/^20(1\d|2\d)20(1\d|2\d)$/.test(t)) {
+    const y1 = parseInt(t.slice(0, 4), 10);
+    const y2 = parseInt(t.slice(4, 8), 10);
+    if (y1 >= 2010 && y1 <= 2035 && y2 >= 2010 && y2 <= 2035 && Math.abs(y1 - y2) <= 2) {
+      return [y1, y2];
+    }
+  }
+  // Most table headers are columnar (multi-space / tabs), but OCR often collapses
+  // them into single spaces (e.g. "SEK K Note 2015 2014"). Keep the strict pass
+  // first, then fall back to scanning all year tokens in the line.
   const parts = t.split(/\s{2,}|\t+/).map((p) => p.trim()).filter(Boolean);
-  const years: number[] = [];
+  const strictYears: number[] = [];
   for (const p of parts) {
     const m = p.match(/\b(20[12]\d)\b/);
-    if (m) years.push(parseInt(m[1], 10));
+    if (m) strictYears.push(parseInt(m[1], 10));
   }
-  return years.length >= 2 ? years : [];
+  if (strictYears.length >= 2) return strictYears;
+
+  const tokenYears = Array.from(t.matchAll(/\b(20[12]\d)\b/g))
+    .map((m) => parseInt(m[1], 10))
+    .filter((y) => y >= 2010 && y <= 2035);
+  return tokenYears.length >= 2 ? tokenYears : [];
 }
 
 function yearHeaderLinesAbove(lines: string[], lineIndex: number): string[] {
@@ -221,12 +240,12 @@ function selectBestNumericFromCells(
     const seq = parseYearSequenceFromHeaderLine(hdr);
     if (seq.length < 2) continue;
 
+    const ordered = [...candidates].sort((a, b) => a.idx - b.idx);
     const tryYearColumn = (year: number): { cell: string; value: number } | null => {
       const yIdx = seq.lastIndexOf(year);
       if (yIdx < 0) return null;
-      const dataIdx = Math.min(yIdx, candidates.length - 1);
-      const chosen = candidates.find((c) => c.idx === dataIdx);
-      return chosen ?? null;
+      const col = Math.min(yIdx, ordered.length - 1);
+      return ordered[col] ?? null;
     };
 
     // Prefer the latest fiscal year column in the header (often rightmost current year).
@@ -280,7 +299,32 @@ function isPercentage(cell: string): boolean {
   return cell.includes('%');
 }
 
+/**
+ * ESEF / PDF tables often emit display years as "2025¹" or "2024)" — treat like a plain
+ * year token so column pickers do not select them as numeric data cells.
+ */
+function normalizedDisplayYearCore(cell: string): string | null {
+  const t = cell
+    .trim()
+    .replace(/[\u00B9\u00B2\u00B3\u2070-\u209F¹²³⁰⁴⁵⁶⁷⁸⁹]+/g, '')
+    .replace(/[)\],.;:]+$/g, '')
+    .trim();
+  if (/^20[12]\d$/.test(t)) return t;
+  return null;
+}
+
+/** Avoid "fte" matching inside Swedish "löften" / similar fused words. */
+function isShortSingleTokenLabelBounded(lineLower: string, labelIdx: number, label: string): boolean {
+  if (label.includes(' ') || label.length > 5) return true;
+  const letter = /[a-zåäöéüáóíúýæøœ]/;
+  const before = labelIdx === 0 ? ' ' : lineLower.charAt(labelIdx - 1);
+  const after =
+    labelIdx + label.length >= lineLower.length ? ' ' : lineLower.charAt(labelIdx + label.length);
+  return !letter.test(before) && !letter.test(after);
+}
+
 function isSkippableCell(cell: string): boolean {
+  if (normalizedDisplayYearCore(cell)) return true;
   if (/^20[12]\d$/.test(cell.trim())) return true;
   if (isFootnoteRef(cell)) return true;
   if (isNoteReference(cell)) return true;
@@ -293,7 +337,7 @@ function isSkippableCell(cell: string): boolean {
 // Unit-context detection — many reports state "amounts in MSEK" once
 // ---------------------------------------------------------------------------
 
-type UnitContext = 'msek' | 'bsek' | 'ksek' | 'sek' | 'eur_m';
+type UnitContext = 'msek' | 'bsek' | 'ksek' | 'sek' | 'eur_m' | 'usd_m' | 'usd_k';
 
 function firstMatchIndex(text: string, pattern: RegExp): number {
   const m = text.match(pattern);
@@ -348,6 +392,32 @@ function detectUnitContext(text: string): UnitContext | null {
         firstMatchIndex(lower, /\bmillion\s+euros?\b/),
         firstMatchIndex(lower, /\belopp\s+i\s+meur\b/),
         firstMatchIndex(lower, /\bi\s+miljoner\s+euro\b/),
+      ),
+    },
+    {
+      unit: 'usd_k',
+      idx: Math.min(
+        firstMatchIndex(lower, /\(in\s+thousands\s+of\s+u\.?s\.?\s*dollars/),
+        firstMatchIndex(lower, /amounts?\s+in\s+thousands?\s+of\s+(?:u\.?s\.?\s*)?dollars?\b/),
+        firstMatchIndex(lower, /amounts?\s+in\s+000s?\s+of\s+(?:u\.?s\.?\s*)?dollars?\b/),
+        firstMatchIndex(lower, /\bthousands?\s+of\s+(?:u\.?s\.?\s*)?dollars?\b/),
+        firstMatchIndex(lower, /\b000s?\s+of\s+u\.?s\.?\s*dollars?\b/),
+      ),
+    },
+    {
+      unit: 'usd_m',
+      idx: Math.min(
+        firstMatchIndex(
+          lower,
+          /amounts?\s+(?:expressed|stated|presented)\s+in\s+millions?\s+of\s+(?:united\s+states\s+)?dollars?\b/,
+        ),
+        firstMatchIndex(lower, /amounts?\s+in\s+millions?\s+of\s+(?:u\.?s\.?\s*)?dollars?\b/),
+        firstMatchIndex(lower, /\bin\s+millions?\s+of\s+(?:u\.?s\.?\s*)?dollars?\b/),
+        firstMatchIndex(lower, /\bu\.?s\.?\s*dollars?\s+in\s+millions?\b/),
+        firstMatchIndex(lower, /\busd\s*(?:million|millions|m)\b/),
+        firstMatchIndex(lower, /\bus\$\s*(?:million|millions|m)\b/),
+        firstMatchIndex(lower, /\bu\.?s\.?\s*\$\s*(?:million|millions|m)\b/),
+        firstMatchIndex(lower, /\bmillion\s+u\.?s\.?\s*dollars?\b/),
       ),
     },
   ];
@@ -457,6 +527,11 @@ function normalizeToMsek(value: number, unit: UnitContext | null): number {
       return value / 1_000_000;
     case 'eur_m':
       return Math.round(value * EUR_MILLIONS_TO_MSEK_APPROX);
+    case 'usd_m':
+      return Math.round(value * USD_MILLIONS_TO_MSEK_APPROX);
+    case 'usd_k':
+      // IFRS-style tables: figures in thousands of USD → convert via USD millions × SEK/USD.
+      return Math.round((value / 1000) * USD_MILLIONS_TO_MSEK_APPROX);
     case 'msek':
     default:
       return value;
@@ -468,10 +543,22 @@ function applyEbitMegascaleGuard(
   revenue: number | null,
 ): { ebit: number; adjusted: boolean } {
   if (!Number.isFinite(ebit)) return { ebit, adjusted: false };
-  if (Math.abs(ebit) < 1_000_000) return { ebit, adjusted: false };
   const candidate = Math.round(ebit / 1_000);
-  if (revenue === null) return { ebit, adjusted: false };
-  if (Math.abs(candidate) <= Math.abs(revenue) * 2 + 1) {
+  if (revenue === null) {
+    if (Math.abs(ebit) >= 1_000_000) return { ebit: candidate, adjusted: true };
+    return { ebit, adjusted: false };
+  }
+  if (Math.abs(ebit) >= 1_000_000 && Math.abs(candidate) <= Math.abs(revenue) * 2 + 1) {
+    return { ebit: candidate, adjusted: true };
+  }
+  // Common OCR/unit issue: KSEK two-year table values collapse into a single huge
+  // MSEK-looking number (e.g. "481 414" parsed as 481414). When this dominates
+  // revenue by a wide margin but ÷1000 lands in a plausible EBIT range, correct it.
+  if (
+    Math.abs(ebit) >= 100_000 &&
+    Math.abs(ebit) > Math.abs(revenue) * 8 + 1 &&
+    Math.abs(candidate) <= Math.abs(revenue) * 2 + 1
+  ) {
     return { ebit: candidate, adjusted: true };
   }
   return { ebit, adjusted: false };
@@ -488,6 +575,29 @@ function hasFusedYearRawArtifact(rawCell: string): boolean {
  * indicator is found. This prevents a global "BSEK" indicator from
  * being applied to a section that declares "Amounts in SEK m".
  */
+/**
+ * When the global/section unit is USD thousands (IFRS tables) but the matched line is
+ * clearly stated in USD millions (MD&A narrative), use millions scaling for that row.
+ */
+function resolveUsdAmountUnitForLine(
+  lines: string[],
+  lineIndex: number,
+  sectionUnit: UnitContext | null,
+): UnitContext | null {
+  if (sectionUnit !== 'usd_k' && sectionUnit !== 'usd_m') return sectionUnit;
+  const window = lines
+    .slice(Math.max(0, lineIndex - 1), Math.min(lines.length, lineIndex + 2))
+    .join(' ')
+    .toLowerCase();
+  if (
+    /\$\s*[\d][\d,]*(?:\.\d+)?\s+million\b/.test(window) ||
+    /\b\d[\d,]*(?:\.\d+)?\s+million\s+(?:u\.?s\.?\s*)?dollars?\b/.test(window)
+  ) {
+    return 'usd_m';
+  }
+  return sectionUnit;
+}
+
 function detectSectionUnitContext(
   lines: string[],
   start: number,
@@ -498,7 +608,10 @@ function detectSectionUnitContext(
   for (let i = Math.max(0, start - 3); i <= windowEnd; i++) {
     const line = lines[i];
     if (!line) continue;
-    const lineUnit = detectUnitContext(line);
+    const combinedNext = `${line} ${lines[i + 1] ?? ''}`;
+    const combinedPrev = `${lines[i - 1] ?? ''} ${line}`;
+    const lineUnit =
+      detectUnitContext(line) ?? detectUnitContext(combinedNext) ?? detectUnitContext(combinedPrev);
     if (lineUnit) {
       if (lineUnit !== globalUnit) {
         log.debug(
@@ -623,6 +736,7 @@ interface NumberMatch {
 /** Patterns that identify the start of a consolidated income statement section. */
 const INCOME_STATEMENT_PATTERNS: RegExp[] = [
   /consolidated\s+(?:statement\s+of\s+)?(?:income|profit|loss)/i,
+  /consolidated\s+statements?\s+of\s+(?:\(?(?:loss|profit|income)\)?\s+)?earnings/i,
   /consolidated\s+income\s+statement/i,
   /(?:income|profit\s+(?:and|&)\s+loss)\s+statement/i,
   /koncernens\s+resultaträkning/i,
@@ -907,7 +1021,27 @@ function stripLeadingNoteRef(text: string): string {
  */
 function splitIntoCells(text: string): string[] {
   const stdCells = text.split(/\s{2,}|\t+/).map((c) => c.trim()).filter(Boolean);
-  if (stdCells.length >= 2) return stdCells;
+  if (stdCells.length >= 2) {
+    // Tabular rows sometimes fuse a note ref with the first USD column, e.g.
+    // "(Note 19)$ 3,422,604" + "$ 2,743,444" after whitespace normalization — split on
+    // each "$ …" monetary column so multi-year pickers see one number per cell.
+    const expanded: string[] = [];
+    for (const c of stdCells) {
+      const fuseNoteOrMultiUsd =
+        /\)\s*\$\s*[-–−]?[\d]/i.test(c) || (c.match(/\$/g) ?? []).length >= 2;
+      if (!fuseNoteOrMultiUsd) {
+        expanded.push(c);
+        continue;
+      }
+      const chunks = c
+        .split(/(?=\$\s*[-–−]?[\d][\d,\s]*)/)
+        .map((x) => x.trim())
+        .filter(Boolean);
+      if (chunks.length > 1) expanded.push(...chunks);
+      else expanded.push(c);
+    }
+    return expanded.filter(Boolean);
+  }
 
   // Attempt ESEF-style reassembly: greedily combine digit groups
   // that form valid thousand-separated numbers (e.g. "168 343" → 168343).
@@ -959,6 +1093,8 @@ function findAllLabeledNumbers(
       if (labelLower === 'ebit' && lineLower.charAt(labelIdx + label.length) === 'a') {
         continue;
       }
+
+      if (!isShortSingleTokenLabelBounded(lineLower, labelIdx, labelLower)) continue;
 
       if (labelIdx >= 6) {
         const before = lineLower.substring(Math.max(0, labelIdx - 6), labelIdx).trim();
@@ -1045,6 +1181,30 @@ function pickNumberFromLabelTail(
     if (gluedPick !== null) return gluedPick;
   }
 
+  const fusedFourDigitCells = extractFusedFourDigitPairCells(tail);
+  if (fusedFourDigitCells.length >= 2) {
+    const fusedPick = selectBestNumericFromCells(
+      fusedFourDigitCells,
+      lines,
+      lineIndex,
+      opts,
+      pickContext,
+    );
+    if (fusedPick !== null) return fusedPick;
+  }
+
+  const fusedThreeDigitCells = extractFusedThreeDigitPairCells(tail);
+  if (fusedThreeDigitCells.length >= 2) {
+    const fusedPick = selectBestNumericFromCells(
+      fusedThreeDigitCells,
+      lines,
+      lineIndex,
+      opts,
+      pickContext,
+    );
+    if (fusedPick !== null) return fusedPick;
+  }
+
   let chosen = selectBestNumericFromCells(splitIntoCells(tail), lines, lineIndex, opts, pickContext);
   if (chosen !== null && /\d\s+\d/.test(chosen.cell) && (chosen.cell.match(/\s+/g) ?? []).length >= 2) {
     const reconstructed = selectBestNumericFromCells(
@@ -1073,6 +1233,7 @@ function pickNumberFromLabelTail(
 
   const directTokens = extractNumberTokens(afterLabel);
   for (const token of directTokens) {
+    if (normalizedDisplayYearCore(token)) continue;
     if (/^20[12]\d$/.test(token)) continue;
     const value = parseNumber(token);
     if (value === null) continue;
@@ -1080,16 +1241,65 @@ function pickNumberFromLabelTail(
     return { cell: token, value };
   }
 
+  const fyPick = pickContext?.preferredFiscalYear ?? null;
+  const isMisreadYearValue = (val: number): boolean => {
+    const v = Math.round(val);
+    if (!Number.isFinite(v) || v < 1900 || v > 2100) return false;
+    if (fyPick == null) return false;
+    return v === fyPick || v === fyPick - 1 || v === fyPick + 1;
+  };
+
+  /** Swedish / English consolidated rows: "Moderbolaget1504915449" → first 3-digit column. */
+  const tryParentCompanyFusedHeadcount = (mergedBody: string): { cell: string; value: number } | null => {
+    const hit = mergedBody.match(/(?:moderbolaget|parent\s+company)\D*/i);
+    if (!hit || hit.index === undefined) return null;
+    const rest = mergedBody.slice(hit.index + hit[0].length).trim();
+    let m = rest.match(/^(\d{3})(?=\d{6,})/);
+    if (!m) m = rest.match(/^(\d{3,5})(?=\s|[,]|$)/);
+    if (!m) return null;
+    const value = parseNumber(m[1]);
+    if (value === null || value < minValue || value > maxValue) return null;
+    if (isMisreadYearValue(value)) return null;
+    return { cell: m[1], value };
+  };
+
   if (lineIndex + 1 < lines.length) {
-    const merged = `${afterLabel}  ${lines[lineIndex + 1]}`;
-    chosen = selectBestNumericFromCells(
-      splitIntoCells(merged.trim()),
-      lines,
-      lineIndex,
-      opts,
-      pickContext,
-    );
-    if (chosen !== null) return chosen;
+    if (!tail) {
+      const buf: string[] = [];
+      for (let j = 1; j <= 12 && lineIndex + j < lines.length; j++) {
+        const seg = lines[lineIndex + j].trim();
+        if (!seg) continue;
+        if (/^[\)\],.:;–\-]+$/.test(seg)) continue;
+        if (normalizedDisplayYearCore(seg)) continue;
+        buf.push(seg);
+        const mergedBody = buf.join('  ').trim();
+        if (!mergedBody) continue;
+
+        chosen = selectBestNumericFromCells(
+          splitIntoCells(mergedBody),
+          lines,
+          lineIndex,
+          opts,
+          pickContext,
+        );
+        if (chosen !== null && !isMisreadYearValue(chosen.value)) {
+          return chosen;
+        }
+
+        const parentPick = tryParentCompanyFusedHeadcount(mergedBody);
+        if (parentPick !== null) return parentPick;
+      }
+    } else {
+      const merged = `${afterLabel}  ${lines[lineIndex + 1]}`;
+      chosen = selectBestNumericFromCells(
+        splitIntoCells(merged.trim()),
+        lines,
+        lineIndex,
+        opts,
+        pickContext,
+      );
+      if (chosen !== null) return chosen;
+    }
   }
 
   return null;
@@ -1102,6 +1312,42 @@ function extractGluedPairThousandCells(tail: string): string[] {
   const a = m[1].replace(/\s+/g, ' ').trim();
   const b = m[2].replace(/\s+/g, ' ').trim();
   if (!/\d/.test(a) || !/\d/.test(b)) return [];
+  return [a, b];
+}
+
+/**
+ * Handles OCR-fused two-year 4-digit cells like "13791 278" where intended
+ * values are "1379" and "1278".
+ */
+function extractFusedFourDigitPairCells(tail: string): string[] {
+  const t = tail.replace(/\u00A0/g, ' ').replace(/[−–]/g, '-').trim();
+  const m = t.match(/^(-?)(\d{5})\s+(\d{3})(?!\d)/);
+  if (!m) return [];
+  const sign = m[1];
+  const first5 = m[2];
+  const trailing3 = m[3];
+  const a = `${sign}${first5.slice(0, 4)}`;
+  const b = `${sign}${first5.slice(4)}${trailing3}`;
+  if (!/^-?\d{4}$/.test(a) || !/^-?\d{4}$/.test(b)) return [];
+  return [a, b];
+}
+
+/**
+ * Handles OCR-fused two-year 3-digit cells like "579708" where intended
+ * values are "579" and "708".
+ */
+function extractFusedThreeDigitPairCells(tail: string): string[] {
+  const t = tail.replace(/\u00A0/g, ' ').replace(/[−–]/g, '-').trim();
+  const m = t.match(/^(-?)(\d{6})(?!\d)/);
+  if (!m) return [];
+  const sign = m[1];
+  const six = m[2];
+  const trailing = six.slice(3);
+  // Avoid splitting a likely genuine thousand value like "100000".
+  if (/^0{3}$/.test(trailing)) return [];
+  const a = `${sign}${six.slice(0, 3)}`;
+  const b = `${sign}${trailing}`;
+  if (!/^-?\d{3}$/.test(a) || !/^-?\d{3}$/.test(b)) return [];
   return [a, b];
 }
 
@@ -1172,6 +1418,8 @@ function scanForNumber(
       if (labelLower === 'ebit' && lineLower.charAt(labelIdx + label.length) === 'a') {
         continue;
       }
+
+      if (!isShortSingleTokenLabelBounded(lineLower, labelIdx, labelLower)) continue;
 
       if (labelIdx >= 6) {
         const before = lineLower.substring(Math.max(0, labelIdx - 6), labelIdx).trim();
@@ -1884,6 +2132,25 @@ function extractEbitWithStrategies(
   bankScan: ScanConstraints,
 ): { msek: number | null; match: NumberMatch | null; extraNotes: string[] } {
   const extraNotes: string[] = [];
+  const shouldRejectPrimaryEbitAsImplausible = (candidateMsek: number): boolean => {
+    if (revenue === null || revenue <= 0) return false;
+    const ratio = candidateMsek / Math.max(revenue, 1);
+    const absDelta = candidateMsek - revenue;
+
+    if (detectedType === 'bank') {
+      // Net interest income / fee lines mapped to revenue_msek are often mis-scaled or
+      // not comparable to consolidated operating profit — do not discard a good EBIT
+      // row solely because it dominates that proxy (e.g. SEB: NII misread vs op. result).
+      if (revenue < 10_000) return false;
+      return ratio > 1.35 && absDelta > 20_000;
+    }
+    if (detectedType === 'real_estate') {
+      return ratio > 3;
+    }
+    // Keep near-parity industrial rows, but reject clearly misaligned picks so
+    // fallback strategies (adjusted EBIT / EBITA) can run.
+    return ratio > 1.5 && absDelta > 5_000;
+  };
 
   const ebitPick: NumberPickContext = {
     preferredFiscalYear: fallbackFiscalYear,
@@ -1978,11 +2245,18 @@ function extractEbitWithStrategies(
         'EBIT estimated from profit before tax — bank reporting, no pure EBIT available',
       );
     }
-    return {
-      msek: normalizeEbitMatchToMsek(match, lines, unitContext),
-      match,
-      extraNotes,
-    };
+    const primaryMsek = normalizeEbitMatchToMsek(match, lines, unitContext);
+    if (shouldRejectPrimaryEbitAsImplausible(primaryMsek)) {
+      extraNotes.push(
+        `Primary EBIT candidate ${primaryMsek} MSEK from "${match.label}" rejected — implausibly above revenue ${revenue} MSEK; trying fallback strategies`,
+      );
+    } else {
+      return {
+        msek: primaryMsek,
+        match,
+        extraNotes,
+      };
+    }
   }
 
   const adjustedOpts: NumberSearchOpts = {
@@ -2099,7 +2373,14 @@ export function extractFields(
   if (detectedType === 'investment_company') {
     notes.push('Investment company — standard revenue not applicable');
   } else {
-    const revMin = unitContext === 'eur_m' ? 5 : detectedType === 'bank' ? 50 : 100;
+    const revMin =
+      unitContext === 'eur_m' || unitContext === 'usd_m'
+        ? 5
+        : unitContext === 'usd_k'
+          ? 200_000
+          : detectedType === 'bank'
+            ? 50
+            : 100;
     if (detectedType === 'bank') {
       revMatch = findFinancialNumberPhased(
         lines,
@@ -2134,7 +2415,7 @@ export function extractFields(
       }
     }
     if (revMatch !== null) {
-      const revUnit = revMatch.sectionRange
+      let revUnit = revMatch.sectionRange
         ? detectSectionUnitContext(lines, revMatch.sectionRange.start, revMatch.sectionRange.end, unitContext)
         : detectSectionUnitContext(
             lines,
@@ -2142,6 +2423,7 @@ export function extractFields(
             Math.min(lines.length - 1, revMatch.lineIndex + 2),
             unitContext,
           );
+      revUnit = resolveUsdAmountUnitForLine(lines, revMatch.lineIndex, revUnit);
       revenue = Math.round(normalizeToMsek(revMatch.value, revUnit));
       revProvenance = numMatchToProvenance(revMatch);
       log.info(`Revenue: ${revenue} MSEK`);
@@ -2151,6 +2433,16 @@ export function extractFields(
       if (revUnit === 'eur_m') {
         notes.push(
           `Revenue converted from EUR millions using approximate EUR/SEK ${EUR_MILLIONS_TO_MSEK_APPROX} — verify report footnote`,
+        );
+      }
+      if (revUnit === 'usd_m') {
+        notes.push(
+          `Revenue converted from USD millions using approximate USD/SEK ${USD_MILLIONS_TO_MSEK_APPROX} — verify report footnote`,
+        );
+      }
+      if (revUnit === 'usd_k') {
+        notes.push(
+          `Revenue converted from USD thousands (÷1000 → millions) using approximate USD/SEK ${USD_MILLIONS_TO_MSEK_APPROX} — verify report footnote`,
         );
       }
     }
@@ -2228,10 +2520,25 @@ export function extractFields(
             unitContext,
           )
         : unitContext;
-    if (ebitUnit === 'eur_m' && !/margin|× revenue/i.test(ebitOutcome.match.rawCell)) {
-      notes.push(
-        `EBIT converted from EUR millions using approximate EUR/SEK ${EUR_MILLIONS_TO_MSEK_APPROX} — verify report footnote`,
-      );
+    if (
+      (ebitUnit === 'eur_m' || ebitUnit === 'usd_m' || ebitUnit === 'usd_k') &&
+      !/margin|× revenue/i.test(ebitOutcome.match.rawCell)
+    ) {
+      if (ebitUnit === 'eur_m') {
+        notes.push(
+          `EBIT converted from EUR millions using approximate EUR/SEK ${EUR_MILLIONS_TO_MSEK_APPROX} — verify report footnote`,
+        );
+      }
+      if (ebitUnit === 'usd_m') {
+        notes.push(
+          `EBIT converted from USD millions using approximate USD/SEK ${USD_MILLIONS_TO_MSEK_APPROX} — verify report footnote`,
+        );
+      }
+      if (ebitUnit === 'usd_k') {
+        notes.push(
+          `EBIT converted from USD thousands (÷1000 → millions) using approximate USD/SEK ${USD_MILLIONS_TO_MSEK_APPROX} — verify report footnote`,
+        );
+      }
     }
     }
   } else {
@@ -2240,6 +2547,7 @@ export function extractFields(
   }
 
   // --- Employees ---
+  const empScan = detectedType === 'bank' ? bankScan : SCAN_DEFAULT;
   const empMatch = findLabeledNumber(
     lines,
     labels.employees,
@@ -2248,11 +2556,44 @@ export function extractFields(
       maxValue: 1_000_000,
     },
     tablePickBase,
-    detectedType === 'bank' ? bankScan : SCAN_DEFAULT,
+    empScan,
   );
+
+  const isFiscalYearMisreadAsEmployees = (val: number, fy: number | null): boolean => {
+    const v = Math.round(val);
+    if (!Number.isFinite(v) || v < 1900 || v > 2100) return false;
+    if (fy == null) return false;
+    return fy === v || fy === v - 1 || fy === v + 1;
+  };
+
+  let workingEmpMatch: NumberMatch | null = empMatch;
+  if (
+    workingEmpMatch !== null &&
+    isFiscalYearMisreadAsEmployees(workingEmpMatch.value, fallbackFiscalYear)
+  ) {
+    const bad = Math.round(workingEmpMatch.value);
+    notes.push(`Employee count ${bad} discarded — likely fiscal-year column misread`);
+    log.warn(`Employees ${bad} looks like fiscal year ${fallbackFiscalYear ?? 'n/a'} — discarding`);
+    const pool = findAllLabeledNumbers(
+      lines,
+      labels.employees,
+      { minValue: 100, maxValue: 1_000_000 },
+      tablePickBase,
+      empScan.loose.maxLineLen,
+      empScan.loose.maxLabelOffset,
+    );
+    const alt = pool.find((m) => !isFiscalYearMisreadAsEmployees(m.value, fallbackFiscalYear));
+    workingEmpMatch = alt ?? null;
+    if (workingEmpMatch !== null) {
+      notes.push(
+        `Employees: using alternate labeled hit (${Math.round(workingEmpMatch.value)}) after skipping fiscal-year column`,
+      );
+    }
+  }
+
   let employees: number | null = null;
-  if (empMatch !== null) {
-    const parsedEmployees = Math.round(empMatch.value);
+  if (workingEmpMatch !== null) {
+    const parsedEmployees = Math.round(workingEmpMatch.value);
     const fy = fallbackFiscalYear;
     const yearLike =
       parsedEmployees >= 1900 &&
@@ -2270,8 +2611,8 @@ export function extractFields(
       );
     } else {
       let empVal = parsedEmployees;
-      const lineText = lines[empMatch.lineIndex] ?? '';
-      const lineWindow = `${lineText} ${lines[empMatch.lineIndex + 1] ?? ''}`.toLowerCase();
+      const lineText = lines[workingEmpMatch.lineIndex] ?? '';
+      const lineWindow = `${lineText} ${lines[workingEmpMatch.lineIndex + 1] ?? ''}`.toLowerCase();
       if (
         empVal >= 50_000 &&
         /\b(in\s+thousands|tusental|employees.*thousand|anställda.*tusen)\b/i.test(lineWindow)
@@ -2283,18 +2624,17 @@ export function extractFields(
         }
       }
       employees = empVal;
-      empProvenance = numMatchToProvenance(empMatch);
+      empProvenance = numMatchToProvenance(workingEmpMatch);
       log.info(`Employees: ${employees}`);
 
       if (revenue !== null && revenue >= 1000 && employees > 0 && employees < revenue / 50) {
-        const scan = detectedType === 'bank' ? bankScan : SCAN_DEFAULT;
         const allEmp = findAllLabeledNumbers(
           lines,
           labels.employees,
           { minValue: 100, maxValue: 1_000_000 },
           tablePickBase,
-          scan.loose.maxLineLen,
-          scan.loose.maxLabelOffset,
+          empScan.loose.maxLineLen,
+          empScan.loose.maxLabelOffset,
         );
         const alt = pickBetterEmployeeMatchForRevenue(allEmp, employees, revenue);
         if (alt !== null) {

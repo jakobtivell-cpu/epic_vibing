@@ -158,6 +158,8 @@ export const INVESTMENT_LABELS: LabelSet = {
     [
       'intäkter från investeringsverksamheten',
       'income from investment activities',
+      'other operating income',
+      'övriga rörelseintäkter',
       'summa intäkter',
       'total income',
       'management fee income',

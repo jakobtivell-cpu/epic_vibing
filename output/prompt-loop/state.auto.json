@@ -1,5 +1,5 @@
 {
-  "iteration": 9,
+  "iteration": 10,
   "completeness_rate": 0.7318840579710145,
   "companies_total": 138,
   "companies_100pct": 101,
@@ -13,23 +13,24 @@
     "HMS Networks AB (publ)/ebit_msek",
     "Bonesupport Holding AB (publ)/employees",
     "AB Industrivarden (publ)/revenue_msek",
-    "Nordnet AB (publ)/employees"
+    "Nordnet AB (publ)/employees",
+    "Kinnevik AB/revenue_msek"
   ],
   "last_fix": {
-    "company": "Nordnet AB (publ)",
-    "field": "employees",
-    "root_cause": "OCR-concatenated multi-year employee columns (e.g. 6/9-digit runs like \"722674\") were parsed as one implausibly large headcount and later discarded.",
+    "company": "Kinnevik AB",
+    "field": "revenue_msek",
+    "root_cause": "Investment-company revenue labels missed \"other operating income\" wording, so valid revenue-equivalent lines in annual reports were not matched.",
     "files_changed": [
-      "src/extraction/field-extractor.ts"
+      "src/extraction/labels.ts"
     ],
     "result": "code_fix_applied",
-    "verification_method": "Cached-text pattern verification on cache/nordnet_ab_publ-2026.txt plus wrapped TypeScript check.",
-    "verification_output": "Confirmed employee tables include concatenated numeric runs and fallback logic now normalizes values like 722674 -> 722 and 364612976 -> 364 instead of keeping inflated headcount tokens.",
+    "verification_method": "Cached-text label verification on cache/kinnevik_ab-2025.txt plus wrapped TypeScript check.",
+    "verification_output": "Confirmed Kinnevik cached report contains \"Other Operating Income1019\" and new investment labels now include both \"other operating income\" and \"ovriga rorelseintakter\" for matching this pattern.",
     "companies_also_helped": [
-      "Camurus AB (publ)",
-      "Hoist Finance AB (publ)",
-      "Invisio AB (publ)",
-      "Nokia Oyj"
+      "AB Industrivarden (publ)",
+      "Bure Equity AB (publ)",
+      "L E Lundbergforetagen AB (publ)",
+      "Modern Times Group MTG AB"
     ]
   },
   "regressions": [],
@@ -126,6 +127,16 @@
       "completeness_before": 0.7318840579710145,
       "files_changed": [
         "src/extraction/field-extractor.ts"
+      ]
+    },
+    {
+      "iteration": 10,
+      "timestamp": "2026-04-15T08:54:32Z",
+      "fix": "Kinnevik AB/revenue_msek",
+      "result": "code_fix_applied",
+      "completeness_before": 0.7318840579710145,
+      "files_changed": [
+        "src/extraction/labels.ts"
       ]
     }
   ]

@@ -1,5 +1,5 @@
 {
-  "iteration": 8,
+  "iteration": 9,
   "completeness_rate": 0.7318840579710145,
   "companies_total": 138,
   "companies_100pct": 101,
@@ -12,23 +12,24 @@
     "Svenska Cellulosa Aktiebolaget SCA (publ)/revenue_msek",
     "HMS Networks AB (publ)/ebit_msek",
     "Bonesupport Holding AB (publ)/employees",
-    "AB Industrivarden (publ)/revenue_msek"
+    "AB Industrivarden (publ)/revenue_msek",
+    "Nordnet AB (publ)/employees"
   ],
   "last_fix": {
-    "company": "AB Industrivarden (publ)",
-    "field": "revenue_msek",
-    "root_cause": "When a first revenue hit looked like a fused-year artifact, extraction nulled revenue immediately without trying alternate labeled revenue rows in the same document.",
+    "company": "Nordnet AB (publ)",
+    "field": "employees",
+    "root_cause": "OCR-concatenated multi-year employee columns (e.g. 6/9-digit runs like \"722674\") were parsed as one implausibly large headcount and later discarded.",
     "files_changed": [
       "src/extraction/field-extractor.ts"
     ],
     "result": "code_fix_applied",
-    "verification_method": "Cached-text label verification on cache/ab_industriv_rden_publ-2024.txt plus wrapped TypeScript check.",
-    "verification_output": "Confirmed multiple alternate revenue-like rows exist (e.g. \"Dividend income28,5856,4184,7393,853\", \"Dividend income8,585...6,418\"). New logic now retries with non-fused labeled candidates instead of returning null after first fused-year rejection.",
+    "verification_method": "Cached-text pattern verification on cache/nordnet_ab_publ-2026.txt plus wrapped TypeScript check.",
+    "verification_output": "Confirmed employee tables include concatenated numeric runs and fallback logic now normalizes values like 722674 -> 722 and 364612976 -> 364 instead of keeping inflated headcount tokens.",
     "companies_also_helped": [
-      "Fabege AB (publ)",
-      "Getinge AB (publ)",
-      "Electrolux Professional AB (publ)",
-      "Svenska Cellulosa Aktiebolaget SCA (publ)"
+      "Camurus AB (publ)",
+      "Hoist Finance AB (publ)",
+      "Invisio AB (publ)",
+      "Nokia Oyj"
     ]
   },
   "regressions": [],
@@ -111,6 +112,16 @@
       "iteration": 8,
       "timestamp": "2026-04-15T08:31:13Z",
       "fix": "AB Industrivarden (publ)/revenue_msek",
+      "result": "code_fix_applied",
+      "completeness_before": 0.7318840579710145,
+      "files_changed": [
+        "src/extraction/field-extractor.ts"
+      ]
+    },
+    {
+      "iteration": 9,
+      "timestamp": "2026-04-15T08:34:30Z",
+      "fix": "Nordnet AB (publ)/employees",
       "result": "code_fix_applied",
       "completeness_before": 0.7318840579710145,
       "files_changed": [

@@ -2709,7 +2709,29 @@ export function extractFields(
 
   let employees: number | null = null;
   if (workingEmpMatch !== null) {
-    const parsedEmployees = Math.round(workingEmpMatch.value);
+    let parsedEmployees = Math.round(workingEmpMatch.value);
+    const rawEmpDigits = workingEmpMatch.rawCell.replace(/[^\d]/g, '');
+    // OCR table collapse: employee columns like "722674" or "364612976" can be
+    // concatenated year values, not one headcount. Prefer the first 3-digit
+    // group (current-year left column) when the parsed value is implausibly high.
+    if (
+      parsedEmployees > 200_000 &&
+      /^\d{6}(?:\d{3})?$/.test(rawEmpDigits)
+    ) {
+      const groups = rawEmpDigits.match(/\d{3}/g) ?? [];
+      if (groups.length >= 2) {
+        const firstGroup = groups[0];
+        if (firstGroup) {
+          const first = parseInt(firstGroup, 10);
+          if (Number.isFinite(first) && first >= 50 && first <= 999) {
+            notes.push(
+              `Employee count ${parsedEmployees} adjusted to ${first} — likely OCR-concatenated multi-year employee columns (${rawEmpDigits})`,
+            );
+            parsedEmployees = first;
+          }
+        }
+      }
+    }
     const fy = fallbackFiscalYear;
     const yearLike =
       parsedEmployees >= 1900 &&

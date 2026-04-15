@@ -24,6 +24,9 @@ import { createLogger } from '../utils/logger';
 import {
   EUR_MILLIONS_TO_MSEK_APPROX,
   USD_MILLIONS_TO_MSEK_APPROX,
+  GBP_MILLIONS_TO_MSEK_APPROX,
+  NOK_MILLIONS_TO_MSEK_APPROX,
+  DKK_MILLIONS_TO_MSEK_APPROX,
 } from '../config/settings';
 import { parseNumber } from './number-parse';
 import { applyRevenueMegascaleMsekGuard, isFusedYearIntegerCorruption } from './number-guards';
@@ -337,7 +340,7 @@ function isSkippableCell(cell: string): boolean {
 // Unit-context detection — many reports state "amounts in MSEK" once
 // ---------------------------------------------------------------------------
 
-type UnitContext = 'msek' | 'bsek' | 'ksek' | 'sek' | 'eur_m' | 'usd_m' | 'usd_k';
+type UnitContext = 'msek' | 'bsek' | 'ksek' | 'sek' | 'eur_m' | 'usd_m' | 'usd_k' | 'gbp_m' | 'nok_m' | 'dkk_m';
 
 function firstMatchIndex(text: string, pattern: RegExp): number {
   const m = text.match(pattern);
@@ -418,6 +421,40 @@ function detectUnitContext(text: string): UnitContext | null {
         firstMatchIndex(lower, /\bus\$\s*(?:million|millions|m)\b/),
         firstMatchIndex(lower, /\bu\.?s\.?\s*\$\s*(?:million|millions|m)\b/),
         firstMatchIndex(lower, /\bmillion\s+u\.?s\.?\s*dollars?\b/),
+      ),
+    },
+    {
+      unit: 'gbp_m',
+      idx: Math.min(
+        firstMatchIndex(lower, /amounts?\s+in\s+(?:millions?\s+of\s+)?(?:pounds?\s+)?sterling\b/),
+        firstMatchIndex(lower, /amounts?\s+in\s+gbp\s*(?:million|millions|m)\b/),
+        firstMatchIndex(lower, /\bgbp\s*(?:million|millions|m)\b/),
+        firstMatchIndex(lower, /\b£\s*m\b/),
+        firstMatchIndex(lower, /\b£\s*million\b/),
+        firstMatchIndex(lower, /\bmillion\s+pounds?\b/),
+        firstMatchIndex(lower, /\bin\s+millions?\s+of\s+pounds?\b/),
+      ),
+    },
+    {
+      unit: 'nok_m',
+      idx: Math.min(
+        firstMatchIndex(lower, /amounts?\s+in\s+nok\s*(?:million|millions|m)\b/),
+        firstMatchIndex(lower, /\bmnok\b/),
+        firstMatchIndex(lower, /\bnok\s*(?:million|millions|m)\b/),
+        firstMatchIndex(lower, /\bmillion\s+nok\b/),
+        firstMatchIndex(lower, /\bin\s+millions?\s+of\s+(?:norwegian\s+)?kroner?\b/),
+        firstMatchIndex(lower, /\bnorske\s+kroner\s+i\s+millioner\b/),
+      ),
+    },
+    {
+      unit: 'dkk_m',
+      idx: Math.min(
+        firstMatchIndex(lower, /amounts?\s+in\s+dkk\s*(?:million|millions|m)\b/),
+        firstMatchIndex(lower, /\bmdkk\b/),
+        firstMatchIndex(lower, /\bdkk\s*(?:million|millions|m)\b/),
+        firstMatchIndex(lower, /\bmillion\s+dkk\b/),
+        firstMatchIndex(lower, /\bin\s+millions?\s+of\s+(?:danish\s+)?kroner?\b/),
+        firstMatchIndex(lower, /\bdanske\s+kroner\s+i\s+millioner\b/),
       ),
     },
   ];
@@ -618,8 +655,13 @@ function normalizeToMsek(value: number, unit: UnitContext | null): number {
     case 'usd_m':
       return Math.round(value * USD_MILLIONS_TO_MSEK_APPROX);
     case 'usd_k':
-      // IFRS-style tables: figures in thousands of USD → convert via USD millions × SEK/USD.
       return Math.round((value / 1000) * USD_MILLIONS_TO_MSEK_APPROX);
+    case 'gbp_m':
+      return Math.round(value * GBP_MILLIONS_TO_MSEK_APPROX);
+    case 'nok_m':
+      return Math.round(value * NOK_MILLIONS_TO_MSEK_APPROX);
+    case 'dkk_m':
+      return Math.round(value * DKK_MILLIONS_TO_MSEK_APPROX);
     case 'msek':
     default:
       return value;
@@ -2569,6 +2611,21 @@ export function extractFields(
           `Revenue converted from USD thousands (÷1000 → millions) using approximate USD/SEK ${USD_MILLIONS_TO_MSEK_APPROX} — verify report footnote`,
         );
       }
+      if (revUnit === 'gbp_m') {
+        notes.push(
+          `Revenue converted from GBP millions using approximate GBP/SEK ${GBP_MILLIONS_TO_MSEK_APPROX} — verify report footnote`,
+        );
+      }
+      if (revUnit === 'nok_m') {
+        notes.push(
+          `Revenue converted from NOK millions using approximate NOK/SEK ${NOK_MILLIONS_TO_MSEK_APPROX} — verify report footnote`,
+        );
+      }
+      if (revUnit === 'dkk_m') {
+        notes.push(
+          `Revenue converted from DKK millions using approximate DKK/SEK ${DKK_MILLIONS_TO_MSEK_APPROX} — verify report footnote`,
+        );
+      }
     }
 
     // BSEK / Sales narrative (infographics, CEO letter) — fills revenue when tables fail or mispick
@@ -2644,8 +2701,9 @@ export function extractFields(
             unitContext,
           )
         : unitContext;
+    const NON_SEK_EBIT_UNITS: UnitContext[] = ['eur_m', 'usd_m', 'usd_k', 'gbp_m', 'nok_m', 'dkk_m'];
     if (
-      (ebitUnit === 'eur_m' || ebitUnit === 'usd_m' || ebitUnit === 'usd_k') &&
+      ebitUnit && NON_SEK_EBIT_UNITS.includes(ebitUnit) &&
       !/margin|× revenue/i.test(ebitOutcome.match.rawCell)
     ) {
       if (ebitUnit === 'eur_m') {
@@ -2661,6 +2719,21 @@ export function extractFields(
       if (ebitUnit === 'usd_k') {
         notes.push(
           `EBIT converted from USD thousands (÷1000 → millions) using approximate USD/SEK ${USD_MILLIONS_TO_MSEK_APPROX} — verify report footnote`,
+        );
+      }
+      if (ebitUnit === 'gbp_m') {
+        notes.push(
+          `EBIT converted from GBP millions using approximate GBP/SEK ${GBP_MILLIONS_TO_MSEK_APPROX} — verify report footnote`,
+        );
+      }
+      if (ebitUnit === 'nok_m') {
+        notes.push(
+          `EBIT converted from NOK millions using approximate NOK/SEK ${NOK_MILLIONS_TO_MSEK_APPROX} — verify report footnote`,
+        );
+      }
+      if (ebitUnit === 'dkk_m') {
+        notes.push(
+          `EBIT converted from DKK millions using approximate DKK/SEK ${DKK_MILLIONS_TO_MSEK_APPROX} — verify report footnote`,
         );
       }
     }
@@ -2792,7 +2865,23 @@ export function extractFields(
         }
       }
 
-      if (revenue !== null && employees > 0 && employees < revenue / 10) {
+      if (revenue !== null && revenue > 10_000 && employees > 0 && employees < 500) {
+        notes.push(`SUSPECT_LOW: ${employees} employees vs ${revenue} MSEK revenue — trying narrative fallback`);
+        log.warn(`Employee count ${employees} implausibly low for ${revenue} MSEK revenue — retrying via narrative`);
+        const narrativeRetry = findNarrativeEmployeeHit(text);
+        if (narrativeRetry !== null && narrativeRetry.employees > employees) {
+          notes.push(
+            `Employee count revised from ${employees} to ${narrativeRetry.employees} via narrative (${narrativeRetry.matchedLabel})`,
+          );
+          employees = narrativeRetry.employees;
+          empProvenance = {
+            matchedLabel: narrativeRetry.matchedLabel,
+            rawSnippet: narrativeRetry.rawSnippet,
+            lineIndex: 0,
+            context: 'management-section',
+          };
+        }
+      } else if (revenue !== null && employees > 0 && employees < revenue / 10) {
         notes.push(`SUSPECT_LOW: ${employees} employees vs ${revenue} MSEK revenue (< 1 per 10 MSEK)`);
         log.warn(`Employee count ${employees} suspiciously low relative to revenue ${revenue} MSEK`);
       }

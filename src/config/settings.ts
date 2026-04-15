@@ -65,6 +65,21 @@ export const PDF_DOWNLOAD_TIMEOUT_MS = 120_000;
  */
 export const EUR_MILLIONS_TO_MSEK_APPROX = 11.25;
 
+/**
+ * When income statements use USD millions, convert to MSEK with this approximate rate.
+ * Mining / dual-listed issuers often report in U.S. dollars; footnotes give the average rate.
+ */
+export const USD_MILLIONS_TO_MSEK_APPROX = 10.8;
+
+/** GBP millions → MSEK (approximate). UK-listed dual-listed issuers (e.g. AstraZeneca). */
+export const GBP_MILLIONS_TO_MSEK_APPROX = 13.5;
+
+/** NOK millions → MSEK (approximate). Norwegian issuers (e.g. DNB, Kongsberg). */
+export const NOK_MILLIONS_TO_MSEK_APPROX = 1.0;
+
+/** DKK millions → MSEK (approximate). Danish issuers. */
+export const DKK_MILLIONS_TO_MSEK_APPROX = 1.55;
+
 /** Maximum PDF candidates to try per fallback step before advancing. */
 export const MAX_CANDIDATES_PER_STEP = 5;
 

@@ -683,6 +683,10 @@ const EBIT_EXCLUSIONS: RegExp[] = [
   /\bincome\s+from\s+property\s+management\b/i,
   /\bdriftnetto\b/i,
   /\boperating\s+surplus\b/i,
+  // Narrative sensitivity commentary (e.g. FX/one-offs) often says
+  // "impact on operating profit of SEK X" — this is not the EBIT line item.
+  /\bimpact\s+on\s+operating\s+profit\b/i,
+  /\bpåverkan\s+på\s+rörelseresultat\b/i,
 ];
 
 /** Exclusions for adjusted-EBIT pass — still block EBITDA / PBT, but allow adjusted / underlying labels. */

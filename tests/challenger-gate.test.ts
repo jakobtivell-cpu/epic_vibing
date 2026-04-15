@@ -11,6 +11,7 @@ describe('shouldRunLlmChallenger', () => {
       ebit_msek: 1000,
       employees: 5000,
       ceo: 'Jane Doe',
+      fiscal_year: 2025,
     },
     fiscalYear: 2025,
     companyName: 'TestCo',

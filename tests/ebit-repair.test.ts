@@ -10,7 +10,13 @@ const baseCtx = {
 describe('repairEbitBeforeValidation', () => {
   it('rescales industrial EBIT when far above revenue', () => {
     const { data, notes } = repairEbitBeforeValidation(
-      { revenue_msek: 50_000, ebit_msek: 50_000_000, employees: 1000, ceo: 'A B' },
+      {
+        revenue_msek: 50_000,
+        ebit_msek: 50_000_000,
+        employees: 1000,
+        ceo: 'A B',
+        fiscal_year: null,
+      },
       'industrial',
       [],
       baseCtx,
@@ -21,7 +27,7 @@ describe('repairEbitBeforeValidation', () => {
 
   it('skips repair for investment companies', () => {
     const { data, notes } = repairEbitBeforeValidation(
-      { revenue_msek: 1000, ebit_msek: 2_000_000, employees: 50, ceo: 'A B' },
+      { revenue_msek: 1000, ebit_msek: 2_000_000, employees: 50, ceo: 'A B', fiscal_year: null },
       'investment_company',
       [],
       baseCtx,
@@ -32,13 +38,25 @@ describe('repairEbitBeforeValidation', () => {
 
   it('applies KSEK hint from provenance before generic rescale', () => {
     const { data, notes } = repairEbitBeforeValidation(
-      { revenue_msek: 10_000, ebit_msek: 8_000_000, employees: 500, ceo: 'A B' },
+      {
+        revenue_msek: 10_000,
+        ebit_msek: 8_000_000,
+        employees: 500,
+        ceo: 'A B',
+        fiscal_year: null,
+      },
       'industrial',
       [],
       {
         ...baseCtx,
         fieldExtraction: {
-          data: { revenue_msek: null, ebit_msek: null, employees: null, ceo: null },
+          data: {
+            revenue_msek: null,
+            ebit_msek: null,
+            employees: null,
+            ceo: null,
+            fiscal_year: null,
+          },
           fiscalYear: null,
           detectedCompanyType: 'industrial',
           provenance: {

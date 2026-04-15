@@ -2913,6 +2913,7 @@ export function extractFields(
       ebit_msek: ebit,
       employees,
       ceo,
+      fiscal_year: fiscalYear,
     },
     fiscalYear,
     detectedCompanyType: detectedType,

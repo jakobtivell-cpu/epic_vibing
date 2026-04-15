@@ -437,6 +437,7 @@ export async function extractFromAllabolag(
       ebit_msek: ebit,
       employees,
       ceo,
+      fiscal_year: fiscalYear,
     },
     fiscalYear,
     sourceUrl: baseUrl,

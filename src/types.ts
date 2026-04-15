@@ -78,6 +78,7 @@ export interface ExtractedData {
   ebit_msek: number | null;
   employees: number | null;
   ceo: string | null;
+  fiscal_year: number | null;
 }
 
 export type Scope2Methodology = 'market-based' | 'location-based';

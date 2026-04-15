@@ -256,6 +256,7 @@ export async function extractFromIrHtml(
       ebit_msek: ebit,
       employees,
       ceo,
+      fiscal_year: fiscalYear,
     },
     fiscalYear,
     sourceUrl: successfulUrl,

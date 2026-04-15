@@ -116,6 +116,7 @@ function mergeExtractedPreferBase(base: ExtractedData, supplement: ExtractedData
     ebit_msek: base.ebit_msek ?? supplement.ebit_msek,
     employees: base.employees ?? supplement.employees,
     ceo: base.ceo ?? supplement.ceo,
+    fiscal_year: base.fiscal_year ?? supplement.fiscal_year,
   };
 }
 
@@ -310,7 +311,8 @@ type CandidateRejectReason =
   | 'quality-gate'
   | 'entity-check'
   | 'revenue-too-high'
-  | 'revenue-too-low-warning';
+  | 'revenue-too-low-warning'
+  | 'bank-headlines-implausible';
 
 /** Prefer PDFs that yield coherent revenue+EBIT and more headline fields (multi-candidate tournament). */
 function pdfCandidateMerit(data: ExtractedData, detected: CompanyType): number {
@@ -505,6 +507,33 @@ async function tryPdfCandidates(
     for (const n of extraction.notes) notes.push(n);
 
     const rev = extraction.data.revenue_msek;
+    const emp = extraction.data.employees;
+    const isBank =
+      entity.reportingModelHint === 'bank' || extraction.detectedCompanyType === 'bank';
+    // Wrong-company or wrong-document PDFs sometimes pass entity token checks but yield absurd
+    // combinations (e.g. SME-bank revenue with hundreds of thousands of "employees").
+    if (isBank) {
+      if (emp !== null && emp > 80_000) {
+        log.warn(
+          `[${entity.displayName}] Rejected candidate #${displayIndex} — bank employee count ${emp} implausible`,
+        );
+        notes.push(
+          `Rejected ${stepName} candidate #${displayIndex} — bank employees ${emp} implausible for listed bank (likely wrong PDF)`,
+        );
+        recordReject('bank-headlines-implausible');
+        continue;
+      }
+      if (rev !== null && rev < 10_000 && emp !== null && emp > 15_000) {
+        log.warn(
+          `[${entity.displayName}] Rejected candidate #${displayIndex} — bank revenue ${rev} MSEK vs employees ${emp} incoherent`,
+        );
+        notes.push(
+          `Rejected ${stepName} candidate #${displayIndex} — bank revenue/employees incoherent (likely wrong PDF)`,
+        );
+        recordReject('bank-headlines-implausible');
+        continue;
+      }
+    }
     const revenueCeilingMsek =
       entity.reportingModelHint === 'bank' || extraction.detectedCompanyType === 'bank'
         ? 50_000_000
@@ -1553,7 +1582,9 @@ async function processCompany(
     annualReportUrl: state.reportUrl,
     annualReportDownloaded: state.downloadResult.value,
     fiscalYear: state.fiscalYear,
-    extractedData: validationResult.value,
+    extractedData: validationResult.value
+      ? { ...validationResult.value, fiscal_year: state.fiscalYear }
+      : null,
     sustainability,
     dataSource: state.dataSource,
     confidence,

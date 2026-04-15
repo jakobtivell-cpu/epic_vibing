@@ -8,6 +8,7 @@ describe('validateExtractedData — implausible magnitudes', () => {
         ebit_msek: 100,
         employees: 10_000,
         ceo: 'X',
+        fiscal_year: null,
       },
       'industrial',
     );
@@ -22,6 +23,7 @@ describe('validateExtractedData — implausible magnitudes', () => {
         ebit_msek: 5_000_000,
         employees: 5000,
         ceo: 'X',
+        fiscal_year: null,
       },
       'industrial',
     );
@@ -36,6 +38,7 @@ describe('validateExtractedData — implausible magnitudes', () => {
         ebit_msek: 8_500,
         employees: 500,
         ceo: 'A B',
+        fiscal_year: null,
       },
       'real_estate',
     );

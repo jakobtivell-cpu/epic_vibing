@@ -16,6 +16,9 @@ export const INDUSTRIAL_LABELS: LabelSet = {
     'sales, sek billion',
     'net sales, sek billion',
     'sales sek billion',
+    // IFRS / dual-listed: consolidated income statement line (before bare "revenue" hits MD&A or TOC)
+    'revenue (note 19)',
+    'total net sales',
     // Sandvik and others use "Intäkter" as the primary consolidated revenue line — before generic omsättning/försäljning
     'intäkter',
     'net sales',
@@ -97,6 +100,7 @@ export const INDUSTRIAL_LABELS: LabelSet = {
  * Order: consolidated / total operating income first, then interest income.
  */
 export const BANK_REVENUE_LABELS_PRIMARY: string[] = [
+  'rörelseintäkter',
   'summa rörelseintäkter',
   'totala rörelseintäkter',
   'total operating income',
@@ -150,12 +154,18 @@ export const BANK_LABELS: LabelSet = {
 };
 
 export const INVESTMENT_LABELS: LabelSet = {
-  revenue: [
-    'management fee income',
-    'dividend income',
-    'total return',
-    ...INDUSTRIAL_LABELS.revenue,
-  ],
+  revenue: dedupeLabels(
+    [
+      'intäkter från investeringsverksamheten',
+      'income from investment activities',
+      'summa intäkter',
+      'total income',
+      'management fee income',
+      'dividend income',
+      'total return',
+    ],
+    INDUSTRIAL_LABELS.revenue,
+  ),
   ebit: INDUSTRIAL_LABELS.ebit,
   employees: INDUSTRIAL_LABELS.employees,
   ceo: INDUSTRIAL_LABELS.ceo,

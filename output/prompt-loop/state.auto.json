@@ -1,28 +1,30 @@
 {
-  "iteration": 2,
+  "iteration": 3,
   "completeness_rate": 0.7318840579710145,
   "companies_total": 138,
   "companies_100pct": 101,
   "stage": "fix",
   "attempted_targets": [
     "Skandinaviska Enskilda Banken AB (publ)/ebit_msek",
-    "Beijer Ref AB (publ)/ebit_msek"
+    "Beijer Ref AB (publ)/ebit_msek",
+    "Bure Equity AB (publ)/revenue_msek"
   ],
   "last_fix": {
-    "company": "Beijer Ref AB (publ)",
-    "field": "ebit_msek",
-    "root_cause": "OCR-collapsed two-year KSEK rows (e.g. \"Operating profit 567 114 481 414\") were interpreted as a single inflated EBIT token; year headers with single spaces were also under-detected.",
+    "company": "Bure Equity AB (publ)",
+    "field": "revenue_msek",
+    "root_cause": "Revenue extraction was hard-disabled for detected investment companies, so valid lines like \"Intakter fran investeringsverksamheten\"/\"Summa intakter\" were never parsed.",
     "files_changed": [
-      "src/extraction/field-extractor.ts"
+      "src/extraction/field-extractor.ts",
+      "src/extraction/labels.ts"
     ],
     "result": "code_fix_applied",
-    "verification_method": "Cached-text verification on cache/beijer_ref_ab_publ-unknown_year.txt plus wrapped TypeScript check.",
-    "verification_output": "Confirmed target row \"Operating profit 567 114 481 414\" and \"Financial review 2015 2014\" header shape; new year-token parsing captures [2015,2014], and new EBIT megascale guard converts 481414 -> 481 when revenue is 6595.",
+    "verification_method": "Cached-text label verification in cache/bure_equity_ab_publ-2024.txt plus wrapped TypeScript check.",
+    "verification_output": "Confirmed target labels exist in cached report (\"Intakter fran investeringsverksamheten var 6 323 Mkr\", \"Summa intakter6 3234 384\") and extractor now attempts revenue for investment_company instead of skipping.",
     "companies_also_helped": [
-      "Betsson AB (publ)",
-      "NCAB Group AB (publ)",
-      "BioGaia AB (publ)",
-      "HMS Networks AB (publ)"
+      "Investor AB (publ)",
+      "Kinnevik AB",
+      "L E Lundbergforetagen AB (publ)",
+      "Modern Times Group MTG AB"
     ]
   },
   "regressions": [],
@@ -48,6 +50,17 @@
       "completeness_before": 0.7318840579710145,
       "files_changed": [
         "src/extraction/field-extractor.ts"
+      ]
+    },
+    {
+      "iteration": 3,
+      "timestamp": "2026-04-15T08:15:45Z",
+      "fix": "Bure Equity AB (publ)/revenue_msek",
+      "result": "code_fix_applied",
+      "completeness_before": 0.7318840579710145,
+      "files_changed": [
+        "src/extraction/field-extractor.ts",
+        "src/extraction/labels.ts"
       ]
     }
   ]

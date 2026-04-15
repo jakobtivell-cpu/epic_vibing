@@ -2370,9 +2370,7 @@ export function extractFields(
   let revenue: number | null = null;
   let revMatch: NumberMatch | null = null;
 
-  if (detectedType === 'investment_company') {
-    notes.push('Investment company — standard revenue not applicable');
-  } else {
+  {
     const revMin =
       unitContext === 'eur_m' || unitContext === 'usd_m'
         ? 5
@@ -2380,6 +2378,8 @@ export function extractFields(
           ? 200_000
           : detectedType === 'bank'
             ? 50
+            : detectedType === 'investment_company'
+              ? 1
             : 100;
     if (detectedType === 'bank') {
       revMatch = findFinancialNumberPhased(
@@ -2394,6 +2394,14 @@ export function extractFields(
       revMatch = findFinancialNumberPhased(
         lines,
         REAL_ESTATE_REVENUE_LABELS_PRIMARY,
+        labels.revenue,
+        { minValue: revMin },
+        tablePickBase,
+        SCAN_DEFAULT,
+      );
+    } else if (detectedType === 'investment_company') {
+      revMatch = findFinancialNumber(
+        lines,
         labels.revenue,
         { minValue: revMin },
         tablePickBase,
@@ -2429,6 +2437,9 @@ export function extractFields(
       log.info(`Revenue: ${revenue} MSEK`);
       if (detectedType === 'bank') {
         notes.push(`Bank — '${revMatch.label}' mapped to revenue_msek`);
+      }
+      if (detectedType === 'investment_company') {
+        notes.push(`Investment company — '${revMatch.label}' mapped to revenue_msek`);
       }
       if (revUnit === 'eur_m') {
         notes.push(

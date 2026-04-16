@@ -347,7 +347,8 @@ function firstMatchIndex(text: string, pattern: RegExp): number {
   return m?.index ?? Number.POSITIVE_INFINITY;
 }
 
-function detectUnitContext(text: string): UnitContext | null {
+/** Exported for tests — resolves PDF/table currency scale from explicit wording. */
+export function detectUnitContext(text: string): UnitContext | null {
   const lower = text.toLowerCase();
   // Choose the earliest explicit denomination marker to avoid global-heading bleed
   // in mixed-unit documents (e.g., page heading MSEK but table body KSEK).
@@ -469,7 +470,26 @@ function detectUnitContext(text: string): UnitContext | null {
     .filter((c) => Number.isFinite(c.idx))
     .sort((a, b) => a.idx - b.idx)[0];
 
-  return best?.unit ?? null;
+  if (!best) return null;
+
+  // Footnotes and MD&A often mention MEUR (e.g. debt covenants) before the consolidated
+  // income statement states "Amounts in SEK m". Prefer explicit SEK-millions body copy
+  // over an early EUR marker when the EUR hit is clearly in the front matter.
+  if (best.unit === 'eur_m' && best.idx < 45_000) {
+    const strongMsekIdx = firstMatchIndex(
+      lower,
+      /amounts?\s+in\s+(?:sek\s*)?m\b|amounts?\s+in\s+msek|belopp\s+i\s+msek|sek\s+millions?\b/i,
+    );
+    if (
+      Number.isFinite(strongMsekIdx) &&
+      strongMsekIdx > best.idx &&
+      strongMsekIdx < 250_000
+    ) {
+      return 'msek';
+    }
+  }
+
+  return best.unit;
 }
 
 /** Parsed BSEK-style revenue from narrative / infographic text (not tables). */

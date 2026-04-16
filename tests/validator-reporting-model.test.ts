@@ -54,26 +54,23 @@ describe('validateExtractedData reporting model', () => {
     expect(r.warnings.some((w) => /förvaltningsresultat.*above revenue proxy/i.test(w))).toBe(true);
   });
 
-  it('real_estate: still discards EBIT above revenue when EBIT proxy is not förvaltningsresultat', () => {
-    const pipelineNotes = [
-      'EBIT estimated from driftnetto — real estate reporting, excludes fair value changes',
-    ];
+  it('real_estate: still discards EBIT more than 3× above revenue (clearly misaligned pick)', () => {
     const r = validateExtractedData(
       { revenue_msek: 800, ebit_msek: 3200, employees: 5000, ceo: 'A B', fiscal_year: null },
       'real_estate',
-      pipelineNotes,
+      [],
     );
     expect(r.data.ebit_msek).toBeNull();
     expect(r.warnings.some((w) => /exceeds revenue/i.test(w))).toBe(true);
   });
 
-  it('real_estate: allows near-parity EBIT/revenue even without förvaltningsresultat note', () => {
+  it('real_estate: keeps EBIT up to 3× revenue without any pipeline note (REIT operating surplus pattern)', () => {
     const r = validateExtractedData(
-      { revenue_msek: 10_000, ebit_msek: 10_300, employees: 5000, ceo: 'A B', fiscal_year: null },
+      { revenue_msek: 3_548, ebit_msek: 4_139, employees: 500, ceo: 'A B', fiscal_year: null },
       'real_estate',
       [],
     );
-    expect(r.data.ebit_msek).toBe(10_300);
+    expect(r.data.ebit_msek).toBe(4_139);
   });
 
   it('industrial: discards employee counts below 100', () => {
@@ -86,30 +83,30 @@ describe('validateExtractedData reporting model', () => {
     expect(r.warnings.some((w) => /too low .*industrial large-cap/i.test(w))).toBe(true);
   });
 
-  it('industrial: keeps near-parity EBIT slightly above revenue', () => {
+  it('industrial: discards EBIT at near-parity with revenue (≈100% margin is a misaligned pick)', () => {
     const r = validateExtractedData(
       { revenue_msek: 46_028, ebit_msek: 46_253, employees: 1000, ceo: 'A B', fiscal_year: null },
       'industrial',
       [],
     );
-    expect(r.data.ebit_msek).toBe(46_253);
-    expect(r.warnings.some((w) => /near-parity tolerance/i.test(w))).toBe(true);
+    expect(r.data.ebit_msek).toBeNull();
+    expect(r.warnings.some((w) => /exceeds revenue.*discarding/i.test(w))).toBe(true);
   });
 
-  it('industrial: keeps EBIT modestly above net sales when ratio and gap are small (IFRS line mismatch)', () => {
+  it('industrial: discards EBIT modestly above revenue regardless of gap size (no near-parity band)', () => {
     const addLifeLike = validateExtractedData(
       { revenue_msek: 10_286, ebit_msek: 10_724, employees: 2000, ceo: 'A B', fiscal_year: 2025 },
       'industrial',
       [],
     );
-    expect(addLifeLike.data.ebit_msek).toBe(10_724);
+    expect(addLifeLike.data.ebit_msek).toBeNull();
 
     const betssonLike = validateExtractedData(
       { revenue_msek: 12_443, ebit_msek: 14_130, employees: 2000, ceo: 'A B', fiscal_year: 2025 },
       'industrial',
       [],
     );
-    expect(betssonLike.data.ebit_msek).toBe(14_130);
+    expect(betssonLike.data.ebit_msek).toBeNull();
   });
 
   it('industrial: still discards EBIT far above revenue', () => {

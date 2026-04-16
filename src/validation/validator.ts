@@ -134,10 +134,13 @@ export function validateExtractedData(
         }
       }
     } else if (companyType === 'real_estate') {
+      // Operating surplus (förvaltningsresultat) and fair-value changes routinely push the
+      // operating metric above rental income — align the validator threshold with the extractor
+      // guard (ratio > 3) so well-formed REIT rows are not incorrectly discarded.
       const ratio = cleaned.ebit_msek / Math.max(cleaned.revenue_msek, 1);
-      if (realEstateForvaltEbitFromNotes || ratio <= 1.05) {
+      if (ratio <= 3.0) {
         warnings.push(
-          `Real estate: operating metric (${cleaned.ebit_msek} MSEK) above revenue proxy (${cleaned.revenue_msek} MSEK) — kept; lines often not directly comparable`,
+          `Real estate: operating metric (${cleaned.ebit_msek} MSEK) above revenue proxy (${cleaned.revenue_msek} MSEK) — kept; operating surplus routinely exceeds rental income for REITs`,
         );
         score -= 5;
       } else {
@@ -148,25 +151,13 @@ export function validateExtractedData(
         score -= 15;
       }
     } else {
-      const ratio = cleaned.ebit_msek / Math.max(cleaned.revenue_msek, 1);
-      const absDelta = cleaned.ebit_msek - cleaned.revenue_msek;
-      // IFRS / FX / segment vs consolidated labels sometimes land a few % above net sales;
-      // keep a tight band plus a slightly wider band with capped absolute gap (partial-row cluster).
-      if (
-        (ratio <= 1.03 && absDelta <= 3_000) ||
-        (ratio <= 1.15 && absDelta <= 2_000)
-      ) {
-        warnings.push(
-          `Industrial: EBIT (${cleaned.ebit_msek}) slightly above revenue (${cleaned.revenue_msek}) — kept within near-parity tolerance`,
-        );
-        score -= 4;
-      } else {
-        warnings.push(
-          `EBIT (${cleaned.ebit_msek}) exceeds revenue (${cleaned.revenue_msek}) — likely extraction error, discarding EBIT`,
-        );
-        cleaned.ebit_msek = null;
-        score -= 15;
-      }
+      // For industrial / unspecified types any EBIT above revenue is a misaligned pick —
+      // the two lines are not comparable and no legitimate near-parity band exists.
+      warnings.push(
+        `EBIT (${cleaned.ebit_msek}) exceeds revenue (${cleaned.revenue_msek}) — likely extraction error, discarding EBIT`,
+      );
+      cleaned.ebit_msek = null;
+      score -= 15;
     }
   }
 

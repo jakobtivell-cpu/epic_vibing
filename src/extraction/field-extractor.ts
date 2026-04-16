@@ -2422,10 +2422,17 @@ function extractEbitWithStrategies(
   };
   const revAbsRaw = revMatch !== null ? Math.abs(revMatch.value) : 0;
   const revAbsMsek = revenue !== null ? Math.abs(revenue) : 0;
+  // Mid-size revenue + op. line in KSEK read as MSEK can land ~400× revenue until ÷1000 repair;
+  // keep a temporary ceiling so the row is still visible to the primary picker.
+  const industrialKsekSlop =
+    detectedType === 'industrial' && revAbsMsek > 0 && revAbsMsek < 100_000
+      ? revAbsMsek * 500 + 1
+      : 0;
   const ebitMaxNonBank = Math.max(
     500_000,
     revAbsRaw * 50 + 1,
     revAbsMsek * 50 + 1,
+    industrialKsekSlop,
   );
   const ebitOpts: NumberSearchOpts = {
     minValue: detectedType === 'bank' ? -1_000_000 : -500_000,
@@ -2511,6 +2518,22 @@ function extractEbitWithStrategies(
     }
     const primaryMsek = normalizeEbitMatchToMsek(match, lines, unitContext);
     if (shouldRejectPrimaryEbitAsImplausible(primaryMsek)) {
+      // Operating line read as MSEK but row is KSEK/tkr: huge EBIT vs credible revenue — try one ÷1000 before fallbacks.
+      const megaVsRev =
+        detectedType === 'industrial' &&
+        revenue !== null &&
+        revenue > 0 &&
+        primaryMsek > revenue * 25 &&
+        primaryMsek >= 100_000;
+      if (megaVsRev) {
+        const recovered = Math.round(primaryMsek / 1000);
+        if (!shouldRejectPrimaryEbitAsImplausible(recovered)) {
+          extraNotes.push(
+            `Primary EBIT ÷1000 recovery: ${primaryMsek} → ${recovered} MSEK after implausible-vs-revenue check (likely KSEK as MSEK on op. line)`,
+          );
+          return { msek: recovered, match, extraNotes };
+        }
+      }
       extraNotes.push(
         `Primary EBIT candidate ${primaryMsek} MSEK from "${match.label}" rejected — implausibly above revenue ${revenue} MSEK; trying fallback strategies`,
       );

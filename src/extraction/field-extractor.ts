@@ -1015,7 +1015,12 @@ function findIncomeStatementSections(lines: string[]): Array<{ start: number; en
       }
     }
 
-    if (end - i >= 5) {
+    const span = end - i;
+    const reachesEof = end >= lines.length;
+    // Full statements usually span many lines; require 5+ to avoid TOC heading noise.
+    // When the extracted text ends right after the IS (micro-fixtures, one-page snippets),
+    // keep the window if there is at least one data line after the heading.
+    if (span >= 5 || (reachesEof && span >= 2)) {
       raw.push({ start: i, end, parentOnly: incomeHeadingIsParentCompanyOnly(lines[i]) });
     }
   }
@@ -2528,6 +2533,15 @@ function extractEbitWithStrategies(
     }
     const primaryMsek = normalizeEbitMatchToMsek(match, lines, unitContext);
     if (shouldRejectPrimaryEbitAsImplausible(primaryMsek)) {
+      // If the post-parse megascale guard would ÷1000 into a plausible EBIT band, keep the raw pick so
+      // extractFields can run applyEbitMegascaleGuard and emit the standard "EBIT unit guard" note.
+      const guardPreview = applyEbitMegascaleGuard(primaryMsek, revenue);
+      if (
+        guardPreview.adjusted &&
+        !shouldRejectPrimaryEbitAsImplausible(guardPreview.ebit)
+      ) {
+        return { msek: primaryMsek, match, extraNotes };
+      }
       // Operating line read as MSEK but row is KSEK/tkr: huge EBIT vs credible revenue — try one ÷1000 before fallbacks.
       const megaVsRev =
         detectedType === 'industrial' &&

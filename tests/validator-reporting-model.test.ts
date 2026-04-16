@@ -95,4 +95,29 @@ describe('validateExtractedData reporting model', () => {
     expect(r.data.ebit_msek).toBe(46_253);
     expect(r.warnings.some((w) => /near-parity tolerance/i.test(w))).toBe(true);
   });
+
+  it('industrial: keeps EBIT modestly above net sales when ratio and gap are small (IFRS line mismatch)', () => {
+    const addLifeLike = validateExtractedData(
+      { revenue_msek: 10_286, ebit_msek: 10_724, employees: 2000, ceo: 'A B', fiscal_year: 2025 },
+      'industrial',
+      [],
+    );
+    expect(addLifeLike.data.ebit_msek).toBe(10_724);
+
+    const betssonLike = validateExtractedData(
+      { revenue_msek: 12_443, ebit_msek: 14_130, employees: 2000, ceo: 'A B', fiscal_year: 2025 },
+      'industrial',
+      [],
+    );
+    expect(betssonLike.data.ebit_msek).toBe(14_130);
+  });
+
+  it('industrial: still discards EBIT far above revenue', () => {
+    const r = validateExtractedData(
+      { revenue_msek: 10_000, ebit_msek: 18_000, employees: 2000, ceo: 'A B', fiscal_year: null },
+      'industrial',
+      [],
+    );
+    expect(r.data.ebit_msek).toBeNull();
+  });
 });

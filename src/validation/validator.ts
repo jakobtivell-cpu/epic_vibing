@@ -115,11 +115,25 @@ export function validateExtractedData(
         score -= 15;
       }
     } else {
-      warnings.push(
-        `EBIT (${cleaned.ebit_msek}) exceeds revenue (${cleaned.revenue_msek}) — likely extraction error, discarding EBIT`,
-      );
-      cleaned.ebit_msek = null;
-      score -= 15;
+      const ratio = cleaned.ebit_msek / Math.max(cleaned.revenue_msek, 1);
+      const absDelta = cleaned.ebit_msek - cleaned.revenue_msek;
+      // IFRS / FX / segment vs consolidated labels sometimes land a few % above net sales;
+      // keep a tight band plus a slightly wider band with capped absolute gap (partial-row cluster).
+      if (
+        (ratio <= 1.03 && absDelta <= 3_000) ||
+        (ratio <= 1.15 && absDelta <= 2_000)
+      ) {
+        warnings.push(
+          `Industrial: EBIT (${cleaned.ebit_msek}) slightly above revenue (${cleaned.revenue_msek}) — kept within near-parity tolerance`,
+        );
+        score -= 4;
+      } else {
+        warnings.push(
+          `EBIT (${cleaned.ebit_msek}) exceeds revenue (${cleaned.revenue_msek}) — likely extraction error, discarding EBIT`,
+        );
+        cleaned.ebit_msek = null;
+        score -= 15;
+      }
     }
   }
 

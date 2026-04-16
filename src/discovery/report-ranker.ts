@@ -27,7 +27,7 @@ const CURRENT_YEAR = new Date().getFullYear();
 const MOST_RECENT_FISCAL_YEAR = CURRENT_YEAR - 1;
 
 function extractYear(text: string): number | null {
-  const matches = text.match(/\b(20[12]\d)\b/g);
+  const matches = text.match(/\b((?:19|20)\d{2})\b/g);
   if (!matches) return null;
   const years = matches.map(Number);
   return Math.max(...years);
@@ -168,7 +168,9 @@ function urlScore(href: string): number {
 
   const urlYear = extractYear(href);
   if (urlYear !== null) {
-    if (urlYear === MOST_RECENT_FISCAL_YEAR || urlYear === CURRENT_YEAR) score += 10;
+    const urlYearPts = yearScore(urlYear);
+    score += urlYearPts;
+    log.debug(`URL year=${urlYear} urlYearScore=${urlYearPts} — ${href.substring(0, 120)}`);
   }
 
   return score;

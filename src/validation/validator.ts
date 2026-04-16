@@ -86,19 +86,26 @@ export function validateExtractedData(
       );
       score -= 4;
     } else if (companyType === 'bank') {
-      const ratio = cleaned.ebit_msek / Math.max(cleaned.revenue_msek, 1);
-      const absDelta = cleaned.ebit_msek - cleaned.revenue_msek;
-      if (ratio <= 1.3 && absDelta <= 15_000) {
+      if (cleaned.revenue_msek < 10_000) {
         warnings.push(
-          `Bank: operating result (${cleaned.ebit_msek}) above revenue-equivalent (${cleaned.revenue_msek}) — may reflect credit-loss / line definitions; kept`,
+          `Bank: operating result (${cleaned.ebit_msek} MSEK) above low revenue-equivalent (${cleaned.revenue_msek} MSEK) — kept; net interest / fee proxy is not comparable to operating profit`,
         );
         score -= 5;
       } else {
-        warnings.push(
-          `Bank: operating result (${cleaned.ebit_msek}) exceeds revenue-equivalent (${cleaned.revenue_msek}) — possible semantic mismatch; discarding EBIT for assignment safety`,
-        );
-        cleaned.ebit_msek = null;
-        score -= 12;
+        const ratio = cleaned.ebit_msek / Math.max(cleaned.revenue_msek, 1);
+        const absDelta = cleaned.ebit_msek - cleaned.revenue_msek;
+        if (ratio <= 1.3 && absDelta <= 15_000) {
+          warnings.push(
+            `Bank: operating result (${cleaned.ebit_msek}) above revenue-equivalent (${cleaned.revenue_msek}) — may reflect credit-loss / line definitions; kept`,
+          );
+          score -= 5;
+        } else {
+          warnings.push(
+            `Bank: operating result (${cleaned.ebit_msek}) exceeds revenue-equivalent (${cleaned.revenue_msek}) — possible semantic mismatch; discarding EBIT for assignment safety`,
+          );
+          cleaned.ebit_msek = null;
+          score -= 12;
+        }
       }
     } else if (companyType === 'real_estate') {
       const ratio = cleaned.ebit_msek / Math.max(cleaned.revenue_msek, 1);

@@ -1,5 +1,17 @@
 # Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-13)
 
+## Fix round 20
+- artifacts: run_summary.json 2026-04-16T08:49:45.874Z (48 rows, stale); results.json source of truth (136 rows, 2026-04-15 scrape); partial scrape of 46 tickers ran but does not write to results.json
+- git_head: 1c009e8
+- Fixed:
+  - extractor: alternate-label employee revision ceiling — if the best alternate-label candidate is >100× the primary labeled count, the revision is rejected and the primary count is retained. Production trigger: HACK (439 453 → retained 985), AMBEA (115 119 → retained 148).
+  - extractor: SUSPECT_LOW narrative employee ceiling — same 100× rule applied to the narrative fallback result. Production trigger: HAUTOO (214 255 → retained 469, ~fleet capacity metric matched the employee regex).
+  - ticker: AQ.ST `annualReportPdfUrls` corrected — previous URL pointed to a 6-page auditor summary (0.4 MB). Now uses `mb.cision.com/Main/11536/4326558/4005197.pdf` (full ~9 BSEK revenue, 8 000 employees, CEO James Ahrgren).
+  - ticker: ALIG.ST direct PDF URL added — `corporate.alimakgroup.com/.../alimakgroup-ar-2025-260317.pdf`. All cached PDFs in 2026-04-15 run were investor presentations or Q2 reports, causing timeout.
+  - ticker: SAND.ST `annualReportPdfUrls` corrected — previous URL (`annualreport.sandvik` microsite) served a cached quarterly report (0.4 MB). Now uses `mb.cision.com/Main/208/4318236/3973881.pdf` (Cision-hosted full AR, 17.1 MB / 180 pages).
+- Validation: partial scrape confirmed round 16–18 fixes active (FABG CEO found on retry → 100/100; AAK/AddLife EBIT > revenue → discarded; AZN CEO "Changing World" boilerplate discarded → retry found real CEO). Employee ceiling fix (HAUTOO, HACK) unvalidated in this run — HAUTOO timed out; HACK not in subset.
+- Remaining toward 100%: ~51 non-success rows in 2026-04-15 artifacts (24 timeout + 26 partial + 4 failed); full re-scrape needed to refresh results.json and confirm all accumulated fixes (rounds 16–20). VOLCAR-B still blocked (cached file, URL uncertain). CAMX blocked (investor.camurus.com DNS failure in this run).
+
 ## Fix round 19
 - artifacts: run_summary.json 2026-04-16T08:49:45.874Z (48 rows, stale); results.json source of truth (136 rows, 2026-04-15 scrape)
 - git_head: 3568f51

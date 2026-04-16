@@ -1,5 +1,14 @@
 # Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-13)
 
+## Fix round 19
+- artifacts: run_summary.json 2026-04-16T08:49:45.874Z (48 rows, stale); results.json source of truth (136 rows, 2026-04-15 scrape)
+- git_head: 3568f51
+- Fixed:
+  - discovery: Q4+full-year combined report (mining/energy pattern) was rejected as quarterly. `hasCombinedAnnualSignal` override added — if the first 5000 chars contain "full-year/full year/annual results/fiscal year ended" AND the document has an income statement, quarterly rejection is overridden. Directly fixes LUG.ST (Lundin Gold Q4+full-year shareholder report was a false reject).
+  - ticker: CAMX.ST (Camurus AB) assigned `companyType: "pharma"` — exempts it from the 1000 MSEK Large Cap industrial revenue floor. Camurus is a pharma Large Cap (~SEK 553 MSEK genuine revenue) whose revenue was being wrongly discarded.
+  - ticker: direct PDF URLs added for SAND.ST (annualreport.sandvik), VOLCAR-B.ST (investors.volvocars.com), AQ.ST (aqgroup.com) — all three were failing to find any annual report PDF during the 2026-04-15 scrape due to link discovery failures.
+- Remaining toward 100%: ~51 non-success rows in 2026-04-15 artifacts (24 timeout + 26 partial + 4 failed); CAMX gains revenue on re-scrape (stays partial without employees); SAND/VOLCAR/AQ may fully succeed if PDF URLs are accessible.
+
 ## Fix round 18
 - artifacts: run_summary.json 2026-04-16T08:49:45.874Z (48 rows, stale); results.json source of truth (136 rows, 2026-04-15 scrape)
 - git_head: 7346a4e

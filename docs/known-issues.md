@@ -1,5 +1,12 @@
 # Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-13)
 
+## Fix round 16
+- artifacts: run_summary.json 2026-04-16T08:49:45.874Z (48 rows, stale); results.json treated as source of truth (136 rows, 2026-04-15 scrape)
+- git_head: 8912670
+- Fixed:
+  - extractor: single CEO candidate found → discarded as boilerplate/company-name echo → no retry → CEO stays null. Now retries up to 3 times with discarded line excluded. Affected ~9 partial rows with all other fields present (AZN, FABG, HACK, HAUTOO, NCC-A, NP3, SECU-B, STOR-B, VSURE).
+- Remaining toward 100%: ~54 non-success rows (24 timeout + 26 partial + 4 failed); CEO fix likely converts ~9 partial → complete on re-scrape.
+
 ## Fix round 15 — stop condition C, re-scrape required
 
 Scrape stale after 2 consecutive no-code rounds (rounds 14–15): `run_summary.json` (2026-04-16T08:49:45.874Z, 48 rows) still does not match `results.json` (136 rows, 2026-04-15). Re-scrape required — run `npm run test:overnight` (or equivalent full run) to regenerate both artifacts from the same execution, then restart the fix loop.

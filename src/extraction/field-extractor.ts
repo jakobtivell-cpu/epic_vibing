@@ -2591,6 +2591,22 @@ function extractEbitWithStrategies(
   return { msek: null, match: null, extraNotes };
 }
 
+/**
+ * Tiny EBIT with no revenue but thousands of employees: footnote / stray-cell noise
+ * on partial extracts (not a plausible operating result for that headcount).
+ */
+export function shouldDiscardOrphanEbitVersusHeadcount(
+  revenue: number | null,
+  ebit: number | null,
+  employees: number | null,
+  detectedType: CompanyType,
+): boolean {
+  if (revenue !== null || ebit === null || employees === null) return false;
+  if (detectedType === 'investment_company') return false;
+  const ae = Math.abs(ebit);
+  return (employees >= 2_000 && ae < 500) || (employees >= 250 && ae < 30);
+}
+
 // ---------------------------------------------------------------------------
 // Main entry point
 // ---------------------------------------------------------------------------
@@ -3118,6 +3134,15 @@ export function extractFields(
       );
       ebit = ebitGuard.ebit;
     }
+  }
+
+  if (shouldDiscardOrphanEbitVersusHeadcount(revenue, ebit, employees, detectedType)) {
+    notes.push(
+      `EBIT ${ebit} discarded — no revenue and magnitude implausible versus ${employees} employees`,
+    );
+    log.warn(`Discarding orphan EBIT ${ebit} (no revenue, ${employees} employees)`);
+    ebit = null;
+    ebitProvenance = null;
   }
 
   if (detectedType !== 'investment_company' && revenue === null) {

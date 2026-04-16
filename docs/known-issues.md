@@ -1,11 +1,42 @@
-# Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-9)
+# Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-10)
 
 Fresh diagnosis from `output/results.json` + `output/run_summary.json` (136
 companies: 88 complete, 23 partial, 3 failed, 22 timeout). Per-field null
 counts in the last run: `fiscal_year` 38, `ebit`/`employees` 36, `revenue` 34,
 `ceo` 27.
 
-## Fix round 9 (this run)
+## Fix round 10 (this run — documentation only)
+
+**Diagnosis (same scrape JSON)** — Re-checked clusters vs **git history (through
+fix round 9)**. Large note-buckets still include: **“below 1,000 — implausible”**
+(8), **“Fiscal year not found”** (13), **Second-pass EBIT** (15), **“EBIT not
+found”** (14), **“CEO not found”** (3), **timeouts** (22), etc. Most align with
+**already merged** fixes (industrial revenue floor, fiscal-year anchors,
+investment-company employees, EBIT/IS windows, CEO boilerplate substrings, M&A URL
+penalties, …) on **`results.json` that predates those commits**.
+
+**Fixed (this round)** — *No code changes.* Shipping another generic extractor
+pass without a **fresh scrape** would duplicate logic already on `main` or chase
+**heterogeneous** leftovers (e.g. **CEO not found** ×3 = bank ISK / mining USD /
+wrong Sandvik doc — not one mechanism).
+
+**Skipped / deferred**
+
+- **All tractable ≥3 clusters** visible in this JSON are either **covered by
+  rounds 6–9** (pending re-scrape confirmation) or **not one root cause** across
+  the tickers (second-pass / EBIT-not-found mixes partials and completes).
+- **Long-tail** <3 companies per pattern (e.g. residual role-adjacent CEO
+  captures) — not worth a blind rule without new evidence.
+
+**Hypotheses needing a fresh scrape:** which note buckets actually clear after
+re-running the pipeline on `main`; whether any **new** ≥3 cluster appears with a
+single owner file.
+
+**Human loop note:** **This round shipped no code commits.** If the **next** fix
+round also ships **no code**, stop the iterative prompt loop and **re-scrape**
+before another generic hunt (per guardrails).
+
+## Fix round 9 (historical)
 
 **Diagnosis (same scrape JSON)** — **Eight** rows hit the validator line **“Revenue …
 MSEK below 1,000 — implausible for Large Cap industrial”** (industrial gate).

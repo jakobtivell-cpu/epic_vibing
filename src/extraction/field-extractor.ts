@@ -1781,11 +1781,15 @@ interface CeoMatch {
  * Search for CEO name with a priority window. First scans the CEO letter
  * (first ~120 lines), then the full document.
  */
-function findCeoWithProvenance(lines: string[], labels: string[]): CeoMatch | null {
+function findCeoWithProvenance(
+  lines: string[],
+  labels: string[],
+  excludeLineIndices: ReadonlySet<number> = new Set(),
+): CeoMatch | null {
   // Pass 1: CEO letter window — scan first ~800 lines to cover the
   // CEO letter section which may appear on pages 5-20 in large reports.
   const ceoLetterEnd = Math.min(800, lines.length);
-  const letterResult = scanForCeo(lines, labels, 0, ceoLetterEnd);
+  const letterResult = scanForCeo(lines, labels, 0, ceoLetterEnd, excludeLineIndices);
   if (letterResult) {
     letterResult.context = 'ceo-letter';
     return letterResult;
@@ -1794,7 +1798,7 @@ function findCeoWithProvenance(lines: string[], labels: string[]): CeoMatch | nu
   // Pass 2: Management / board section (look for section headings)
   const mgmtSections = findManagementSections(lines);
   for (const section of mgmtSections) {
-    const result = scanForCeo(lines, labels, section.start, section.end);
+    const result = scanForCeo(lines, labels, section.start, section.end, excludeLineIndices);
     if (result) {
       result.context = 'management-section';
       return result;
@@ -1874,6 +1878,7 @@ function scanForCeo(
   labels: string[],
   startLine: number,
   endLine: number,
+  excludeLineIndices: ReadonlySet<number> = new Set(),
 ): CeoMatch | null {
   for (const label of labels) {
     const labelLower = label.toLowerCase();
@@ -1906,7 +1911,7 @@ function scanForCeo(
         const prevMatch = prevLine.match(
           /^([A-ZÅÄÖÉÜ][a-zåäöéü]+(?:[\s-]+(?:von\s+|af\s+|de\s+)?[A-ZÅÄÖÉÜ][a-zåäöéü]+){1,3})$/,
         );
-        if (prevMatch && !isKnownNonName(prevMatch[1])) {
+        if (prevMatch && !isKnownNonName(prevMatch[1]) && !excludeLineIndices.has(i - 1)) {
           log.debug(`Found CEO (prev line): "${prevMatch[1]}" via "${label}"`);
           return { name: prevMatch[1], label, lineIndex: i - 1, pattern: 'prev-line', context: 'general' };
         }
@@ -1919,7 +1924,7 @@ function scanForCeo(
         .trim();
 
       const afterMatch = afterLabel.match(NAME_RE);
-      if (afterMatch && !isKnownNonName(afterMatch[1])) {
+      if (afterMatch && !isKnownNonName(afterMatch[1]) && !excludeLineIndices.has(i)) {
         log.debug(`Found CEO (same line): "${afterMatch[1]}" via "${label}"`);
         return { name: afterMatch[1], label, lineIndex: i, pattern: 'same-line-after', context: 'general' };
       }
@@ -1927,7 +1932,7 @@ function scanForCeo(
       // Pattern C: name BEFORE the label on the same line
       const beforeLabel = lines[i].substring(0, idx).replace(/[,:\s–—.-]+$/, '').trim();
       const beforeMatch = beforeLabel.match(NAME_RE);
-      if (beforeMatch && !isKnownNonName(beforeMatch[1])) {
+      if (beforeMatch && !isKnownNonName(beforeMatch[1]) && !excludeLineIndices.has(i)) {
         log.debug(`Found CEO (before label): "${beforeMatch[1]}" via "${label}"`);
         return { name: beforeMatch[1], label, lineIndex: i, pattern: 'same-line-before', context: 'general' };
       }
@@ -1936,7 +1941,7 @@ function scanForCeo(
       if (i + 1 < endLine) {
         const nextLine = lines[i + 1].trim();
         const nextMatch = nextLine.match(NAME_RE);
-        if (nextMatch && !isKnownNonName(nextMatch[1])) {
+        if (nextMatch && !isKnownNonName(nextMatch[1]) && !excludeLineIndices.has(i + 1)) {
           log.debug(`Found CEO (next line): "${nextMatch[1]}" via "${label}"`);
           return { name: nextMatch[1], label, lineIndex: i + 1, pattern: 'next-line', context: 'general' };
         }
@@ -3105,17 +3110,24 @@ export function extractFields(
   }
 
   // --- CEO ---
+  // Retry up to 3 times: when a candidate is discarded as boilerplate/non-person,
+  // exclude that line and search again — the real person name is often further on.
   let ceo: string | null = null;
-  const ceoMatch = findCeoWithProvenance(lines, labels.ceo);
-  if (ceoMatch !== null) {
+  const excludedCeoLines = new Set<number>();
+  let ceoMatch = findCeoWithProvenance(lines, labels.ceo, excludedCeoLines);
+  for (let attempt = 0; attempt < 3 && ceoMatch !== null && ceo === null; attempt++) {
     if (/single electronic format|electronic format|esef/i.test(ceoMatch.name)) {
       notes.push(`CEO candidate "${ceoMatch.name}" discarded — non-person ESEF phrase`);
       log.warn(`Discarding non-person CEO candidate: ${ceoMatch.name}`);
+      excludedCeoLines.add(ceoMatch.lineIndex);
+      ceoMatch = findCeoWithProvenance(lines, labels.ceo, excludedCeoLines);
     } else if (shouldDiscardCeoCandidate(ceoMatch.name, companyName)) {
       notes.push(
         `CEO candidate "${ceoMatch.name}" discarded — heading/boilerplate or company label echo`,
       );
       log.warn(`Discarding non-person CEO candidate: ${ceoMatch.name}`);
+      excludedCeoLines.add(ceoMatch.lineIndex);
+      ceoMatch = findCeoWithProvenance(lines, labels.ceo, excludedCeoLines);
     } else {
       ceo = ceoMatch.name;
       ceoProvenance = {
@@ -3125,7 +3137,8 @@ export function extractFields(
         context: ceoMatch.context,
       };
     }
-  } else {
+  }
+  if (ceo === null) {
     notes.push(`CEO not found for ${companyName}`);
     log.warn(`CEO not found for ${companyName}`);
   }

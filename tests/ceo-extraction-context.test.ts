@@ -74,3 +74,68 @@ President and CEO
     expect(r.data.ceo).toBeNull();
   });
 });
+
+describe('CEO extraction — retry after boilerplate discard', () => {
+  it('finds real person name after discarding a boilerplate candidate on first pass', () => {
+    // Pattern: boilerplate echo appears near first CEO label; real name near second
+    const text = `
+Annual report 2025
+
+Message from the CEO
+Changing World
+
+Dear shareholders,
+
+Management team
+Anna Andersson
+President and CEO
+`;
+    const r = extractFields(text, 'PharmaCo PLC', 2025);
+    expect(r.data.ceo).toBe('Anna Andersson');
+  });
+
+  it('finds real person name after discarding company-name echo', () => {
+    const text = `
+Annual report 2025
+
+CEO letter
+Höegh Autoliners
+President and CEO
+
+Group management
+Bent Martini
+President & CEO
+`;
+    const r = extractFields(text, 'Höegh Autoliners ASA', 2025);
+    expect(r.data.ceo).toBe('Bent Martini');
+  });
+
+  it('finds real person name after discarding HR org title', () => {
+    const text = `
+Annual report 2025
+
+President and CEO
+Chief Human Resources
+
+Leadership
+Magnus Ahlqvist
+Group President and CEO
+`;
+    const r = extractFields(text, 'Securitas AB (publ)', 2025);
+    expect(r.data.ceo).toBe('Magnus Ahlqvist');
+  });
+
+  it('still returns null when all retries exhaust candidates', () => {
+    const text = `
+Annual report 2025
+Boilerplate Company
+President and CEO
+Exchange Act Rule
+Chief Executive Officer
+Chief Human Resources
+VD
+`;
+    const r = extractFields(text, 'Boilerplate Company', 2025);
+    expect(r.data.ceo).toBeNull();
+  });
+});

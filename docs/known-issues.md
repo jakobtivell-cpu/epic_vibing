@@ -1,5 +1,14 @@
 # Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-13)
 
+## Fix round 18
+- artifacts: run_summary.json 2026-04-16T08:49:45.874Z (48 rows, stale); results.json source of truth (136 rows, 2026-04-15 scrape)
+- git_head: 7346a4e
+- Fixed:
+  - validator: real_estate EBIT tolerance widened from ratio ≤ 1.05 to ratio ≤ 3.0 — aligns with extractor guard; REIT operating surplus routinely exceeds rental income. PNDX EBIT (4139 MSEK on 3548 MSEK rental income) was wrongly discarded. (~1 row, PNDX EBIT recovers on re-scrape; still partial if CEO stays null)
+  - validator: removed industrial near-parity tolerance — any EBIT > revenue for industrial/unspecified is now discarded (was: kept when ratio ≤ 1.03 and Δ ≤ 3000, or ratio ≤ 1.15 and Δ ≤ 2000). Fixes 4 quality-failure complete rows where EBIT ≈ revenue: AAK (46253 ≈ 46028), AddLife (10724 > 10286), Betsson (14130 > 12443), Skanska (6748 > 6658). These become partial on re-scrape, but with null EBIT rather than bogus EBIT.
+  - extractor: CEO boilerplate guard extended with corporate-entity strings ("parent com", "holding company", "group ab", "moderbolag") — PNDX had CEO="Parent Com" passing old guard.
+- Remaining toward 100%: ~51 non-success rows in 2026-04-15 artifacts (24 timeout + 26 partial + 4 failed); this round removes 4 quality failures from complete + fixes PNDX EBIT path. Net quality improvement: 4 fewer bogus EBIT values.
+
 ## Fix round 17
 - artifacts: run_summary.json 2026-04-16T08:49:45.874Z (48 rows, stale); results.json source of truth (136 rows, 2026-04-15 scrape)
 - git_head: 095f168

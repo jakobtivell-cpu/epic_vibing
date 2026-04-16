@@ -1375,7 +1375,7 @@ async function processCompany(
     if (
       irPageUrl &&
       validationResult.value &&
-      determineStatus(validationResult.value) !== 'complete' &&
+      determineStatus(validationResult.value, state.detectedCompanyType ?? undefined) !== 'complete' &&
       pdfishForChase
     ) {
       log.info(`[${name}] Completeness chase: IR HTML supplement for remaining nulls`);
@@ -1395,9 +1395,9 @@ async function processCompany(
         );
         validationResult = {
           status:
-            determineStatus(vIr.data) === 'complete' && pdfishForChase
+            determineStatus(vIr.data, state.detectedCompanyType ?? undefined) === 'complete' && pdfishForChase
               ? 'success'
-              : determineStatus(vIr.data) === 'complete'
+              : determineStatus(vIr.data, state.detectedCompanyType ?? undefined) === 'complete'
                 ? 'partial'
                 : validationResult.status,
           value: vIr.data,
@@ -1422,7 +1422,7 @@ async function processCompany(
     if (
       company.orgNumber &&
       validationResult.value &&
-      determineStatus(validationResult.value) !== 'complete' &&
+      determineStatus(validationResult.value, state.detectedCompanyType ?? undefined) !== 'complete' &&
       state.dataSource &&
       state.dataSource !== 'allabolag'
     ) {
@@ -1446,9 +1446,9 @@ async function processCompany(
           state.dataSource === 'search+pdf';
         validationResult = {
           status:
-            determineStatus(v2.data) === 'complete' && pdfish
+            determineStatus(v2.data, state.detectedCompanyType ?? undefined) === 'complete' && pdfish
               ? 'success'
-              : determineStatus(v2.data) === 'complete'
+              : determineStatus(v2.data, state.detectedCompanyType ?? undefined) === 'complete'
                 ? 'partial'
                 : validationResult.status,
           value: v2.data,
@@ -1481,12 +1481,12 @@ async function processCompany(
         );
         validationResult = {
           status:
-            determineStatus(vManual.data) === 'complete' &&
+            determineStatus(vManual.data, state.detectedCompanyType ?? undefined) === 'complete' &&
             (state.dataSource === 'pdf' ||
               state.dataSource === 'playwright+pdf' ||
               state.dataSource === 'search+pdf')
               ? 'success'
-              : determineStatus(vManual.data) === 'complete'
+              : determineStatus(vManual.data, state.detectedCompanyType ?? undefined) === 'complete'
                 ? 'partial'
                 : validationResult.status,
           value: vManual.data,
@@ -1516,7 +1516,7 @@ async function processCompany(
     pdfLikeSources.includes(state.dataSource) &&
     validationResult.value
   ) {
-    const rowStatus = determineStatus(validationResult.value);
+    const rowStatus = determineStatus(validationResult.value, state.detectedCompanyType ?? undefined);
     const dt = await runChallengerTrack({
       companyDisplayName: name,
       legalNameForPrompt: entity.legalName,
@@ -1572,7 +1572,7 @@ async function processCompany(
     }
   }
 
-  const status = determineStatus(validationResult.value);
+  const status = determineStatus(validationResult.value, state.detectedCompanyType ?? undefined);
 
   return {
     company: name,
@@ -1621,11 +1621,17 @@ function nullSustainability(note: string): SustainabilityData {
   };
 }
 
-function determineStatus(data: ExtractedData | null): ResultStatus {
+function determineStatus(data: ExtractedData | null, companyType?: string): ResultStatus {
   if (!data) return 'failed';
-  const fields = [data.revenue_msek, data.ebit_msek, data.employees, data.ceo];
+  // Investment companies intentionally omit EBIT (portfolio result ≠ industrial EBIT).
+  // Require only revenue, employees, and CEO for them.
+  const fields =
+    companyType === 'investment_company'
+      ? [data.revenue_msek, data.employees, data.ceo]
+      : [data.revenue_msek, data.ebit_msek, data.employees, data.ceo];
+  const required = fields.length;
   const nonNull = fields.filter((f) => f !== null).length;
-  if (nonNull === 4) return 'complete';
+  if (nonNull === required) return 'complete';
   if (nonNull > 0) return 'partial';
   return 'failed';
 }

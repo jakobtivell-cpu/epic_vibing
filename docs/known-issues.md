@@ -1,11 +1,29 @@
-# Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-11)
+# Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-12)
 
 Fresh diagnosis from `output/results.json` + `output/run_summary.json` (136
 companies: 88 complete, 23 partial, 3 failed, 22 timeout). Per-field null
 counts in the last run: `fiscal_year` 38, `ebit`/`employees` 36, `revenue` 34,
 `ceo` 27.
 
-## Fix round 11 (this run — documentation only)
+## Fix round 12 (this run — documentation only)
+
+**Diagnosis** — `run_summary.json` timestamp is still **2026-04-15**; failure
+counts and clusters match prior triage. No **new** ≥3-company pattern appears that
+is both **not already covered on `main`** (rounds 6–9) and **safe to fix in one
+commit** without a refreshed `results.json`.
+
+**Fixed (this round)** — *No code changes.*
+
+**Skipped** — Same as rounds 10–11 (stale JSON vs merged fixes; heterogeneous
+leftovers; investment EBIT ×3 with mixed causes; CEO “Chief Human Resources” ×1
+below cluster threshold per prompt rules).
+
+**Hypotheses needing a fresh scrape:** unchanged — regenerate `output/results.json`
+on current `main` before the next code fix round.
+
+---
+
+## Fix round 11 (historical — documentation only)
 
 **Diagnosis (same scrape JSON)** — Same landscape as round 10. Examples: **five**
 `complete` rows still show **non-person** `ceo` strings (“Changing World”, “Exchange
@@ -30,10 +48,10 @@ current `main`; whether a **new** ≥3 cluster appears after refresh.
 
 ## STOP — human action required (guardrails)
 
-**Fix rounds 10 and 11 both shipped no code commits.** Per the iterative prompt
-rules: **stop this bug-hunt loop** until **`output/results.json` is regenerated**
-by a full scrape on current `main`. Further passes on the same JSON will keep
-re-triaging stale symptoms.
+**Fix rounds 10, 11, and 12 all shipped no code commits.** Per the iterative
+prompt rules: **stop this bug-hunt loop** until **`output/results.json` is
+regenerated** by a full scrape on current `main`. Further passes on the same
+JSON will keep re-triaging stale symptoms.
 
 ---
 

@@ -3010,14 +3010,17 @@ export function extractFields(
     if (yearLike) {
       notes.push(`Employee count ${parsedEmployees} discarded — likely fiscal-year column misread`);
       log.warn(`Employees ${parsedEmployees} looks like fiscal year ${fy ?? 'n/a'} — discarding`);
-    } else if (detectedType === 'investment_company' && parsedEmployees >= 2_000) {
-      notes.push(
-        `Employee count ${parsedEmployees} discarded — likely portfolio/holdings headcount for investment company`,
-      );
-      log.warn(
-        `Employees ${parsedEmployees} likely portfolio-level for investment company ${companyName} — discarding`,
-      );
     } else {
+      // Labeled FTE for investment/holding companies is usually consolidated portfolio staff, not
+      // parent-only operating headcount — discarding produced systematic null employees on valid rows.
+      if (detectedType === 'investment_company' && parsedEmployees >= 2_000) {
+        notes.push(
+          `Investment company: employee count ${parsedEmployees} kept as portfolio/consolidated headcount — not comparable to industrial operating FTE`,
+        );
+        log.info(
+          `Employees ${parsedEmployees} kept (investment company portfolio-level) for ${companyName}`,
+        );
+      }
       let empVal = parsedEmployees;
       const lineText = lines[workingEmpMatch.lineIndex] ?? '';
       const lineWindow = `${lineText} ${lines[workingEmpMatch.lineIndex + 1] ?? ''}`.toLowerCase();

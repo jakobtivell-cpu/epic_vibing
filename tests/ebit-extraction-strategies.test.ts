@@ -221,6 +221,20 @@ describe('EBIT extraction strategies', () => {
     ).toBe(true);
   });
 
+  it('investment_company: keeps large labeled headcount as portfolio/consolidated FTE', () => {
+    const text = [
+      'Annual report 2025',
+      'Average number of employees  8530',
+    ].join('\n');
+    const r = extractFields(text, 'InvCoC', 2025, 'investment_company');
+    expect(r.data.employees).toBe(8530);
+    expect(
+      r.notes.some((n) =>
+        /portfolio\/consolidated headcount/i.test(n),
+      ),
+    ).toBe(true);
+  });
+
   it('telecom: prefers adjusted EBIT over reported operating income', () => {
     const text = [
       'Telecom operations',

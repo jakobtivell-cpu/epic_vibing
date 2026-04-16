@@ -1747,6 +1747,12 @@ const CEO_HEADING_OR_BOILERPLATE_SUBSTRINGS: readonly string[] = [
   // Subsidiary / brand names that appear beside CEO label but are not the person
   'volkswagen',
   'sport games',
+  // Corporate-entity labels that appear in parenthetical notes near the CEO line
+  'parent com',
+  'holding company',
+  'group plc',
+  'group ab',
+  'moderbolag',
 ];
 
 /** Reject when every substantive token of the CEO span appears in the legal company name (reports sometimes duplicate the trading name next to the CEO label). */

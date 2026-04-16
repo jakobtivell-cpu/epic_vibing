@@ -1,11 +1,35 @@
-# Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-4)
+# Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-5)
 
 Fresh diagnosis from `output/results.json` + `output/run_summary.json` (136
 companies: 88 complete, 23 partial, 3 failed, 22 timeout). Per-field null
 counts in the last run: `fiscal_year` 38, `ebit`/`employees` 36, `revenue` 34,
 `ceo` 27.
 
-## Fix round 4 (this run)
+## Fix round 5 (this run)
+
+**Fixed**
+
+- **Orphan tiny `ebit_msek` with no revenue** — Several partial rows (e.g.
+  Essity, Electrolux Professional, Nyfosa, Getinge-class) had null revenue but
+  EBIT in the single- or low-double-digit MSEK while employees were in the
+  thousands — implausible operating result vs headcount. Discarded in
+  `extractFields` via `shouldDiscardOrphanEbitVersusHeadcount` (`field-extractor.ts`).
+- **M&A / acquisition presentation PDFs ranked as annual report** — Sandvik’s
+  URL path contained a typo `acqusition-presentations` / deck-style `presentation`
+  file; when no `annual_like` candidate exists, the fallback pool must not prefer
+  that PDF. Added `TEXT_NEGATIVE` + `urlScore` penalties and `acq[u]?isition` in
+  non-annual classification (`report-ranker.ts`).
+
+**Skipped (still visible in stale JSON or need re-scrape / bespoke work)**
+
+- **Industrial Camurus-scale KSEK**, **timeouts (22)**, **Arion ISK**, **Volvo Car /
+  Wallenstam wrong doc**, **Wihlborgs employee OCR**, **holdings partial EBIT** —
+  not fully addressed this round; see numbered sections below.
+
+**Human loop note:** If two consecutive fix rounds produce no code commits, stop
+the prompt loop and refresh data (e.g. new scrape) before continuing.
+
+## Fix round 4 (historical)
 
 **Fixed**
 
@@ -25,9 +49,6 @@ counts in the last run: `fiscal_year` 38, `ebit`/`employees` 36, `revenue` 34,
 - **Pipeline timeouts (22)**, **Arion ISK**, **wrong PDF first** (Sandvik / Volvo
   Car / Wallenstam), **Wihlborgs employee OCR concat**, **partial EBIT on
   holdings** — unchanged; see sections below.
-
-**Human loop note:** If two consecutive fix rounds produce no code commits, stop
-the prompt loop and refresh data (e.g. new scrape) before continuing.
 
 ## Fix round 3 (historical)
 
@@ -57,7 +78,7 @@ the prompt loop and refresh data (e.g. new scrape) before continuing.
 ---
 
 Additional failure patterns from earlier analysis. Items marked ✅ were
-addressed in fix rounds 1–4 where noted; unmarked items are NOT fully fixed.
+addressed in fix rounds 1–5 where noted; unmarked items are NOT fully fixed.
 
 ## 1. Pipeline timeouts (22/136 companies — 16.2%)
 
@@ -105,12 +126,15 @@ the body, unit context falls back to MSEK. Needs a fresh scrape to confirm on
 
 ## 4. Wrong document type selected
 
-- Sandvik — auditors' remuneration PDF (no P&L, all financials null, emp=600)
+- Sandvik — in the last run, an acquisition/M&A **presentation** PDF was chosen
+  (not the consolidated annual report; financials null, spurious `emp=600`).
 - Volvo Car — Corporate Governance Report instead of Annual Report
 - Wallenstam — sustainability report as primary
 
-Potential fix: stronger negative scoring for governance/auditor documents
-in `report-ranker.ts` TEXT_NEGATIVE patterns.
+✅ **Partially addressed (fix round 5):** extra penalties for acquisition-deck URL
+paths (including common `acqusition` typo) in `report-ranker.ts`. Volvo Car /
+Wallenstam still need stronger governance/sustainability deprioritization or
+better primary PDF discovery.
 
 ## 5. Investment companies have non-standard financials
 

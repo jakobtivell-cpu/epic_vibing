@@ -1,59 +1,77 @@
-# Known Issues — Full Scrape Analysis (2026-04-15)
+# Known Issues — Full Scrape Analysis (2026-04-15, post-fix-round-1)
 
-Additional failure patterns identified from `output/results.json` (136 companies,
-54 complete / 15 partial / 67 timeout). These are NOT yet fixed.
+Additional failure patterns from `output/results.json` (136 companies:
+88 complete, 23 partial, 3 failed, 22 timeout). These are NOT yet fixed.
 
-## 1. Pipeline timeouts (67/136 companies)
+## 1. Pipeline timeouts (22/136 companies — 16.2%)
 
-Half the companies timed out at 180s before reaching extraction. Root causes vary:
-- IR page not discovered (no `irPage` in results)
-- IR page discovered but sub-page crawl + fallback ladder exhausted the budget
-- Playwright fallback triggered but slow on JS-heavy IR sites
+Companies timing out at 210s: ABB, Electrolux, Ericsson, Handelsbanken,
+Swedbank, DNB, Stora Enso, Saab, NIBE, Sinch, and others.
 
-Potential fix: increase per-company timeout, parallelize discovery steps, or
-add curated `irPage`/`annualReportPdfUrls` overrides in `data/ticker.json`.
+Root causes: complex JS-heavy IR pages exhausting Playwright budget, deep
+sub-page crawl + fallback ladder consuming the timeout, or IR page not
+discovered at all.
 
-## 2. Wrong document type selected
+Potential fix: curate `irPage`/`annualReportPdfUrls` overrides in
+`data/ticker.json` for the 22 timeout companies, or increase per-company
+timeout for known-slow sites.
 
-Several companies got governance, sustainability, or auditor reports instead of
-the full annual report:
+## 2. KSEK/wrong-scale revenue (inflated by 1000x)
+
+Several companies have revenue values 100x–1000x too large, suggesting
+the extractor read KSEK or TSEK values without downscaling to MSEK:
+
+| Company | Revenue (MSEK) | Expected ~MSEK | Employees |
+| --- | --- | --- | --- |
+| Atrium Ljungberg | 2,988,000 | ~3,000 | 111 |
+| Wihlborgs | 4,354,000 | ~4,350 | 156,152 (also wrong) |
+| Bonesupport | 591,077 | ~591 | 9,008 |
+| Camurus | 532,265 | ~532 | null |
+| Hacksaw | 313,855 | ~314 | 439,453 (also wrong) |
+| Bilia | 530,804 | ~38,000 | 5,559 |
+| Systemair | 301,512 | ~13,500 | 6,555 |
+
+Potential fix: strengthen the KSEK guard in `applyRevenueMegascaleMsekGuard`
+to cross-check revenue/employee ratios for obvious 1000x misscale.
+
+## 3. False EUR detection (Holmen AB)
+
+Holmen is a Swedish company reporting in SEK, but `detectUnitContext` matched
+an EUR pattern early in the document (possibly from a footnote about EUR-
+denominated debt). Revenue was then multiplied by 11.25, inflating from
+~15,400 → 173,554 MSEK.
+
+Potential fix: require EUR/USD unit markers to appear near financial table
+headers (income statement context), not just anywhere in the document.
+
+## 4. Wrong document type selected
+
 - Sandvik — auditors' remuneration PDF (no P&L, all financials null)
-- Volvo Car — Corporate Governance Report 2023
+- Volvo Car — Corporate Governance Report 2023 instead of Annual Report
 - Wallenstam — sustainability report as primary
-- Lindab — sustainability PDF URL but financials still extracted
 
-Potential fix: stronger negative scoring for "governance", "sustainability-only",
-and "auditor" documents in `report-ranker.ts` TEXT_NEGATIVE patterns.
+Potential fix: stronger negative scoring for governance/auditor documents
+in `report-ranker.ts` TEXT_NEGATIVE patterns.
 
-## 3. Investment companies have non-standard financials
+## 5. Investment companies have non-standard financials
 
-Investor, Kinnevik, Bure, Industrivärden: revenue/EBIT definitions don't map
-cleanly to industrial labels. Employees are often discarded as "portfolio headcount".
+Investor, Kinnevik, Bure, Industrivärden: revenue/EBIT definitions don't
+map to industrial labels. Employee counts are often portfolio headcount.
 
-Potential fix: refine `investment_company` label sets and loosen employee thresholds
-for this company type.
+Potential fix: refine `investment_company` label sets and mark EBIT as
+legitimately N/A for these entities.
 
-## 4. Fiscal year misread as employee count
+## 6. CEO extraction picks up headings
 
-Some companies have employee values that match a fiscal year (e.g. 2025, 2024).
-The existing `isFiscalYearMisreadAsEmployees` guard catches some but not all cases.
-
-## 5. CEO extraction picks up headings
-
-AstraZeneca: CEO extracted as "Changing World" (a section heading). The CEO finder
-regex sometimes matches text after "VD" or "CEO" labels that is a heading rather
+AstraZeneca: CEO extracted as "Changing World" (a section heading near the
+CEO label). The regex matches text after "CEO" that is a heading rather
 than a person's name.
 
-Potential fix: add a name-plausibility check (must contain at least two capitalized
-words, no common heading words like "report", "world", "summary").
+Potential fix: add name-plausibility check (must contain 2+ capitalized
+words, reject common heading words like "report", "world", "summary").
 
-## 6. Revenue from calendar-year bleed
+## 7. Stale cache files from pre-fix-round-1
 
-Lundin Mining: revenue extracted as 2025 (the calendar year leaked into the revenue
-field from a year column). The fused-year guard didn't catch single-year values.
-
-## 7. Stale cache entries from unknown_year collisions
-
-Fixed in this round (Bug 2), but existing `downloads/` cache files with the old
-`{slug}_unknown_year_annual_report.pdf` naming may still cause stale hits on re-runs.
-Consider clearing `downloads/` before the next full scrape.
+Old download cache files with the `{slug}_unknown_year_annual_report.pdf`
+naming (without URL hash) may still cause stale hits on re-runs. Clear
+`downloads/` before the next full scrape.

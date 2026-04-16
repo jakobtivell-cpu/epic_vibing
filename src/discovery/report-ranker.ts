@@ -59,6 +59,11 @@ const TEXT_NEGATIVE: { pattern: RegExp; points: number }[] = [
   { pattern: /\bgovernance\b/i, points: -8 },
   { pattern: /\bremuneration\b/i, points: -8 },
   { pattern: /\bpresentation\b/i, points: -8 },
+  {
+    pattern:
+      /\bacq[u]?isition\b|acquisition[-_\s]present|\bpresentations\/[^?\s]*acqui|\b(?:m&a|mergers?\s+and\s+acquisitions?)\b[^\n]{0,80}\bpresentation\b/i,
+    points: -32,
+  },
   { pattern: /capital\s*markets?\s*day/i, points: -8 },
   { pattern: /\bpress\s*release\b/i, points: -10 },
   { pattern: /\bnews\b/i, points: -8 },
@@ -105,7 +110,7 @@ const TEXT_NEGATIVE: { pattern: RegExp; points: number }[] = [
 const REPORT_CLASS_ANNUAL_RE =
   /\b(annual\s+(and\s+sustainability\s+)?report|årsredovisning|integrated\s+annual\s+report|annual\s+financial\s+report)\b/i;
 const REPORT_CLASS_NON_ANNUAL_RE =
-  /\b(corporate\s+governance|governance\s+report|governance\s+statement|policy|presentation|factbook|year\s+in\s+brief|remuneration\s+report|annual\s+general\s+meeting|agm|notice\s+of\s+meeting|sustainability\s+report|hållbarhetsrapport|hållbarhetsredovisning)\b/i;
+  /\b(corporate\s+governance|governance\s+report|governance\s+statement|policy|presentation|factbook|year\s+in\s+brief|remuneration\s+report|annual\s+general\s+meeting|agm|notice\s+of\s+meeting|sustainability\s+report|hållbarhetsrapport|hållbarhetsredovisning|acq[u]?isition)\b/i;
 
 export type ReportClass = 'annual_like' | 'non_annual_like' | 'unknown';
 
@@ -142,7 +147,7 @@ function sustainabilityPenalty(text: string): number {
 
 // ---- URL scoring ----
 
-function urlScore(href: string): number {
+export function urlScore(href: string): number {
   let score = 0;
   const lower = href.toLowerCase();
 
@@ -150,6 +155,15 @@ function urlScore(href: string): number {
   if (/annual|arsredovisning|årsredovisning/i.test(lower)) score += 4;
   if (/annual-and-sustainability|annual.report|arsredovisning|års-och-hållbarhets/i.test(lower)) {
     score += 3;
+  }
+  // M&A / investor-deck PDFs (often typo "acqusition"); when no annual_like link exists these
+  // must not beat a weak but real årsredovisning URL in the fallback pool.
+  if (
+    /\bacq[u]?isition\b|acquisition[-_\s]present|\bpresentations\/[^?\s]*acqui|\b(?:m&a|mergers?\s+and\s+acquisitions?)[-_\s]/i.test(
+      lower,
+    )
+  ) {
+    score -= 38;
   }
   if (/press|\/pr-|\/news\/|pressrelease|_pr_/i.test(lower)) score -= 10;
   if (/interim|quarterly|q[1-4]\b/i.test(lower)) score -= 8;

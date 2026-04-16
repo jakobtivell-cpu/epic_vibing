@@ -1,11 +1,45 @@
-# Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-8)
+# Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-9)
 
 Fresh diagnosis from `output/results.json` + `output/run_summary.json` (136
 companies: 88 complete, 23 partial, 3 failed, 22 timeout). Per-field null
 counts in the last run: `fiscal_year` 38, `ebit`/`employees` 36, `revenue` 34,
 `ceo` 27.
 
-## Fix round 8 (this run)
+## Fix round 9 (this run)
+
+**Diagnosis (same scrape JSON)** — **Eight** rows hit the validator line **“Revenue …
+MSEK below 1,000 — implausible for Large Cap industrial”** (industrial gate).
+Several show **mid-hundreds** “MSEK” net sales with **thousands of employees** and
+**healthy EBIT/revenue on that same mis-scaled pair** (e.g. hygiene / equipment
+names), consistent with a **×1000** unit error before the 1k floor. Others are
+wrong-doc, mining, mis-typed RE, or inconsistent EBIT/employee rows where a
+blind ×1000 would misfire.
+
+**Fixed**
+
+- **Industrial sub–1k revenue recovery** — When revenue is in **[100, 999]**, employees
+  **≥ 5k**, revenue/employee **< 0.03 MSEK/FTE**, and operating margin on the
+  **extracted** pair is **8–45%**, apply **×1000** with a warning instead of
+  nulling (`validator.ts`). Targets the hygiene/equipment-style cluster; **low
+  margin on the micro pair** skips landlord / wrong-line cases in the same gate.
+
+**Skipped**
+
+- **Rows where revenue, EBIT, and employees are jointly wrong** (e.g. Getinge-class
+  headcount), **wrong PDF / governance**, **timeouts**, **industrial EBIT-only
+  partials (5)** — still need re-scrape or bespoke extraction; not the same
+  gate pattern.
+- **Post-recovery EBIT** may still be on the wrong scale even when revenue
+  recovers — confirm on a fresh scrape.
+
+**Hypotheses needing a fresh scrape:** whether Essity-class rows gain plausible
+`revenue_msek` without new false positives; whether Nyfosa-class stays null as
+intended.
+
+**Human loop note:** This round shipped a code commit. If **two consecutive**
+future fix rounds ship **no** commits, stop and re-scrape before continuing.
+
+## Fix round 8 (historical)
 
 **Diagnosis (same scrape JSON)** — Among rows with `extractedData`, **nine** had
 `employees` null while `revenue_msek` was set. **Four** are

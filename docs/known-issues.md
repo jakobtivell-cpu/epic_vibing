@@ -1,11 +1,35 @@
-# Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-3)
+# Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-4)
 
 Fresh diagnosis from `output/results.json` + `output/run_summary.json` (136
 companies: 88 complete, 23 partial, 3 failed, 22 timeout). Per-field null
 counts in the last run: `fiscal_year` 38, `ebit`/`employees` 36, `revenue` 34,
 `ceo` 27.
 
-## Fix round 3 (this run)
+## Fix round 4 (this run)
+
+**Fixed**
+
+- **`fiscal_year` null despite good revenue** — Ten tickers had only “Fiscal year
+  not found…” in notes (e.g. period-end wording lives with the income statement,
+  past the 15k-char early window). Added a deep, anchor-only scan (English/Swedish
+  closing-date phrases + integrated report title) in `findFiscalYear`.
+- **False EUR unit context (Holmen-class)** — Early `MEUR` in footnotes won over
+  later “Amounts in SEK m” on the consolidated statements. `detectUnitContext`
+  now prefers explicit body SEK-millions wording when the EUR hit is still in
+  the front matter.
+
+**Skipped (same scrape JSON; no new clusters ≥3 with a better tractable fix)**
+
+- **Industrial mid-band KSEK-as-MSEK** (e.g. Camurus) — still needs joint
+  context, not a lower global industrial threshold.
+- **Pipeline timeouts (22)**, **Arion ISK**, **wrong PDF first** (Sandvik / Volvo
+  Car / Wallenstam), **Wihlborgs employee OCR concat**, **partial EBIT on
+  holdings** — unchanged; see sections below.
+
+**Human loop note:** If two consecutive fix rounds produce no code commits, stop
+the prompt loop and refresh data (e.g. new scrape) before continuing.
+
+## Fix round 3 (historical)
 
 **Fixed**
 
@@ -27,17 +51,13 @@ counts in the last run: `fiscal_year` 38, `ebit`/`employees` 36, `revenue` 34,
   industrial threshold alone.
 - **Pipeline timeouts (22)** — operational / override / timeout budget, not
   addressed here.
-- **Holmen false EUR**, **Arion ISK**, **wrong PDF ranked first** (Sandvik /
-  Volvo Car / Wallenstam), **Wihlborgs employee OCR concat** — still listed
-  in sections 2–5 below; not re-diagnosed beyond what the JSON already shows.
-
-**Human loop note:** If two consecutive fix rounds produce no code commits, stop
-the prompt loop and refresh data (e.g. new scrape) before continuing.
+- **Arion ISK**, **wrong PDF ranked first** (Sandvik / Volvo Car / Wallenstam),
+  **Wihlborgs employee OCR concat** — still listed in sections 2–5 below.
 
 ---
 
 Additional failure patterns from earlier analysis. Items marked ✅ were
-addressed in fix rounds 1–3 where noted; unmarked items are NOT fully fixed.
+addressed in fix rounds 1–4 where noted; unmarked items are NOT fully fixed.
 
 ## 1. Pipeline timeouts (22/136 companies — 16.2%)
 
@@ -78,8 +98,10 @@ an EUR pattern early in the document (possibly from a footnote about EUR-
 denominated debt). Revenue was then multiplied by 11.25, inflating from
 ~15,400 → 173,554 MSEK.
 
-Potential fix: require EUR/USD unit markers to appear near financial table
-headers (income statement context), not just anywhere in the document.
+✅ **Addressed (fix round 4):** when the winning EUR marker sits in the first
+~45k chars and explicit “Amounts in SEK m” / `belopp i msek` appears later in
+the body, unit context falls back to MSEK. Needs a fresh scrape to confirm on
+`HOLM-A.ST` row.
 
 ## 4. Wrong document type selected
 

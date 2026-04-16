@@ -418,9 +418,15 @@ function detectUnitContext(text: string): UnitContext | null {
         firstMatchIndex(lower, /\bin\s+millions?\s+of\s+(?:u\.?s\.?\s*)?dollars?\b/),
         firstMatchIndex(lower, /\bu\.?s\.?\s*dollars?\s+in\s+millions?\b/),
         firstMatchIndex(lower, /\busd\s*(?:million|millions|m)\b/),
+        firstMatchIndex(lower, /\bmusd\b/),
         firstMatchIndex(lower, /\bus\$\s*(?:million|millions|m)\b/),
         firstMatchIndex(lower, /\bu\.?s\.?\s*\$\s*(?:million|millions|m)\b/),
         firstMatchIndex(lower, /\bmillion\s+u\.?s\.?\s*dollars?\b/),
+        firstMatchIndex(lower, /\$\s*m\b/),
+        firstMatchIndex(lower, /\$\s*million/),
+        firstMatchIndex(lower, /\bin\s+\$\s*(?:million|millions|m)\b/),
+        firstMatchIndex(lower, /amounts?\s+in\s+\$\s*(?:million|millions|m)\b/),
+        firstMatchIndex(lower, /\bfigures?\s+in\s+\$\s*(?:million|millions|m)\b/),
       ),
     },
     {
@@ -621,6 +627,26 @@ function findNarrativeEmployeeHit(text: string): NarrativeEmployeeHit | null {
     {
       re: /\baverage\s+number\s+of\s+employees(?:\s+was|\s+were|\s*[:=])?\s*(\d{2,3}(?:,\d{3})*|\d{2,6})\b/gi,
       label: 'average number of employees',
+    },
+    {
+      re: /\bnumber\s+of\s+employees(?:\s+at\s+year[- ]end)?(?:\s+was|\s+were|\s*[:=])?\s*(\d{2,3}(?:,\d{3})*|\d{2,6})\b/gi,
+      label: 'number of employees',
+    },
+    {
+      re: /\b(?:approximately|approx\.?|about|around|circa)\s+(\d{2,3}(?:,\d{3})*|\d{2,6})\s+(?:employees|FTEs?|full[- ]time\s+equivalents?)\b/gi,
+      label: 'approximately N employees/FTE',
+    },
+    {
+      re: /\b(\d{2,3}(?:,\d{3})*|\d{2,6})\s+(?:full[- ]time\s+equivalents?|FTEs?)\b/gi,
+      label: 'N FTE',
+    },
+    {
+      re: /\bheadcount(?:\s+was|\s+of|\s*[:=])?\s*(\d{2,3}(?:,\d{3})*|\d{2,6})\b/gi,
+      label: 'headcount',
+    },
+    {
+      re: /\b(\d{2,3}(?:,\d{3})*|\d{2,6})\s+employees\s+(?:worldwide|globally|across)\b/gi,
+      label: 'N employees worldwide',
     },
   ];
 
@@ -2865,7 +2891,12 @@ export function extractFields(
         }
       }
 
-      if (revenue !== null && revenue > 10_000 && employees > 0 && employees < 500) {
+      const empSuspectRetry =
+        revenue !== null &&
+        revenue > 10_000 &&
+        employees > 0 &&
+        (employees < 500 || employees < revenue / 100);
+      if (empSuspectRetry) {
         notes.push(`SUSPECT_LOW: ${employees} employees vs ${revenue} MSEK revenue — trying narrative fallback`);
         log.warn(`Employee count ${employees} implausibly low for ${revenue} MSEK revenue — retrying via narrative`);
         const narrativeRetry = findNarrativeEmployeeHit(text);

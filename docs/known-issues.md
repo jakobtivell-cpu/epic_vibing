@@ -1,5 +1,9 @@
 # Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-13)
 
+## Fix round 14 — artifact mismatch, exit
+
+`run_summary.json` (2026-04-16T08:49:45.874Z, 48 companies) does not match `results.json` (136 rows from 2026-04-15 scrape) — regenerate both from a single full run before the next fix round.
+
 Fresh diagnosis from `output/results.json` + `output/run_summary.json` (136
 companies: 88 complete, 23 partial, 3 failed, 22 timeout). Per-field null
 counts in the last run: `fiscal_year` 38, `ebit`/`employees` 36, `revenue` 34,

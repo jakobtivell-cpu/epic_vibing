@@ -3105,6 +3105,35 @@ export function extractFields(
         notes.push(`SUSPECT_LOW: ${employees} employees vs ${revenue} MSEK revenue (< 1 per 10 MSEK)`);
         log.warn(`Employee count ${employees} suspiciously low relative to revenue ${revenue} MSEK`);
       }
+
+      // SUSPECT_HIGH: revenue/employees < 0.055 MSEK suggests OCR-concatenated multi-year column
+      // or wrong table row. Banks are exempt (revenue proxy is a fraction of real operating scale).
+      const msekPerEmployee = revenue !== null && revenue > 0 ? revenue / employees : null;
+      if (
+        detectedType !== 'bank' &&
+        revenue !== null &&
+        revenue > 1_000 &&
+        msekPerEmployee !== null &&
+        msekPerEmployee < 0.055
+      ) {
+        notes.push(
+          `SUSPECT_HIGH: ${employees} employees vs ${revenue} MSEK revenue (${msekPerEmployee.toFixed(3)} MSEK/emp) — trying narrative fallback`,
+        );
+        log.warn(`Employee count ${employees} implausibly high for ${revenue} MSEK revenue — retrying via narrative`);
+        const narrativeRetry = findNarrativeEmployeeHit(text);
+        if (narrativeRetry !== null && narrativeRetry.employees < employees) {
+          notes.push(
+            `Employee count revised from ${employees} to ${narrativeRetry.employees} via narrative (${narrativeRetry.matchedLabel})`,
+          );
+          employees = narrativeRetry.employees;
+          empProvenance = {
+            matchedLabel: narrativeRetry.matchedLabel,
+            rawSnippet: narrativeRetry.rawSnippet,
+            lineIndex: 0,
+            context: 'management-section',
+          };
+        }
+      }
     }
   } else {
     notes.push(`Employee count not found for ${companyName}`);

@@ -120,4 +120,23 @@ describe('validateExtractedData reporting model', () => {
     );
     expect(r.data.ebit_msek).toBeNull();
   });
+
+  it('industrial: scales sub-1k revenue when headcount and EBIT margin imply ×1000 misread', () => {
+    const r = validateExtractedData(
+      { revenue_msek: 146, ebit_msek: 19, employees: 8496, ceo: 'A B', fiscal_year: 2025 },
+      'industrial',
+      [],
+    );
+    expect(r.data.revenue_msek).toBe(146_000);
+    expect(r.warnings.some((w) => /scaled ×1000/i.test(w))).toBe(true);
+  });
+
+  it('industrial: still nulls sub-1k revenue when operating margin on the micro pair is too low (wrong line / RE)', () => {
+    const r = validateExtractedData(
+      { revenue_msek: 142, ebit_msek: 5, employees: 10_984, ceo: 'A B', fiscal_year: 2025 },
+      'industrial',
+      [],
+    );
+    expect(r.data.revenue_msek).toBeNull();
+  });
 });

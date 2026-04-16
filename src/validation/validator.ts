@@ -47,9 +47,35 @@ export function validateExtractedData(
     );
     score -= 6;
   } else if (companyType === 'industrial' && cleaned.revenue_msek < 1_000) {
-    warnings.push(`Revenue ${cleaned.revenue_msek} MSEK below 1,000 — implausible for Large Cap industrial`);
-    cleaned.revenue_msek = null;
-    score -= 15;
+    const rev = cleaned.revenue_msek;
+    const emp = cleaned.employees;
+    const ebit = cleaned.ebit_msek;
+    const margin =
+      rev !== null && rev > 0 && ebit !== null && ebit > 0 ? ebit / rev : null;
+    // Mid-hundreds "MSEK" net sales with thousands of employees and a normal operating margin on
+    // that same wrong-scale pair: classic BSEK/MEUR-as-MSEK (or similar ×1000) before the Large Cap floor.
+    // Tight margin band avoids landlord / wrong-line rows where EBIT/revenue is a few % on the micro pair.
+    const plausibleThreeOrderRevenueMisread =
+      rev >= 100 &&
+      rev < 1_000 &&
+      emp !== null &&
+      emp >= 5_000 &&
+      rev / emp < 0.03 &&
+      margin !== null &&
+      margin >= 0.08 &&
+      margin <= 0.45;
+    if (plausibleThreeOrderRevenueMisread) {
+      const scaled = rev * 1_000;
+      warnings.push(
+        `Industrial: revenue ${rev} MSEK scaled ×1000 → ${scaled} MSEK — Large Cap floor: group headcount vs mid-hundreds revenue with consistent operating margin suggests unit mismatch (verify)`,
+      );
+      cleaned.revenue_msek = scaled;
+      score -= 8;
+    } else {
+      warnings.push(`Revenue ${cleaned.revenue_msek} MSEK below 1,000 — implausible for Large Cap industrial`);
+      cleaned.revenue_msek = null;
+      score -= 15;
+    }
   } else if (companyType === 'bank' && cleaned.revenue_msek < 1_000) {
     warnings.push(
       `Bank revenue-equivalent ${cleaned.revenue_msek} MSEK below 1,000 — may be unit/segment error; kept with low trust`,

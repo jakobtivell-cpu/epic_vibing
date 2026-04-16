@@ -1,11 +1,45 @@
-# Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-5)
+# Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-6)
 
 Fresh diagnosis from `output/results.json` + `output/run_summary.json` (136
 companies: 88 complete, 23 partial, 3 failed, 22 timeout). Per-field null
 counts in the last run: `fiscal_year` 38, `ebit`/`employees` 36, `revenue` 34,
 `ceo` 27.
 
-## Fix round 5 (this run)
+## Fix round 6 (this run)
+
+**Fixed**
+
+- **Industrial EBIT slightly above net sales discarded in validation** — IFRS /
+  line-definition mismatches can leave EBIT a few percent (or up to ~15% with a
+  small absolute gap) above extracted net sales; validator now keeps a tight
+  near-parity band instead of nulling EBIT (`validator.ts`). Targets partial-row
+  cluster (e.g. AddLife / Betsson scale in the last JSON).
+- **Industrial primary operating line KSEK read as MSEK** — Huge “EBIT” vs
+  credible revenue: widen the non-bank EBIT search ceiling for sub–100k MSEK
+  revenue so the bad cell is still selected, then one-shot ÷1000 recovery when
+  the primary candidate is implausible vs revenue (`field-extractor.ts`).
+  Targets Höegh-class rows in the last JSON.
+- **Bank: operating result vs very low revenue-equivalent** — When the revenue
+  proxy is under 10k MSEK, do not treat EBIT > revenue as an automatic discard;
+  the proxy is often not comparable to operating profit (`validator.ts`). Needs
+  a fresh scrape to confirm against live bank rows.
+
+**Skipped (unchanged scrape JSON; larger or bespoke work)**
+
+- **Timeouts (22)**, **industrial Camurus-scale KSEK** (joint context), **Arion
+  ISK**, **wrong PDF first** (Volvo Car / Wallenstam), **Wihlborgs employee
+  OCR**, **holdings / investment_company partial EBIT** — same as prior rounds;
+  see sections below.
+
+**Hypotheses needing a fresh scrape:** whether AddLife / Betsson / Höegh (and
+similar) move from partial to complete after validation + EBIT recovery; whether
+the bank branch removes false nulls without introducing bad assignments.
+
+**Human loop note:** This round shipped code commits. If the *next* run also
+ships commits, continue; if **two consecutive** fix rounds produce **no** code
+commits, stop the prompt loop and refresh data before continuing.
+
+## Fix round 5 (historical)
 
 **Fixed**
 
@@ -198,6 +232,11 @@ Fixed by:
 Bure, Höegh, Investor, Kinnevik, Lundin Mining. Some may be genuine
 (investment companies), others may need additional EBIT label patterns or
 tolerance for OCR-fused numbers (e.g. "13,74 3" for AstraZeneca-style spacing).
+
+✅ **Partially addressed (fix round 6):** validator near-parity keep for industrial
+EBIT vs net sales; primary EBIT ÷1000 + industrial search slop for KSEK-as-MSEK
+on the operating line — **re-scrape needed** to confirm AddLife / Betsson /
+Höegh / Alimak-class rows.
 
 ## 12. Arion banki — ISK currency not handled
 

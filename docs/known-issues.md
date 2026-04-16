@@ -1,11 +1,43 @@
-# Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-10)
+# Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-11)
 
 Fresh diagnosis from `output/results.json` + `output/run_summary.json` (136
 companies: 88 complete, 23 partial, 3 failed, 22 timeout). Per-field null
 counts in the last run: `fiscal_year` 38, `ebit`/`employees` 36, `revenue` 34,
 `ceo` 27.
 
-## Fix round 10 (this run — documentation only)
+## Fix round 11 (this run — documentation only)
+
+**Diagnosis (same scrape JSON)** — Same landscape as round 10. Examples: **five**
+`complete` rows still show **non-person** `ceo` strings (“Changing World”, “Exchange
+Act Rule”, “Joined Pandox”, “Securitas Values”, “Chief Human Resources”); **four**
+of those phrases are already in `CEO_HEADING_OR_BOILERPLATE_SUBSTRINGS` on
+`main` — the file is almost certainly **older than those commits**. **One**
+remaining gap at substring level is **Chief Human Resources** (1 ticker) — **below
+the ≥3 threshold** for a data-driven cluster this prompt. **Investment_company**
+with revenue but **null EBIT** appears **three** times; root causes differ
+(portfolio exclusion vs no line match) and a one-commit “fix” risks wrong
+assignments.
+
+**Fixed (this round)** — *No code changes.*
+
+**Skipped** — Same as round 10; no new ≥3 cluster with a single safe mechanism
+that is not already merged or long-tail.
+
+**Hypotheses needing a fresh scrape:** all prior merged fixes (rounds 6–9) vs
+current `main`; whether a **new** ≥3 cluster appears after refresh.
+
+---
+
+## STOP — human action required (guardrails)
+
+**Fix rounds 10 and 11 both shipped no code commits.** Per the iterative prompt
+rules: **stop this bug-hunt loop** until **`output/results.json` is regenerated**
+by a full scrape on current `main`. Further passes on the same JSON will keep
+re-triaging stale symptoms.
+
+---
+
+## Fix round 10 (historical — documentation only)
 
 **Diagnosis (same scrape JSON)** — Re-checked clusters vs **git history (through
 fix round 9)**. Large note-buckets still include: **“below 1,000 — implausible”**

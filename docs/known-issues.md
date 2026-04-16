@@ -1,11 +1,45 @@
-# Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-6)
+# Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-7)
 
 Fresh diagnosis from `output/results.json` + `output/run_summary.json` (136
 companies: 88 complete, 23 partial, 3 failed, 22 timeout). Per-field null
 counts in the last run: `fiscal_year` 38, `ebit`/`employees` 36, `revenue` 34,
 `ceo` 27.
 
-## Fix round 6 (this run)
+## Fix round 7 (this run)
+
+**Diagnosis (same scrape JSON)** — Of 38 `fiscal_year` nulls, 25 are timeouts /
+failed with no `extractedData`. The remaining **13** share “Fiscal year not
+found…” notes while other fields look populated (9 `complete`, 4 `partial`):
+cover/statement phrasing not covered by the round-4 anchor set.
+
+**Fixed**
+
+- **Fiscal year — extra title and period-end phrasing** — Leading-year cover
+  lines (`2024 Annual … report`), `annual report for YYYY`, `year-end report`,
+  optional **“financial”** before **“year ended”**, US order **December 31,
+  YYYY** (and June/September 30 variants), Swedish **“räkenskapsåret som
+  avslutades …”**, and **ISO `YYYY-12-31`** after räkenskapsår (`field-extractor.ts`
+  `findFiscalYear`).
+
+**Skipped**
+
+- **Timeouts / failed (25 rows)** — no extraction to patch in code this way.
+- **Industrial EBIT null (5)**, **investment_company EBIT null (3)** — prior
+  rounds already targeted; stale JSON still shows pre-fix symptoms until a new
+  scrape.
+- **Camurus-scale KSEK**, **Arion ISK**, **wrong-doc first PDF**, **Wihlborgs
+  OCR** — unchanged; see sections below.
+
+**Hypotheses needing a fresh scrape:** whether Atrium / Attendo / Axfood / Clas
+Ohlson / EQT / Hexagon / MTG / Scandic / Systemair (and partial Beijer / Cibus /
+Sandvik / Volvo Car) pick up `fiscal_year` without new false years on TOC/MD&A
+noise.
+
+**Human loop note:** This round shipped a code commit. If the next fix round
+ships none, and the one after that also ships none, stop and re-scrape before
+continuing.
+
+## Fix round 6 (historical)
 
 **Fixed**
 

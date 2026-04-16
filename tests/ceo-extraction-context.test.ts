@@ -54,6 +54,16 @@ Changing World
     expect(r.data.ceo).toBeNull();
   });
 
+  it('rejects HR org title captured as CEO (line after CEO heading)', () => {
+    const text = `
+Annual report 2025
+President and CEO
+Chief Human Resources
+`;
+    const r = extractFields(text, 'Example AB', 2025);
+    expect(r.data.ceo).toBeNull();
+  });
+
   it('rejects CEO line that only echoes the legal company trading name', () => {
     const text = `
 Annual report 2025

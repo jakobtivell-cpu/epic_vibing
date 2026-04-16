@@ -1723,6 +1723,8 @@ const CEO_HEADING_OR_BOILERPLATE_SUBSTRINGS: readonly string[] = [
   'administrative heads',
   'norwegian property',
   'exchange act',
+  // Org title on the line after "President and CEO" / "Chief Executive Officer" (not a person name).
+  'chief human resources',
   'building sweden',
   'financial manager',
   'joined pandox',

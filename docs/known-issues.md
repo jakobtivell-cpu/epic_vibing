@@ -1,8 +1,43 @@
-# Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-2)
+# Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-3)
 
-Additional failure patterns from `output/results.json` (136 companies:
-88 complete, 23 partial, 3 failed, 22 timeout). Items marked ✅ were
-addressed in fix rounds 1–2; the rest are NOT yet fixed.
+Fresh diagnosis from `output/results.json` + `output/run_summary.json` (136
+companies: 88 complete, 23 partial, 3 failed, 22 timeout). Per-field null
+counts in the last run: `fiscal_year` 38, `ebit`/`employees` 36, `revenue` 34,
+`ceo` 27.
+
+## Fix round 3 (this run)
+
+**Fixed**
+
+- **Real-estate KSEK lines tagged as MSEK** — Atrium Ljungberg, Cibus Nordic,
+  Wihlborgs (and similar): revenue sat in the hundreds of thousands to low
+  millions MSEK while the megascale guard used a 5M floor for `real_estate`, so
+  ÷1000 never ran. Threshold is now ~tens of thousands MSEK (`number-guards.ts`).
+  EBIT for cases like Cibus should follow via the existing EBIT-vs-revenue
+  megascale guard after revenue is corrected.
+- **CEO = section heading / boilerplate / legal-name echo** — Multiple Large
+  Cap rows had two-token “names” such as report headings, US filing phrases, or
+  the issuer name repeated beside the CEO label (`field-extractor.ts`).
+
+**Skipped (tractable later or needs re-scrape to confirm)**
+
+- **Industrial mid-band KSEK-as-MSEK** (e.g. Camurus ~532k MSEK with plausible
+  mega-cap magnitude) — same order of magnitude as genuine Volvo-class revenues;
+  needs a safer joint signal (snippet units, segment table, etc.), not a lower
+  industrial threshold alone.
+- **Pipeline timeouts (22)** — operational / override / timeout budget, not
+  addressed here.
+- **Holmen false EUR**, **Arion ISK**, **wrong PDF ranked first** (Sandvik /
+  Volvo Car / Wallenstam), **Wihlborgs employee OCR concat** — still listed
+  in sections 2–5 below; not re-diagnosed beyond what the JSON already shows.
+
+**Human loop note:** If two consecutive fix rounds produce no code commits, stop
+the prompt loop and refresh data (e.g. new scrape) before continuing.
+
+---
+
+Additional failure patterns from earlier analysis. Items marked ✅ were
+addressed in fix rounds 1–3 where noted; unmarked items are NOT fully fixed.
 
 ## 1. Pipeline timeouts (22/136 companies — 16.2%)
 
@@ -29,10 +64,12 @@ the extractor read KSEK or TSEK values without downscaling to MSEK:
 | Camurus | 532,265 | ~532 | null |
 | Cibus Nordic | 731,621 | ~732 | null |
 
-Potential fix: strengthen the KSEK guard in `applyRevenueMegascaleMsekGuard`
-to cross-check revenue/employee ratios for obvious 1000x misscale, and
-check for KSEK/tkr markers near the matched value even when the global
-unit context is MSEK.
+✅ **Landlord / `real_estate` typed rows:** megascale threshold lowered so the
+above Atrium / Cibus / Wihlborgs pattern is corrected (fix round 3).
+
+**Still open:** industrial-scale picks in the ~500k–3M MSEK band (e.g. Camurus)
+where ÷1000 is wrong for true mega-caps — needs stronger context than a global
+threshold; also Wihlborgs employee column concatenation is separate.
 
 ## 3. False EUR detection (Holmen AB)
 
@@ -68,8 +105,10 @@ AstraZeneca: CEO extracted as "Changing World" (a section heading near the
 CEO label). The regex matches text after "CEO" that is a heading rather
 than a person's name.
 
-Potential fix: add name-plausibility check (must contain 2+ capitalized
-words, reject common heading words like "report", "world", "summary").
+✅ **Partially addressed (fix round 3):** discard known heading/boilerplate
+substrings and CEO candidates that are only a subset of the legal company name
+(e.g. issuer repeated next to the title). Residual false positives may still
+need token-shape heuristics for edge cases.
 
 ## 7. Stale cache files from pre-fix-round-1
 

@@ -93,11 +93,16 @@
         "name": "Sandvik AB (publ)",
         "orgNumber": "556098-4739",
         "candidateDomains": [
-            "https://www.home.sandvik"
+            "https://www.home.sandvik",
+            "https://www.annualreport.sandvik"
         ],
         "irPage": "https://www.home.sandvik/en/investors/",
         "isin": "SE0000667891",
-        "irEmail": "investor.relations@sandvik.com"
+        "irEmail": "investor.relations@sandvik.com",
+        "annualReportPdfUrls": [
+            "https://www.annualreport.sandvik/en/2025/_assets/downloads/entire-en-svk-ar25.pdf"
+        ],
+        "overrideFiscalYear": 2025
     },
     "NOKIA-SEK.ST": "Nokia Oyj",
     "DNBO.ST": "DNB Bank ASA",
@@ -446,7 +451,11 @@
         "irPage": "https://www.addtech.com/investors/",
         "candidateDomains": [
             "https://www.addtech.com"
-        ]
+        ],
+        "annualReportPdfUrls": [
+            "https://www.addtech.com/fileadmin/user_upload/Arsredovisningar/Addtech-Annual-Report-24-25.pdf"
+        ],
+        "overrideFiscalYear": 2025
     },
     "STE-A.ST": {
         "name": "Stora Enso Oyj",
@@ -559,8 +568,12 @@
         ],
         "isin": "SE0016844831",
         "irEmail": "investors@volvocars.com",
-        "entityWarnings": [
-            "Annual report published as interactive web report at investors.volvocars.com — no direct PDF available. Skip or handle manually."
+        "annualReportPdfUrls": [
+            "https://investors.volvocars.com/~/media/Files/V/Volvo-Cars-IR-V2/AGM%202026%20ENG/VCG_AR_2025_ENG_260305.pdf"
+        ],
+        "overrideFiscalYear": 2025,
+        "aggregatorUrls": [
+            "https://investors.volvocars.com/en/financial-information/results-centre"
         ]
     },
     "SAGA-A.ST": {
@@ -715,7 +728,15 @@
             "https://www.bioarctic.com"
         ]
     },
-    "CAMX.ST": "Camurus AB (publ)",
+    "CAMX.ST": {
+        "name": "Camurus AB (publ)",
+        "companyType": "pharma",
+        "irPage": "https://investor.camurus.com/",
+        "candidateDomains": [
+            "https://investor.camurus.com",
+            "https://www.camurus.com"
+        ]
+    },
     "MCOV-B.ST": "Medicover AB (publ)",
     "IPCO.ST": "International Petroleum Corporation",
     "PEAB-B.ST": {
@@ -877,11 +898,15 @@
     "INTEA-D.ST": "Intea Fastigheter AB (publ)",
     "AQ.ST": {
         "name": "AQ Group AB (publ)",
-        "irPage": "https://www.aqgroup.com/investors/",
+        "irPage": "https://www.aqgroup.com/en/investor/financial-information/annual-reports",
         "candidateDomains": [
             "https://www.aqgroup.com",
             "https://www.aqg.se"
-        ]
+        ],
+        "annualReportPdfUrls": [
+            "https://www.aqgroup.com/download/5109-BBB6DE45B82AB194B124B2CDE3CFB363/AQ-Group-Annual-Report-2025.pdf"
+        ],
+        "overrideFiscalYear": 2025
     },
     "ALIF-B.ST": {
         "name": "AddLife AB (publ)",

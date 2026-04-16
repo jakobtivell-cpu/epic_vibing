@@ -901,10 +901,11 @@
         "irPage": "https://www.aqgroup.com/en/investor/financial-information/annual-reports",
         "candidateDomains": [
             "https://www.aqgroup.com",
-            "https://www.aqg.se"
+            "https://www.aqg.se",
+            "https://mb.cision.com"
         ],
         "annualReportPdfUrls": [
-            "https://www.aqgroup.com/download/5109-BBB6DE45B82AB194B124B2CDE3CFB363/AQ-Group-Annual-Report-2025.pdf"
+            "https://mb.cision.com/Main/11536/4326558/4005197.pdf"
         ],
         "overrideFiscalYear": 2025
     },
@@ -1098,7 +1099,17 @@
         ]
     },
     "BILI-A.ST": "Bilia AB (publ)",
-    "ALIG.ST": "Alimak Group AB (publ)",
+    "ALIG.ST": {
+        "name": "Alimak Group AB (publ)",
+        "irPage": "https://corporate.alimakgroup.com/en/investors/",
+        "candidateDomains": [
+            "https://corporate.alimakgroup.com"
+        ],
+        "annualReportPdfUrls": [
+            "https://corporate.alimakgroup.com/en/wp-content/uploads/sites/2/2021/10/alimakgroup-ar-2025-260317.pdf"
+        ],
+        "overrideFiscalYear": 2025
+    },
     "MTG-A.ST": {
         "name": "Modern Times Group MTG AB",
         "irPage": "https://www.mtg.com/investors/",

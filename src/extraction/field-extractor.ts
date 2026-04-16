@@ -1968,6 +1968,29 @@ function findFiscalYear(
     }
   }
 
+  // Closing date phrasing is often repeated only above the primary statements (far past
+  // the cover/TOC). Keep regexes anchored to period-end wording to avoid latching onto
+  // forward-looking "FY 2028 targets" lines in MD&A.
+  const deepText = text.substring(0, 120_000);
+  const deepAnchorPatterns = [
+    /\bfor\s+the\s+year\s+ended\s+31\s+december\s+(20[12]\d)\b/i,
+    /\bfor\s+the\s+year\s+ended\s+30\s+june\s+(20[12]\d)\b/i,
+    /\bfor\s+the\s+year\s+ended\s+30\s+september\s+(20[12]\d)\b/i,
+    // Line-start: \b does not treat Å as a word char in JS, so avoid leading \b.
+    /^\s*år(?:et)?\s+avslutat\s+den\s+31\s+december\s+(20[12]\d)\b/im,
+    /\bintegrated\s+(?:annual\s+)?(?:and\s+sustainability\s+)?report\s+(20[12]\d)\b/i,
+  ];
+  for (const pattern of deepAnchorPatterns) {
+    const match = deepText.match(pattern);
+    if (match) {
+      const year = parseInt(match[1], 10);
+      if (year >= 2020 && year <= 2030) {
+        log.debug(`Fiscal year from deep-anchor scan: ${year} (${pattern.source})`);
+        return year;
+      }
+    }
+  }
+
   if (fallbackYear !== null) {
     log.debug(`Using fallback fiscal year from discovery: ${fallbackYear}`);
     return fallbackYear;

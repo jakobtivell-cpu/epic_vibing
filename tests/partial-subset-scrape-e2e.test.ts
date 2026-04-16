@@ -23,7 +23,7 @@ describe('partial ticker subset', () => {
   it('builds a non-empty deduped list from the partial ticker set', () => {
     loadTickerMap();
     const companies = buildCompanyProfilesForTickers([...PARTIAL_SUBSET_TICKERS]);
-    expect(PARTIAL_SUBSET_TICKERS.length).toBe(46);
+    expect(PARTIAL_SUBSET_TICKERS.length).toBe(54);
     expect(companies.length).toBeGreaterThan(20);
     expect(companies.every((c) => c.name.trim().length > 0)).toBe(true);
   });

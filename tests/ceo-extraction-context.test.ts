@@ -43,4 +43,24 @@ VD
     const r = extractFields(text, 'RoleOnlyCo', 2025);
     expect(r.data.ceo).toBeNull();
   });
+
+  it('rejects adjacent report headings captured as CEO (e.g. "Changing World" on the line after the CEO title)', () => {
+    const text = `
+Annual report 2025
+Chief Executive Officer
+Changing World
+`;
+    const r = extractFields(text, 'PharmaCo PLC', 2025);
+    expect(r.data.ceo).toBeNull();
+  });
+
+  it('rejects CEO line that only echoes the legal company trading name', () => {
+    const text = `
+Annual report 2025
+Höegh Autoliners
+President and CEO
+`;
+    const r = extractFields(text, 'Höegh Autoliners ASA', 2025);
+    expect(r.data.ceo).toBeNull();
+  });
 });

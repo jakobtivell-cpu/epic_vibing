@@ -1689,6 +1689,42 @@ function isKnownNonName(text: string): boolean {
   return false;
 }
 
+/**
+ * Phrases that often sit on the same line as "CEO" / "President" in annual reports but are
+ * section headings, regulatory boilerplate, or property names — not people.
+ */
+const CEO_HEADING_OR_BOILERPLATE_SUBSTRINGS: readonly string[] = [
+  'changing world',
+  'administrative heads',
+  'norwegian property',
+  'exchange act',
+  'building sweden',
+  'financial manager',
+  'joined pandox',
+  'comments on the',
+  'securitas values',
+  'pound aktiebolag',
+];
+
+/** Reject when every substantive token of the CEO span appears in the legal company name (reports sometimes duplicate the trading name next to the CEO label). */
+function ceoCandidateIsCompanyLabelEcho(name: string, companyName: string): boolean {
+  const tokens = name
+    .toLowerCase()
+    .split(/[^a-zåäö]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 3);
+  if (tokens.length < 2) return false;
+  const co = companyName.toLowerCase();
+  return tokens.every((t) => co.includes(t));
+}
+
+function shouldDiscardCeoCandidate(name: string, companyName: string): boolean {
+  const lower = name.toLowerCase().trim();
+  if (CEO_HEADING_OR_BOILERPLATE_SUBSTRINGS.some((p) => lower.includes(p))) return true;
+  if (ceoCandidateIsCompanyLabelEcho(name, companyName)) return true;
+  return false;
+}
+
 /** Also reject lines that contain a role title suggesting someone other than the CEO. */
 function lineContainsNonCeoRole(line: string): boolean {
   const lower = line.toLowerCase();
@@ -2963,6 +2999,11 @@ export function extractFields(
   if (ceoMatch !== null) {
     if (/single electronic format|electronic format|esef/i.test(ceoMatch.name)) {
       notes.push(`CEO candidate "${ceoMatch.name}" discarded — non-person ESEF phrase`);
+      log.warn(`Discarding non-person CEO candidate: ${ceoMatch.name}`);
+    } else if (shouldDiscardCeoCandidate(ceoMatch.name, companyName)) {
+      notes.push(
+        `CEO candidate "${ceoMatch.name}" discarded — heading/boilerplate or company label echo`,
+      );
       log.warn(`Discarding non-person CEO candidate: ${ceoMatch.name}`);
     } else {
       ceo = ceoMatch.name;

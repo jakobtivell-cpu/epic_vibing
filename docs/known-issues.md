@@ -1,11 +1,47 @@
-# Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-7)
+# Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-8)
 
 Fresh diagnosis from `output/results.json` + `output/run_summary.json` (136
 companies: 88 complete, 23 partial, 3 failed, 22 timeout). Per-field null
 counts in the last run: `fiscal_year` 38, `ebit`/`employees` 36, `revenue` 34,
 `ceo` 27.
 
-## Fix round 7 (this run)
+## Fix round 8 (this run)
+
+**Diagnosis (same scrape JSON)** — Among rows with `extractedData`, **nine** had
+`employees` null while `revenue_msek` was set. **Four** are
+`investment_company` (Industrivärden, Investor, Kinnevik, Lundberg): notes show
+labeled headcounts (e.g. 3k–8k) **discarded** as “portfolio/holdings” — a
+systematic null pattern. Other employee-null rows (Camurus, Cibus, Wallenstam,
+Arion, Lundin Mining) mix extraction / doc-type / ISK issues (not one shared
+root cause ≥3).
+
+**Fixed**
+
+- **Investment company: keep large labeled employee counts** — Portfolio /
+  consolidated FTE is still the only labeled figure in many annual reports;
+  retain it with an explicit “not industrial operating FTE” note instead of
+  forcing null (`field-extractor.ts`).
+- **Income statement window + EBIT megascale handoff** — Sections shorter than
+  five lines but ending at EOF (snippets / tests) were dropped entirely; and
+  primaries rejected as “above revenue” sometimes sat in the band where
+  `applyEbitMegascaleGuard` would ÷1000 to a plausible EBIT — those now reach
+  the standard unit-guard path (`field-extractor.ts`).
+
+**Skipped**
+
+- **Timeouts / failed**, **Camurus / Wallenstam / Arion / Lundin Mining
+  employee gaps**, **industrial EBIT null (5 in JSON)** — prior rounds + need
+  re-scrape or bespoke work; not the investment-company discard pattern.
+- **Camurus-scale KSEK revenue**, **ISK**, **wrong PDF first** — unchanged.
+
+**Hypotheses needing a fresh scrape:** whether the four investment/holding rows
+gain non-null `employees` without harming downstream plausibility checks;
+whether short-IS PDFs pick up EBIT more often.
+
+**Human loop note:** This round shipped code commits. If **two consecutive**
+future fix rounds ship **no** commits, stop and re-scrape before continuing.
+
+## Fix round 7 (historical)
 
 **Diagnosis (same scrape JSON)** — Of 38 `fiscal_year` nulls, 25 are timeouts /
 failed with no `extractedData`. The remaining **13** share “Fiscal year not

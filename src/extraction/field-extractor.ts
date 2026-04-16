@@ -3078,11 +3078,20 @@ export function extractFields(
         );
         const alt = pickBetterEmployeeMatchForRevenue(allEmp, employees, revenue);
         if (alt !== null) {
-          notes.push(
-            `Employee count revised from ${employees} to ${Math.round(alt.value)} — alternate label row vs revenue plausibility`,
-          );
-          employees = Math.round(alt.value);
-          empProvenance = numMatchToProvenance(alt);
+          const altValue = Math.round(alt.value);
+          // Alternate-label candidates sometimes land on capacity/capacity metrics or
+          // HR-note totals that are >100× the labeled headcount — reject those.
+          if (altValue > employees * 100) {
+            notes.push(
+              `Alternate-label employee ${altValue} rejected — >100× labeled value (${employees}); retaining labeled value`,
+            );
+          } else {
+            notes.push(
+              `Employee count revised from ${employees} to ${altValue} — alternate label row vs revenue plausibility`,
+            );
+            employees = altValue;
+            empProvenance = numMatchToProvenance(alt);
+          }
         }
       }
 
@@ -3096,16 +3105,25 @@ export function extractFields(
         log.warn(`Employee count ${employees} implausibly low for ${revenue} MSEK revenue — retrying via narrative`);
         const narrativeRetry = findNarrativeEmployeeHit(text);
         if (narrativeRetry !== null && narrativeRetry.employees > employees) {
-          notes.push(
-            `Employee count revised from ${employees} to ${narrativeRetry.employees} via narrative (${narrativeRetry.matchedLabel})`,
-          );
-          employees = narrativeRetry.employees;
-          empProvenance = {
-            matchedLabel: narrativeRetry.matchedLabel,
-            rawSnippet: narrativeRetry.rawSnippet,
-            lineIndex: 0,
-            context: 'management-section',
-          };
+          // Narrative patterns can match non-employee large numbers (cargo units, safety
+          // statistics, etc.).  Reject the narrative hit when it is >100× the current
+          // labeled value — that multiple is implausible for any genuine headcount revision.
+          if (narrativeRetry.employees > employees * 100) {
+            notes.push(
+              `SUSPECT_LOW narrative ${narrativeRetry.employees} rejected — >100× labeled value (${employees}); suspect non-employee number in text`,
+            );
+          } else {
+            notes.push(
+              `Employee count revised from ${employees} to ${narrativeRetry.employees} via narrative (${narrativeRetry.matchedLabel})`,
+            );
+            employees = narrativeRetry.employees;
+            empProvenance = {
+              matchedLabel: narrativeRetry.matchedLabel,
+              rawSnippet: narrativeRetry.rawSnippet,
+              lineIndex: 0,
+              context: 'management-section',
+            };
+          }
         }
       } else if (revenue !== null && employees > 0 && employees < revenue / 10) {
         notes.push(`SUSPECT_LOW: ${employees} employees vs ${revenue} MSEK revenue (< 1 per 10 MSEK)`);

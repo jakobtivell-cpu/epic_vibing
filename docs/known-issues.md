@@ -1,5 +1,14 @@
 # Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-13)
 
+## Fix round 17
+- artifacts: run_summary.json 2026-04-16T08:49:45.874Z (48 rows, stale); results.json source of truth (136 rows, 2026-04-15 scrape)
+- git_head: 095f168
+- Fixed:
+  - pipeline: `determineStatus` required ebit_msek for all types; investment_company rows with revenue/employees/ceo all present were still marked partial because EBIT is intentionally not extracted. Now accepts 3-field completion for investment_company (BURE, INVE-A, KINV-A → partial → complete on re-scrape).
+  - extractor: CEO boilerplate guard extended with geographic regions ("north america", "south america", "asia pacific", etc.) and corporate function terms ("internal control", "investor relations", etc.) plus subsidiary/brand names ("volkswagen", "sport games") — 4 complete rows had quality-failure CEOs passing the old guard.
+  - extractor: SUSPECT_HIGH employee check added — when revenue/employees < 0.055 MSEK (implausibly low ratio for non-bank), tries narrative fallback and prefers a smaller count if found. Covers sub-200k inflated values missed by the existing > 200k OCR guard (WIHL 156k, SAGA 99k, TEL2 80k class).
+- Remaining toward 100%: ~51 non-success rows (24 timeout + 23 partial + 4 failed); CEO retry (round 16) + investment_company exemption (this round) likely convert ~12 partial → complete on next re-scrape.
+
 ## Fix round 16
 - artifacts: run_summary.json 2026-04-16T08:49:45.874Z (48 rows, stale); results.json treated as source of truth (136 rows, 2026-04-15 scrape)
 - git_head: 8912670

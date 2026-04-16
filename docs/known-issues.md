@@ -1,5 +1,9 @@
 # Known Issues — Full Scrape Analysis (2026-04-16, post-fix-round-13)
 
+## Fix round 15 — stop condition C, re-scrape required
+
+Scrape stale after 2 consecutive no-code rounds (rounds 14–15): `run_summary.json` (2026-04-16T08:49:45.874Z, 48 rows) still does not match `results.json` (136 rows, 2026-04-15). Re-scrape required — run `npm run test:overnight` (or equivalent full run) to regenerate both artifacts from the same execution, then restart the fix loop.
+
 ## Fix round 14 — artifact mismatch, exit
 
 `run_summary.json` (2026-04-16T08:49:45.874Z, 48 companies) does not match `results.json` (136 rows from 2026-04-15 scrape) — regenerate both from a single full run before the next fix round.

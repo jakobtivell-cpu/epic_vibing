@@ -75,6 +75,62 @@ President and CEO
   });
 });
 
+describe('CEO extraction — geographic regions and corporate functions rejected', () => {
+  it('rejects geographic region as CEO name', () => {
+    const text = `
+Annual report 2025
+North America
+President and CEO
+`;
+    const r = extractFields(text, 'GlobalCo AB', 2025);
+    expect(r.data.ceo).toBeNull();
+  });
+
+  it('rejects corporate governance function as CEO name', () => {
+    const text = `
+Annual report 2025
+Internal Control
+Chief Executive Officer
+`;
+    const r = extractFields(text, 'ControlCo AB', 2025);
+    expect(r.data.ceo).toBeNull();
+  });
+
+  it('rejects subsidiary brand name as CEO name', () => {
+    const text = `
+Annual report 2025
+Volkswagen Truck
+President and CEO
+`;
+    const r = extractFields(text, 'Traton SE', 2025);
+    expect(r.data.ceo).toBeNull();
+  });
+
+  it('rejects product division name as CEO name', () => {
+    const text = `
+Annual report 2025
+Sport Games
+Chief Executive Officer
+`;
+    const r = extractFields(text, 'Modern Times Group MTG AB', 2025);
+    expect(r.data.ceo).toBeNull();
+  });
+
+  it('still finds real person after region boilerplate discard (retry)', () => {
+    const text = `
+Annual report 2025
+North America
+President and CEO
+
+Management team
+Lars Eriksson
+CEO and President
+`;
+    const r = extractFields(text, 'GlobalCo AB', 2025);
+    expect(r.data.ceo).toBe('Lars Eriksson');
+  });
+});
+
 describe('CEO extraction — retry after boilerplate discard', () => {
   it('finds real person name after discarding a boilerplate candidate on first pass', () => {
     // Pattern: boilerplate echo appears near first CEO label; real name near second

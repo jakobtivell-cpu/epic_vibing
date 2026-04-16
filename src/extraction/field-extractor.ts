@@ -1731,6 +1731,22 @@ const CEO_HEADING_OR_BOILERPLATE_SUBSTRINGS: readonly string[] = [
   'comments on the',
   'securitas values',
   'pound aktiebolag',
+  // Corporate functions / governance terms (not person names)
+  'internal control',
+  'investor relations',
+  'corporate governance',
+  'audit committee',
+  'risk management',
+  // Geographic regions captured from division headers near CEO labels
+  'north america',
+  'south america',
+  'latin america',
+  'europe middle east',
+  'asia pacific',
+  'middle east',
+  // Subsidiary / brand names that appear beside CEO label but are not the person
+  'volkswagen',
+  'sport games',
 ];
 
 /** Reject when every substantive token of the CEO span appears in the legal company name (reports sometimes duplicate the trading name next to the CEO label). */

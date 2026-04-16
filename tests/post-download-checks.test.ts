@@ -63,6 +63,34 @@ describe('annual content verification', () => {
     expect(r.isLikelyAnnualReport).toBe(true);
   });
 
+  it('does not reject Q4+full-year combined report (mining/energy pattern) as quarterly', () => {
+    // Simulate a "Q4 2025 and Full-Year 2025 Shareholder Report" — quarterly markers in
+    // the cover but the document covers the complete fiscal year with financial statements.
+    const text = [
+      'Q4 2025 and Full-Year 2025 Shareholder Report',
+      'Fourth Quarter and Full-Year Results',
+      'Income Statement',
+      'Balance Sheet',
+      'Revenue 1 234',
+      'Operating income 456',
+    ].join('\n');
+    const r = verifyAnnualReportContent(text);
+    expect(r.isQuarterlyReport).toBe(false);
+    expect(r.isLikelyAnnualReport).toBe(true);
+  });
+
+  it('still rejects a genuine Q1 interim report (no full-year signal)', () => {
+    const text = [
+      'Q1 2025 Interim Report',
+      'First Quarter Results',
+      'Income Statement',
+      'Balance Sheet',
+      'Revenue 300',
+    ].join('\n');
+    const r = verifyAnnualReportContent(text);
+    expect(r.isQuarterlyReport).toBe(true);
+  });
+
   it('accepts bank report income markers when income statement heading is absent', () => {
     const text = [
       'Annual and Sustainability Report 2025',

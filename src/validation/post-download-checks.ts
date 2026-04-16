@@ -312,7 +312,13 @@ export function verifyAnnualReportContent(text: string): ContentCheckResult {
   const first5000 = lower.substring(0, 5_000);
   const hasQuarterlySignals = QUARTERLY_MARKERS.some((p) => p.test(first5000));
   const strongAnnualSignals = annualMarkerCount >= 4 && hasIncomeStatement && hasBalanceSheet;
-  const isQuarterlyReport = hasQuarterlySignals && !strongAnnualSignals;
+  // Q4 + full-year combined reports (common for mining/energy companies on Nordic exchanges)
+  // carry quarterly markers in the cover but cover the complete fiscal year — treat as annual.
+  const hasCombinedAnnualSignal =
+    /\bfull[- ]year\b|\bannual\s+results\b|\bfull\s+year\s+results\b|\bfiscal\s+year\s+ended\b/i.test(
+      first5000,
+    ) && hasIncomeStatement;
+  const isQuarterlyReport = hasQuarterlySignals && !strongAnnualSignals && !hasCombinedAnnualSignal;
   const isGovernanceReport =
     GOVERNANCE_MARKERS.some((p) => p.test(first5000)) && annualMarkerCount < 3;
 

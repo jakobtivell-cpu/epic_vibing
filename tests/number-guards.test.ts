@@ -44,5 +44,21 @@ describe('number-guards', () => {
       });
       expect(applyRevenueMegascaleMsekGuard(100_000_000, 'bank').adjusted).toBe(true);
     });
+
+    it('divides real_estate MSEK above tens of thousands (KSEK-as-MSEK on landlord tables)', () => {
+      expect(applyRevenueMegascaleMsekGuard(731_621, 'real_estate')).toEqual({
+        revenue: 732,
+        adjusted: true,
+      });
+      expect(applyRevenueMegascaleMsekGuard(2_988_000, 'real_estate')).toEqual({
+        revenue: 2988,
+        adjusted: true,
+      });
+    });
+
+    it('does not divide typical listed landlord revenue in MSEK', () => {
+      expect(applyRevenueMegascaleMsekGuard(4994, 'real_estate').adjusted).toBe(false);
+      expect(applyRevenueMegascaleMsekGuard(34_800, 'real_estate').adjusted).toBe(false);
+    });
   });
 });

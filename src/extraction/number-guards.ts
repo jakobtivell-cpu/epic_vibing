@@ -16,7 +16,10 @@ const MEGASCALE_MSEK_THRESHOLD: Record<'industrial' | 'bank' | 'investment_compa
   industrial: 3_000_000,
   bank: 80_000_000,
   investment_company: 2_000_000,
-  real_estate: 5_000_000,
+  // Listed Nordic landlords report rental revenue in low single-digit / low tens of thousands MSEK.
+  // Parent-company KSEK lines mis-tagged as MSEK often land in the hundreds of thousands–few M MSEK,
+  // which is far above any plausible consolidated rental total for these entities.
+  real_estate: 50_000,
 };
 
 /**

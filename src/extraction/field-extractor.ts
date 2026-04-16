@@ -1951,10 +1951,14 @@ function findFiscalYear(
   const patterns = [
     /annual\s+report\s+(\d{4})/i,
     /årsredovisning\s+(\d{4})/i,
+    // Cover-style titles often put the year first (English / bilingual PDFs).
+    /\b(20[12]\d)\s+annual\s+(?:and\s+sustainability\s+)?report\b/i,
+    /\bannual\s+(?:and\s+sustainability\s+)?report\s+for\s+(20[12]\d)\b/i,
+    /\byear[-\s]end(?:ed)?\s+report\s+(20[12]\d)\b/i,
     /fiscal\s+year\s+(\d{4})/i,
     /räkenskapsår(?:et)?\s+(\d{4})/i,
     /financial\s+year\s+(\d{4})/i,
-    /for\s+the\s+year\s+ended.*?(\d{4})/i,
+    /for\s+the\s+(?:financial\s+)?year\s+ended.*?(\d{4})/i,
     /january\s*[-–]\s*december\s+(\d{4})/i,
     /januari\s*[-–]\s*december\s+(\d{4})/i,
   ];
@@ -1993,9 +1997,15 @@ function findFiscalYear(
   // forward-looking "FY 2028 targets" lines in MD&A.
   const deepText = text.substring(0, 120_000);
   const deepAnchorPatterns = [
-    /\bfor\s+the\s+year\s+ended\s+31\s+december\s+(20[12]\d)\b/i,
-    /\bfor\s+the\s+year\s+ended\s+30\s+june\s+(20[12]\d)\b/i,
-    /\bfor\s+the\s+year\s+ended\s+30\s+september\s+(20[12]\d)\b/i,
+    // Many filers insert "financial" ("for the financial year ended …"); without it the match misses.
+    /\bfor\s+the\s+(?:financial\s+)?year\s+ended\s+31\s+december\s+(20[12]\d)\b/i,
+    /\bfor\s+the\s+(?:financial\s+)?year\s+ended\s+(?:december|dec)\s+31(?:st)?,?\s+(20[12]\d)\b/i,
+    /\bfor\s+the\s+(?:financial\s+)?year\s+ended\s+30\s+june\s+(20[12]\d)\b/i,
+    /\bfor\s+the\s+(?:financial\s+)?year\s+ended\s+(?:june)\s+30(?:th)?,?\s+(20[12]\d)\b/i,
+    /\bfor\s+the\s+(?:financial\s+)?year\s+ended\s+30\s+september\s+(20[12]\d)\b/i,
+    /\bfor\s+the\s+(?:financial\s+)?year\s+ended\s+(?:september|sep)\s+30(?:th)?,?\s+(20[12]\d)\b/i,
+    /\bräkenskapsåret\s+som\s+avslutades\s+den\s+31\s+december\s+(20[12]\d)\b/i,
+    /\b(?:för\s+)?räkenskapsåret\s+den\s+(20[12]\d)-12-31\b/i,
     // Line-start: \b does not treat Å as a word char in JS, so avoid leading \b.
     /^\s*år(?:et)?\s+avslutat\s+den\s+31\s+december\s+(20[12]\d)\b/im,
     /\bintegrated\s+(?:annual\s+)?(?:and\s+sustainability\s+)?report\s+(20[12]\d)\b/i,

@@ -270,7 +270,13 @@ describe('EBIT extraction strategies', () => {
     ].join('\n');
     const r = extractFields(text, 'SaabLike', 2025, 'industrial');
     expect(r.data.ebit_msek).toBe(1868);
-    expect(r.notes.some((n) => n.includes('EBIT unit guard: 1868000 → 1868 MSEK'))).toBe(true);
+    expect(
+      r.notes.some(
+        (n) =>
+          n.includes('EBIT unit guard: 1868000 → 1868 MSEK') ||
+          n.includes('Primary EBIT ÷1000 recovery: 1868000 → 1868'),
+      ),
+    ).toBe(true);
   });
 
   it('does not extract EBIT when raw value is far above revenue ceiling', () => {

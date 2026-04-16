@@ -184,6 +184,7 @@ Preflight evaluation checks are lightweight and deterministic (IR reachability, 
 ## Production build and Azure
 
 - Run **`npm run build`** then **`npm start`** (`node dist/server.js`). Output, downloads, cache, and **`GET /api/results`** all use the same project root via [`src/config/settings.ts`](src/config/settings.ts): from compiled `dist/src/config` the root is resolved three levels up; from source `src/config` it is two levels up. Set **`APP_ROOT`** (see [Environment](#environment)) if the app files live in a non-standard layout.
+- For **Azure Web Apps** (or any redeploy that replaces the site folder), point **`OUTPUT_DIR`** at a **persistent absolute path** (for example under `/home/site/` on Linux App Service) so `results.json` and the dashboard survive the next deployment. The GitHub workflow ships an empty `output/` envelope so the site works before the first scrape; copy a local `results.json` there if you want to seed the cloud dashboard without re-scraping.
 - Keep **`data/`** next to **`dist/`** at deploy root so `data/ticker.json` and related JSON load from `{PROJECT_ROOT}/data/`. A fallback to `dist/data/ticker.json` still works if you mirror data there.
 - **Playwright** is a regular dependency. Build/deploy installs Chromium with dependencies; runtime uses bundled Chromium on Linux and does not inject custom `LD_LIBRARY_PATH` overrides. macOS/Windows may try the `chrome` channel first, then bundled Chromium fallback.
 

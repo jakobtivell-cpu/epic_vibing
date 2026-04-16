@@ -7,7 +7,7 @@ import * as fs from 'fs';
 import { randomBytes } from 'crypto';
 import { spawn, ChildProcess } from 'child_process';
 import express, { Request, Response } from 'express';
-import { RESULTS_PATH } from './src/config/settings';
+import { OUTPUT_DIR, RESULTS_PATH } from './src/config/settings';
 import type { PipelineResult } from './src/types';
 import { buildRiskMapResponse } from './src/risk/risk-map';
 import { evaluatePreflightRiskForAll, loadPreflightRiskFile } from './src/risk/preflight-evaluator';
@@ -21,7 +21,7 @@ const JOB_TTL_MS = 2 * 60 * 60 * 1000;
 const ROOT = path.resolve(__dirname, path.basename(__dirname) === 'dist' ? '..' : '.');
 const DASHBOARD_HTML = path.join(ROOT, 'app', 'swedish-largecap-dashboard.html');
 const TICKER_JSON = path.join(ROOT, 'data', 'ticker.json');
-const PREFLIGHT_RISK_PATH = path.join(ROOT, 'output', 'preflight-risk.json');
+const PREFLIGHT_RISK_PATH = path.join(OUTPUT_DIR, 'preflight-risk.json');
 
 interface CompanyRow {
   name: string;

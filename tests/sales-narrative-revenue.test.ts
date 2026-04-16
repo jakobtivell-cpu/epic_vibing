@@ -28,7 +28,9 @@ Sales, SEK billion
 `;
     const r = extractFields(text, 'Saab', 2025);
     expect(r.data.revenue_msek).toBe(79_000);
-    expect(r.notes.some((n) => n.includes('fused year'))).toBe(true);
+    // Fused table row may be discarded at raw-cell stage ("fused-year artifact") or later
+    // ("fused year pattern"); narrative fallback should still run.
+    expect(r.notes.some((n) => /fused.year/i.test(n))).toBe(true);
   });
 
 });

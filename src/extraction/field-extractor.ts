@@ -2562,14 +2562,17 @@ function extractEbitWithStrategies(
     }
     const primaryMsek = normalizeEbitMatchToMsek(match, lines, unitContext);
     if (shouldRejectPrimaryEbitAsImplausible(primaryMsek)) {
-      // If the post-parse megascale guard would ÷1000 into a plausible EBIT band, keep the raw pick so
-      // extractFields can run applyEbitMegascaleGuard and emit the standard "EBIT unit guard" note.
+      // If ÷1000 lands in a plausible EBIT band, apply it here (same outcome as applyEbitMegascaleGuard
+      // later) and emit the explicit recovery note tests and operators rely on.
       const guardPreview = applyEbitMegascaleGuard(primaryMsek, revenue);
       if (
         guardPreview.adjusted &&
         !shouldRejectPrimaryEbitAsImplausible(guardPreview.ebit)
       ) {
-        return { msek: primaryMsek, match, extraNotes };
+        extraNotes.push(
+          `Primary EBIT ÷1000 recovery: ${primaryMsek} → ${guardPreview.ebit} MSEK after implausible-vs-revenue check (likely KSEK as MSEK on op. line)`,
+        );
+        return { msek: guardPreview.ebit, match, extraNotes };
       }
       // Operating line read as MSEK but row is KSEK/tkr: huge EBIT vs credible revenue — try one ÷1000 before fallbacks.
       const megaVsRev =
@@ -3240,7 +3243,7 @@ export function extractFields(
         lineIndex: 0,
         context: 'highlights',
       };
-      notes.push(`Revenue from narrative after fused-year discard (${hit.matchedLabel}): ${hit.msek} MSEK`);
+      notes.push(`Revenue from narrative after fused year discard (${hit.matchedLabel}): ${hit.msek} MSEK`);
       log.info(`Revenue from narrative (post-discard): ${hit.msek} MSEK`);
     }
   }

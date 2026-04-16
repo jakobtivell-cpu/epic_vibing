@@ -7,9 +7,13 @@ import * as path from 'path';
 /**
  * Project root for `output/`, `downloads/`, and `cache/`.
  * From compiled `dist/src/config`, `../../` would wrongly land in `dist/`; use three levels up
- * so paths match `server.ts` (`join(ROOT, 'output', 'results.json')` at deploy root).
+ * so `PROJECT_ROOT` matches the deploy root next to `dist/` and `app/`.
  * From source `src/config`, two levels up is the repo root.
  * Override with `APP_ROOT` for custom layouts (e.g. Azure).
+ *
+ * Override **`OUTPUT_DIR`** (absolute path) to store `results.json`, `run_summary.json`,
+ * and related artifacts on persistent disk (e.g. Azure App Service `/home/site/...`) so
+ * the dashboard at **`GET /api/results`** survives redeploys; defaults to `{PROJECT_ROOT}/output`.
  */
 function resolveProjectRoot(): string {
   const fromEnv = process.env.APP_ROOT?.trim();
@@ -31,6 +35,12 @@ function envInt(name: string, fallback: number): number {
 
 /** Repo / deployment root (see `resolveProjectRoot`). Exported for `data/ticker.json` and similar. */
 export const PROJECT_ROOT = resolveProjectRoot();
+
+function resolveOutputDir(): string {
+  const raw = process.env.OUTPUT_DIR?.trim();
+  if (raw) return path.resolve(raw);
+  return path.join(PROJECT_ROOT, 'output');
+}
 
 /** Base milliseconds to wait between HTTP requests to the same domain. */
 export const SAME_DOMAIN_DELAY_MS = 2_000;
@@ -93,8 +103,8 @@ export const USER_AGENT =
 /** Directory where downloaded PDFs are cached. */
 export const DOWNLOADS_DIR = path.join(PROJECT_ROOT, 'downloads');
 
-/** Directory where results.json and run logs are written. */
-export const OUTPUT_DIR = path.join(PROJECT_ROOT, 'output');
+/** Directory where results.json, run_summary.json, and preflight-risk.json are written. */
+export const OUTPUT_DIR = resolveOutputDir();
 
 /** Path to the main results file. */
 export const RESULTS_PATH = path.join(OUTPUT_DIR, 'results.json');

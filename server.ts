@@ -47,6 +47,37 @@ function loadCompaniesFromTickerFile(): CompanyRow[] {
   return out;
 }
 
+/** Normalize `output/results.json`: envelope `{ results, generatedAt, companyCount }` or legacy bare array. */
+function parseStoredResultsFile(raw: string): {
+  results: PipelineResult[];
+  companyCount: number;
+  generatedAt: string | null;
+} {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      const results = parsed as PipelineResult[];
+      return { results, companyCount: results.length, generatedAt: null };
+    }
+    if (parsed && typeof parsed === 'object') {
+      const o = parsed as {
+        results?: unknown;
+        companyCount?: unknown;
+        generatedAt?: unknown;
+      };
+      const results = Array.isArray(o.results) ? (o.results as PipelineResult[]) : [];
+      return {
+        results,
+        companyCount: typeof o.companyCount === 'number' ? o.companyCount : results.length,
+        generatedAt: typeof o.generatedAt === 'string' ? o.generatedAt : null,
+      };
+    }
+    return { results: [], companyCount: 0, generatedAt: null };
+  } catch {
+    return { results: [], companyCount: 0, generatedAt: null };
+  }
+}
+
 type JobStatus = 'running' | 'done' | 'failed';
 
 interface Job {
@@ -375,16 +406,11 @@ app.get('/api/results', (_req: Request, res: Response) => {
       return;
     }
     const raw = fs.readFileSync(RESULTS_PATH, 'utf8');
-    const data = JSON.parse(raw) as {
-      results?: unknown[];
-      companyCount?: number;
-      generatedAt?: string;
-    };
-    const results = Array.isArray(data.results) ? data.results : [];
+    const { results, companyCount, generatedAt } = parseStoredResultsFile(raw);
     res.json({
       results,
-      companyCount: typeof data.companyCount === 'number' ? data.companyCount : results.length,
-      generatedAt: data.generatedAt ?? null,
+      companyCount,
+      generatedAt,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -405,12 +431,8 @@ app.get('/api/risk-map', (_req: Request, res: Response) => {
     }
 
     const raw = fs.readFileSync(RESULTS_PATH, 'utf8');
-    const parsed = JSON.parse(raw) as {
-      generatedAt?: string | null;
-      results?: PipelineResult[];
-    };
-    const results = Array.isArray(parsed.results) ? parsed.results : [];
-    res.json(buildRiskMapResponse(results, parsed.generatedAt ?? null));
+    const { results, generatedAt } = parseStoredResultsFile(raw);
+    res.json(buildRiskMapResponse(results, generatedAt));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: msg });

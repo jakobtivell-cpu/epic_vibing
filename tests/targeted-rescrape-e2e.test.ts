@@ -18,6 +18,8 @@
  */
 
 import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import {
   buildCompanyProfilesForTickers,
 } from '../src/data/all-ticker-companies';
@@ -58,18 +60,38 @@ function pct(part: number, total: number): string {
   return ((part / total) * 100).toFixed(1);
 }
 
+function parseStoredResultsRows(raw: string): PipelineResult[] {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    const rows = Array.isArray(parsed)
+      ? parsed
+      : (parsed as { results?: unknown }).results;
+    if (!Array.isArray(rows)) return [];
+    return rows as PipelineResult[];
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Load the existing results.json keyed by ticker, then overwrite only the
  * tickers that were just re-scraped.  This preserves complete rows from the
  * last overnight run so the merged file always represents the best-known state.
+ *
+ * Accepts either a bare `PipelineResult[]` or the production envelope
+ * `{ generatedAt, companyCount, results }`. Always writes the envelope shape.
  */
-function mergeAndWriteResults(freshResults: PipelineResult[]): PipelineResult[] {
-  if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+function mergeAndWriteResults(
+  freshResults: PipelineResult[],
+  resultsPath: string = RESULTS_PATH,
+): PipelineResult[] {
+  const dir = path.dirname(resultsPath);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
   let existing: PipelineResult[] = [];
-  if (fs.existsSync(RESULTS_PATH)) {
+  if (fs.existsSync(resultsPath)) {
     try {
-      existing = JSON.parse(fs.readFileSync(RESULTS_PATH, 'utf-8')) as PipelineResult[];
+      existing = parseStoredResultsRows(fs.readFileSync(resultsPath, 'utf-8'));
     } catch {
       // malformed — start fresh
     }
@@ -85,7 +107,12 @@ function mergeAndWriteResults(freshResults: PipelineResult[]): PipelineResult[] 
 
   const merged = [...byTicker.values()];
   const output = merged.map(({ stages, ...rest }) => rest);
-  fs.writeFileSync(RESULTS_PATH, JSON.stringify(output, null, 2), 'utf-8');
+  const payload = {
+    generatedAt: new Date().toISOString(),
+    companyCount: merged.length,
+    results: output,
+  };
+  fs.writeFileSync(resultsPath, JSON.stringify(payload, null, 2), 'utf-8');
   return merged;
 }
 
@@ -161,6 +188,76 @@ describe('targeted rescrape setup', () => {
     const n = PARTIAL_SUBSET_TICKERS.length;
     const worstCase = (n * TIMEOUT_PER_COMPANY_MS) / CONCURRENCY;
     expect(worstCase).toBeLessThanOrEqual(TWO_HOURS_MS);
+  });
+});
+
+describe('mergeAndWriteResults envelope round-trip', () => {
+  it('merges into envelope-shaped results.json and updates generatedAt / companyCount', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rescrape-merge-'));
+    const tmpResults = path.join(tmpDir, 'results.json');
+
+    fs.writeFileSync(
+      tmpResults,
+      JSON.stringify(
+        {
+          generatedAt: '2020-01-01T00:00:00.000Z',
+          companyCount: 2,
+          results: [
+            { company: 'Alpha', ticker: 'AAA', status: 'complete' },
+            { company: 'Beta', ticker: 'BBB', status: 'failed' },
+          ],
+        },
+        null,
+        2,
+      ),
+      'utf-8',
+    );
+
+    const fresh = {
+      company: 'Alpha AB',
+      ticker: 'AAA',
+      status: 'partial',
+    } as PipelineResult;
+
+    mergeAndWriteResults([fresh], tmpResults);
+
+    const roundTrip: {
+      generatedAt: string;
+      companyCount: number;
+      results: { ticker: string; status: string; company: string }[];
+    } = JSON.parse(fs.readFileSync(tmpResults, 'utf-8'));
+
+    expect(roundTrip.companyCount).toBe(2);
+    expect(Array.isArray(roundTrip.results)).toBe(true);
+    expect(typeof roundTrip.generatedAt).toBe('string');
+    expect(roundTrip.generatedAt).not.toBe('2020-01-01T00:00:00.000Z');
+
+    const byTicker = Object.fromEntries(roundTrip.results.map((r) => [r.ticker, r]));
+    expect(byTicker.BBB.status).toBe('failed');
+    expect(byTicker.AAA.status).toBe('partial');
+    expect(byTicker.AAA.company).toBe('Alpha AB');
+  });
+
+  it('supports legacy bare-array results.json', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rescrape-merge-'));
+    const tmpResults = path.join(tmpDir, 'results.json');
+    fs.writeFileSync(
+      tmpResults,
+      JSON.stringify([{ company: 'Old', ticker: 'OLD', status: 'complete' }], null, 2),
+      'utf-8',
+    );
+    mergeAndWriteResults(
+      [{ company: 'New', ticker: 'NEW', status: 'complete' } as PipelineResult],
+      tmpResults,
+    );
+    const parsed = JSON.parse(fs.readFileSync(tmpResults, 'utf-8')) as {
+      results: { ticker: string }[];
+      companyCount: number;
+    };
+    expect(parsed.results).toHaveLength(2);
+    expect(parsed.companyCount).toBe(2);
+    const tickers = parsed.results.map((r) => r.ticker).sort();
+    expect(tickers).toEqual(['NEW', 'OLD']);
   });
 });
 

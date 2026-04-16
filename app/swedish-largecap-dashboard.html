@@ -44,6 +44,7 @@ tbody tr.sel{background:var(--sf)}
 .b-ok{background:#ECFDF5;color:#059669}
 .b-pt{background:#FFFBEB;color:#D97706}
 .b-fl{background:#FEF2F2;color:#DC2626}
+.b-to{background:#F1F5F9;color:#475569}
 .b-run{background:#EFF6FF;color:#2563EB}
 .conf-w{width:44px;height:5px;border-radius:3px;background:var(--bl);overflow:hidden;display:inline-block;vertical-align:middle;margin-right:5px}
 .conf-f{height:100%;border-radius:3px}
@@ -100,6 +101,7 @@ const SBG={Industrials:"#EFF6FF",Technology:"#F5F3FF",Consumer:"#FFFBEB",Financi
 
 // ── STATE ──
 let results=[];   // Full result objects (from API)
+let resultsGeneratedAt=null; // ISO from results.json envelope (when present)
 let jobs=[];      // Active/completed scrape jobs: {id,name,status,logs[],logsExpanded?}
 let riskRows=[];  // Risk map rows from /api/risk-map
 let view="table",selTk=null,inlineStatusMsg="";
@@ -134,7 +136,7 @@ const sec=c=>SMAP[c.company]||"Industrials";
 const mg=c=>{const d=c.extractedData;if(!d||!d.revenue_msek||!d.ebit_msek)return null;return((d.ebit_msek/d.revenue_msek)*100).toFixed(1)};
 const co2=c=>{const s=c.sustainability;if(!s)return null;const a=s.scope1_co2_tonnes,b=s.scope2_co2_tonnes;if(a==null&&b==null)return null;return(a||0)+(b||0)};
 const cc=v=>v==null?"var(--t3)":v>=80?"var(--green)":v>=50?"var(--amber)":"var(--rose)";
-const stBadge=s=>s==="complete"?'<span class="badge b-ok">complete</span>':s==="partial"?'<span class="badge b-pt">partial</span>':s==="running"?'<span class="badge b-run">running</span>':'<span class="badge b-fl">failed</span>';
+const stBadge=s=>s==="complete"?'<span class="badge b-ok">complete</span>':s==="partial"?'<span class="badge b-pt">partial</span>':s==="timeout"?'<span class="badge b-to">timeout</span>':s==="running"?'<span class="badge b-run">running</span>':'<span class="badge b-fl">failed</span>';
 
 const SORT_NUM_KEYS=new Set(["revenue","ebit","employees","fy","confidence"]);
 
@@ -216,7 +218,9 @@ async function loadResultsFromServer(){
     const r=await fetch(API_BASE+"/api/results");
     if(!r.ok)return;
     const data=await r.json();
-    results=Array.isArray(data.results)?data.results.map(x=>({...x,_source:"api"})):[];
+    const rows=Array.isArray(data.results)?data.results:(Array.isArray(data)?data:[]);
+    results=rows.map(x=>({...x,_source:"api"}));
+    resultsGeneratedAt=typeof data.generatedAt==="string"?data.generatedAt:null;
     await loadRiskMapFromServer();
   }catch(e){console.warn("loadResultsFromServer",e)}
 }
@@ -626,7 +630,7 @@ function renderTable(){
 function renderPerf(){
   if(!results.length)return`<div class="cd empty"><div style="font-size:14px;font-weight:600;margin-bottom:6px">No data yet</div><div style="font-size:12.5px;color:var(--t3)">Add companies via scrape</div></div>`;
   const ch=(t,h)=>`<div class="cd" style="padding:22px"><h3 style="margin:0 0 14px;font-size:13px;font-weight:600">${t}</h3>${h}</div>`;
-  const ok=results.filter(r=>r.status==="complete"),pt=results.filter(r=>r.status==="partial"),fl=results.filter(r=>r.status==="failed");
+  const ok=results.filter(r=>r.status==="complete"),pt=results.filter(r=>r.status==="partial"),fl=results.filter(r=>r.status==="failed"),to=results.filter(r=>r.status==="timeout");
   const avgConf=results.filter(r=>r.confidence!=null);
   const avgConfVal=avgConf.length?Math.round(avgConf.reduce((s,r)=>s+r.confidence,0)/avgConf.length):0;
   const fields=["revenue_msek","ebit_msek","employees","ceo"];
@@ -635,13 +639,16 @@ function renderPerf(){
   const co2Found=results.filter(r=>r.sustainability&&(r.sustainability.scope1_co2_tonnes!=null||r.sustainability.scope2_co2_tonnes!=null)).length;
 
   const agg=`<div class="cd" style="padding:18px;margin-bottom:16px"><div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Scraper overview · ${results.length} targets</div>
-    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px">${[
-      {n:ok.length,u:"/"+results.length,l:"Complete"},{n:pt.length,u:"",l:"Partial"},{n:fl.length,u:"",l:"Failed"},
-      {n:avgConfVal,u:"%",l:"Avg confidence"},{n:fieldsOk,u:"/"+fieldsTotal,l:"Fields found"},{n:co2Found,u:"/"+results.length,l:"CO₂ found"}
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:10px">${[
+      {n:ok.length,u:"/"+results.length,l:"Complete"},{n:pt.length,u:"",l:"Partial"},{n:fl.length,u:"",l:"Failed"},{n:to.length,u:"",l:"Timeout"},
+    ].map(i=>`<div><div class="pm"><span class="n">${i.n}</span><span class="u">${i.u}</span></div><div style="font-size:10.5px;color:var(--t3);margin-top:2px">${i.l}</div></div>`).join("")}</div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">${[
+      {n:avgConfVal,u:"%",l:"Avg confidence"},{n:fieldsOk,u:"/"+fieldsTotal,l:"Fields found"},{n:co2Found,u:"/"+results.length,l:"CO₂ found"},
     ].map(i=>`<div><div class="pm"><span class="n">${i.n}</span><span class="u">${i.u}</span></div><div style="font-size:10.5px;color:var(--t3);margin-top:2px">${i.l}</div></div>`).join("")}</div></div>`;
 
   // 1: Confidence
-  const c1=bars([...results].sort((a,b)=>(b.confidence||0)-(a.confidence||0)).map(r=>({...r,_n:r.company})),r=>r.confidence||0,r=>(r.confidence||0)+"%",r=>r.status==="complete"?"#059669":r.status==="partial"?"#D97706":"#DC2626");
+  const statusColor=r=>r.status==="complete"?"#059669":r.status==="partial"?"#D97706":r.status==="timeout"?"#64748B":"#DC2626";
+  const c1=bars([...results].sort((a,b)=>(b.confidence||0)-(a.confidence||0)).map(r=>({...r,_n:r.company})),r=>r.confidence||0,r=>(r.confidence||0)+"%",statusColor);
 
   // 2: Field coverage
   const c2=results.map(r=>{
@@ -846,7 +853,10 @@ function render(){
     else{view="table";h+=renderTable();}
   }
 
-  if(results.length||jobs.length) h+=`<div style="margin-top:28px;padding-top:14px;border-top:1px solid var(--bd);display:flex;justify-content:space-between"><span class="mono" style="font-size:11px;color:var(--t3)">${results.filter(r=>r.status==="complete").length} complete · ${results.filter(r=>r.status==="partial").length} partial · ${results.filter(r=>r.status==="failed").length} failed${act.length?" · "+act.length+" running":""}</span><span style="font-size:11px;color:var(--t3)">${API_BASE?"File mode · API at localhost:3000":"Table from output/results.json via API"}</span></div>`;
+  if(results.length||jobs.length){
+    const snap=resultsGeneratedAt?` · snapshot ${esc(resultsGeneratedAt.slice(0,19).replace("T"," "))}`:"";
+    h+=`<div style="margin-top:28px;padding-top:14px;border-top:1px solid var(--bd);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><span class="mono" style="font-size:11px;color:var(--t3)">${results.length} rows · ${results.filter(r=>r.status==="complete").length} complete · ${results.filter(r=>r.status==="partial").length} partial · ${results.filter(r=>r.status==="failed").length} failed · ${results.filter(r=>r.status==="timeout").length} timeout${act.length?" · "+act.length+" running":""}${snap}</span><span style="font-size:11px;color:var(--t3)">${API_BASE?"File mode · API at localhost:3000":"Table from output/results.json via API"}</span></div>`;
+  }
 
   document.getElementById("app").innerHTML=h;
   const inp=document.getElementById("ci");

@@ -648,7 +648,17 @@ function findNarrativeEmployeeHit(text: string): NarrativeEmployeeHit | null {
       re: /\b(\d{2,3}(?:,\d{3})*|\d{2,6})\s+employees\s+(?:worldwide|globally|across)\b/gi,
       label: 'N employees worldwide',
     },
+    {
+      re: /\b(\d{2,3}(?:,\d{3})*|\d{2,6})\s+employees\s+\(\d{4}:/gi,
+      label: 'N employees (year comparison)',
+    },
+    {
+      re: /\bworkforce\s+of\s+(\d{2,3}(?:,\d{3})*|\d{2,6})\b/gi,
+      label: 'workforce of N',
+    },
   ];
+
+  let best: NarrativeEmployeeHit | null = null;
 
   for (const { re, label } of patterns) {
     re.lastIndex = 0;
@@ -657,14 +667,16 @@ function findNarrativeEmployeeHit(text: string): NarrativeEmployeeHit | null {
       const raw = match[1].replace(/,/g, '');
       const val = parseInt(raw, 10);
       if (!isPlausibleNarrativeEmployees(val)) continue;
-      return {
-        employees: val,
-        matchedLabel: label,
-        rawSnippet: match[0].trim().substring(0, 180),
-      };
+      if (best === null || val > best.employees) {
+        best = {
+          employees: val,
+          matchedLabel: label,
+          rawSnippet: match[0].trim().substring(0, 180),
+        };
+      }
     }
   }
-  return null;
+  return best;
 }
 
 
@@ -902,11 +914,14 @@ const INCOME_STATEMENT_PATTERNS: RegExp[] = [
   /koncernens\s+resultaträkning/i,
   /resultaträkning/i,
   /statement\s+of\s+(?:profit|income|loss)/i,
+  /(?:consolidated\s+)?statement\s+of\s+comprehensive\s+income/i,
+  /statement\s+of\s+(?:total\s+)?comprehensive\s+(?:income|loss)/i,
 ];
 
 /** Patterns that indicate a section boundary (end of income statement section). */
 const SECTION_BOUNDARY_PATTERNS: RegExp[] = [
-  /consolidated\s+(?:statement\s+of\s+)?(?:financial\s+position|balance\s+sheet|comprehensive\s+income|cash\s+flow|changes\s+in\s+equity)/i,
+  /consolidated\s+(?:statement\s+of\s+)?(?:financial\s+position|balance\s+sheet|cash\s+flow|changes\s+in\s+equity)/i,
+  /other\s+comprehensive\s+(?:income|loss)/i,
   /balance\s+sheet/i,
   /koncernens\s+balansräkning/i,
   /balansräkning/i,
@@ -968,7 +983,13 @@ function findIncomeStatementSections(lines: string[]): Array<{ start: number; en
     for (let j = i + 1; j < end; j++) {
       if (lines[j].length > 120) continue;
       const isBoundary = SECTION_BOUNDARY_PATTERNS.some((p) => p.test(lines[j]));
-      if (isBoundary) {
+      const isNextHeading = INCOME_STATEMENT_PATTERNS.some((p) => {
+        const m2 = lines[j].match(p);
+        if (!m2 || (m2.index ?? 0) >= 15) return false;
+        const after2 = lines[j].substring((m2.index ?? 0) + m2[0].length).trim();
+        return after2.length < 10 || /^\d{1,3}$/.test(after2);
+      });
+      if (isBoundary || isNextHeading) {
         end = j;
         break;
       }

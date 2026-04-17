@@ -417,19 +417,35 @@ app.get('/api/results', (_req: Request, res: Response) => {
       hasAltSeedResults,
     });
 
-    const resultsPath = hasOutputResults
-      ? RESULTS_PATH
-      : hasSeedResults
-        ? SEED_RESULTS_PATH
-        : hasAltSeedResults
-          ? ALT_SEED_RESULTS_PATH
-        : null;
-    if (!resultsPath) {
+    const loadParsed = (
+      p: string,
+    ): { results: PipelineResult[]; companyCount: number; generatedAt: string | null } | null => {
+      try {
+        const raw = fs.readFileSync(p, 'utf8');
+        return parseStoredResultsFile(raw);
+      } catch {
+        return null;
+      }
+    };
+
+    const outputParsed = hasOutputResults ? loadParsed(RESULTS_PATH) : null;
+    const seedParsed = hasSeedResults ? loadParsed(SEED_RESULTS_PATH) : null;
+    const altSeedParsed = hasAltSeedResults ? loadParsed(ALT_SEED_RESULTS_PATH) : null;
+
+    const chosen =
+      outputParsed && outputParsed.results.length > 0
+        ? outputParsed
+        : seedParsed && seedParsed.results.length > 0
+          ? seedParsed
+          : altSeedParsed && altSeedParsed.results.length > 0
+            ? altSeedParsed
+            : outputParsed ?? seedParsed ?? altSeedParsed;
+
+    if (!chosen) {
       res.json({ results: [], companyCount: 0, generatedAt: null });
       return;
     }
-    const raw = fs.readFileSync(resultsPath, 'utf8');
-    const { results, companyCount, generatedAt } = parseStoredResultsFile(raw);
+    const { results, companyCount, generatedAt } = chosen;
     res.json({
       results,
       companyCount,

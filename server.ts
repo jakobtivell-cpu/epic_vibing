@@ -21,6 +21,7 @@ const JOB_TTL_MS = 2 * 60 * 60 * 1000;
 const ROOT = path.resolve(__dirname, path.basename(__dirname) === 'dist' ? '..' : '.');
 const DASHBOARD_HTML = path.join(ROOT, 'app', 'swedish-largecap-dashboard.html');
 const SEED_RESULTS_PATH = path.join(ROOT, 'app', 'data', 'seed-results.json');
+const ALT_SEED_RESULTS_PATH = path.join(__dirname, '..', 'app', 'data', 'seed-results.json');
 const TICKER_JSON = path.join(ROOT, 'data', 'ticker.json');
 const PREFLIGHT_RISK_PATH = path.join(OUTPUT_DIR, 'preflight-risk.json');
 
@@ -402,10 +403,26 @@ app.get('/api/stream/:jobId', (req: Request, res: Response) => {
 
 app.get('/api/results', (_req: Request, res: Response) => {
   try {
-    const resultsPath = fs.existsSync(RESULTS_PATH)
+    const hasOutputResults = fs.existsSync(RESULTS_PATH);
+    const hasSeedResults = fs.existsSync(SEED_RESULTS_PATH);
+    const hasAltSeedResults = fs.existsSync(ALT_SEED_RESULTS_PATH);
+    console.log('[api/results] path diagnostics', {
+      cwd: process.cwd(),
+      __dirname,
+      RESULTS_PATH,
+      SEED_RESULTS_PATH,
+      ALT_SEED_RESULTS_PATH,
+      hasOutputResults,
+      hasSeedResults,
+      hasAltSeedResults,
+    });
+
+    const resultsPath = hasOutputResults
       ? RESULTS_PATH
-      : fs.existsSync(SEED_RESULTS_PATH)
+      : hasSeedResults
         ? SEED_RESULTS_PATH
+        : hasAltSeedResults
+          ? ALT_SEED_RESULTS_PATH
         : null;
     if (!resultsPath) {
       res.json({ results: [], companyCount: 0, generatedAt: null });

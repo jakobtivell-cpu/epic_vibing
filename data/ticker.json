@@ -100,9 +100,9 @@
         "isin": "SE0000667891",
         "irEmail": "investor.relations@sandvik.com",
         "annualReportPdfUrls": [
-            "https://mb.cision.com/Main/208/4318236/3973881.pdf"
+            "https://mb.cision.com/Main/208/4114009/3308864.pdf"
         ],
-        "overrideFiscalYear": 2025
+        "overrideFiscalYear": 2024
     },
     "NOKIA-SEK.ST": "Nokia Oyj",
     "DNBO.ST": "DNB Bank ASA",
@@ -130,7 +130,11 @@
         "irEmail": "ir@swedbank.com",
         "aggregatorUrls": [
             "https://www.swedbank.com/investor-relations/reports-and-presentations/annual-reports.html"
-        ]
+        ],
+        "annualReportPdfUrls": [
+            "https://mb.cision.com/Main/67/4109053/3277713.pdf"
+        ],
+        "overrideFiscalYear": 2024
     },
     "ERIC-A.ST": {
         "name": "Telefonaktiebolaget LM Ericsson (publ)",
@@ -281,7 +285,11 @@
         "irPage": "https://lundinmining.com/investors/",
         "candidateDomains": [
             "https://www.lundinmining.com"
-        ]
+        ],
+        "annualReportPdfUrls": [
+            "https://www.lundinmining.com/_resources/financials/annual_financial_statements_-_q4_2024_final_-_combined.pdf"
+        ],
+        "overrideFiscalYear": 2024
     },
     "INDU-A.ST": {
         "name": "AB Industrivärden (publ)",
@@ -557,21 +565,26 @@
         "irPage": "https://www.beijerref.com/investors/",
         "candidateDomains": [
             "https://www.beijerref.com"
-        ]
+        ],
+        "annualReportPdfUrls": [
+            "https://mb.cision.com/Main/1860/4127083/3352475.pdf"
+        ],
+        "overrideFiscalYear": 2024
     },
     "VOLCAR-B.ST": {
         "name": "Volvo Car AB (publ.)",
         "irPage": "https://investors.volvocars.com",
         "candidateDomains": [
             "https://investors.volvocars.com",
-            "https://www.volvocars.com"
+            "https://www.volvocars.com",
+            "https://media-downloads.volvocars.com"
         ],
         "isin": "SE0016844831",
         "irEmail": "investors@volvocars.com",
         "annualReportPdfUrls": [
-            "https://investors.volvocars.com/~/media/Files/V/Volvo-Cars-IR-V2/AGM%202026%20ENG/VCG_AR_2025_ENG_260305.pdf"
+            "https://media-downloads.volvocars.com/2b5aa18c-c415-4bff-805d-b33e001d1739/344864_1_5.pdf"
         ],
-        "overrideFiscalYear": 2025,
+        "overrideFiscalYear": 2024,
         "aggregatorUrls": [
             "https://investors.volvocars.com/en/financial-information/results-centre"
         ]
@@ -863,7 +876,17 @@
             "https://www.atriumljungberg.se"
         ]
     },
-    "SINCH.ST": "Sinch AB (publ)",
+    "SINCH.ST": {
+        "name": "Sinch AB (publ)",
+        "irPage": "https://investors.sinch.com/reports-and-presentations",
+        "candidateDomains": [
+            "https://investors.sinch.com"
+        ],
+        "annualReportPdfUrls": [
+            "https://investors.sinch.com/static-files/d2271b9e-970b-42ef-a65d-07055c257072"
+        ],
+        "overrideFiscalYear": 2024
+    },
     "ARION-SDB.ST": {
         "name": "Arion banki hf.",
         "companyType": "bank",

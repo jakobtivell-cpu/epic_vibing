@@ -1,15 +1,48 @@
 {
   "schemaVersion": 1,
   "startedAt": "2026-04-17T06:33:05.292Z",
-  "lastIterationAt": "2026-04-17T06:33:05.297Z",
-  "iteration": 0,
+  "lastIterationAt": "2026-04-17T09:00:00.000Z",
+  "iteration": 1,
   "baseline": {
     "partial": 14
   },
-  "history": [],
+  "history": [
+    {
+      "iteration": 1,
+      "gitHead": "3ad4f97",
+      "partialBefore": 14,
+      "partialAfter": null,
+      "clustersChosen": [
+        "pdf-wrong-doc-all-quarterly",
+        "download-failures-no-pdf-retrieved",
+        "no-income-statement-section-detected"
+      ],
+      "tickersTouched": [
+        "SAND.ST",
+        "LUMI.ST",
+        "SWED-A.ST",
+        "BEIJ-B.ST",
+        "VOLCAR-B.ST",
+        "SINCH.ST"
+      ],
+      "commits": [
+        "fix(extraction): add 'statement of operations' income-section pattern + annual report URL overrides"
+      ],
+      "notes": "Two-pronged fix: (1) data/ticker.json — replaced the quarterly SAND.ST override URL with the 2024 annual report; added direct Cision/CDN PDF URLs for LUMI, SWED-A, BEIJ-B, VOLCAR-B (media-downloads), and expanded SINCH from bare string to full object with PDF URL. (2) src/extraction/field-extractor.ts — added 'consolidated statements? of operations' and 'statements? of operations and comprehensive income' to INCOME_STATEMENT_PATTERNS, enabling EBIT extraction from North-American-format annual reports (Lundin Mining pattern). All 87 tests pass; no rescrape this iteration (rescrape needed to measure partialAfter).",
+      "rescrapeReason": "no_rescrape_this_iteration"
+    }
+  ],
   "clusterCooldown": 3,
-  "clusterLastTouched": {},
-  "clusterOutcomes": {},
+  "clusterLastTouched": {
+    "pdf-wrong-doc-all-quarterly": 1,
+    "download-failures-no-pdf-retrieved": 1,
+    "no-income-statement-section-detected": 1
+  },
+  "clusterOutcomes": {
+    "pdf-wrong-doc-all-quarterly": "unknown",
+    "download-failures-no-pdf-retrieved": "unknown",
+    "no-income-statement-section-detected": "unknown"
+  },
   "stagnationRounds": 0,
   "blocked": null
 }

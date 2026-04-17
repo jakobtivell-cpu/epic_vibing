@@ -936,6 +936,9 @@ const INCOME_STATEMENT_PATTERNS: RegExp[] = [
   /statement\s+of\s+(?:profit|income|loss)/i,
   /(?:consolidated\s+)?statement\s+of\s+comprehensive\s+income/i,
   /statement\s+of\s+(?:total\s+)?comprehensive\s+(?:income|loss)/i,
+  // North American (Canadian/US) format — common in mining, energy, tech issuers
+  /consolidated\s+statements?\s+of\s+operations/i,
+  /statements?\s+of\s+operations\s+and\s+(?:comprehensive\s+)?(?:income|loss)/i,
 ];
 
 /** Patterns that indicate a section boundary (end of income statement section). */

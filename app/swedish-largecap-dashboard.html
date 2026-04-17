@@ -104,6 +104,7 @@ let results=[];   // Full result objects (from API)
 let resultsGeneratedAt=null; // ISO from results.json envelope (when present)
 let jobs=[];      // Active/completed scrape jobs: {id,name,status,logs[],logsExpanded?}
 let riskRows=[];  // Risk map rows from /api/risk-map
+let initialResultsLoading=false;
 let view="table",selTk=null,inlineStatusMsg="";
 let riskTierFilter="all";
 let riskArchetypeFilter="all";
@@ -213,7 +214,7 @@ const avt=c=>`<div class="av" style="background:${SBG[sec(c)]};color:${SC[sec(c)
 function bars(items,vFn,lFn,cFn){const mx=Math.max(...items.map(vFn),1);return items.map(c=>`<div class="bar-r"><div class="bar-l">${esc(c._n||c.company)}</div><div class="bar-t"><div class="bar-f" style="width:${(vFn(c)/mx)*100}%;background:${cFn(c)};opacity:.6"></div></div><div class="bar-v">${lFn(c)}</div></div>`).join("")}
 
 // ── SCRAPER (POST /api/scrape + SSE /api/stream/:jobId) ──
-async function loadResultsFromServer(){
+async function loadResultsFromServer(silent=false){
   try{
     const r=await fetch(API_BASE+"/api/results");
     if(!r.ok)return;
@@ -222,7 +223,17 @@ async function loadResultsFromServer(){
     results=rows.map(x=>({...x,_source:"api"}));
     resultsGeneratedAt=typeof data.generatedAt==="string"?data.generatedAt:null;
     await loadRiskMapFromServer();
-  }catch(e){console.warn("loadResultsFromServer",e)}
+  }catch(e){
+    if(!silent)console.warn("loadResultsFromServer",e);
+  }
+}
+
+async function autoLoadInitialResults(){
+  if(results.length>0)return;
+  initialResultsLoading=true;
+  render();
+  await loadResultsFromServer(true);
+  initialResultsLoading=false;
 }
 
 async function loadRiskMapFromServer(){
@@ -841,7 +852,8 @@ function render(){
   }
 
   // ── EMPTY STATE ──
-  if(!hasData&&!hasRiskData&&!act.length&&view!=="risk") h+=`<div class="cd empty"><div style="font-size:32px;margin-bottom:12px;opacity:.15">⊞</div><div style="font-size:15px;font-weight:600;margin-bottom:6px">No companies yet</div><div style="font-size:13px;color:var(--t3);max-width:460px;margin:0 auto;line-height:1.5">Enter a company name or ticker above to begin scraping.</div></div>`;
+  if(initialResultsLoading&&view!=="risk") h+=`<div class="cd" style="padding:48px 40px;text-align:center">${spin("#2563EB",20)}<div style="font-size:14px;font-weight:600;margin-top:14px">Loading results...</div></div>`;
+  else if(!hasData&&!hasRiskData&&!act.length&&view!=="risk") h+=`<div class="cd empty"><div style="font-size:32px;margin-bottom:12px;opacity:.15">⊞</div><div style="font-size:15px;font-weight:600;margin-bottom:6px">No companies yet</div><div style="font-size:13px;color:var(--t3);max-width:460px;margin:0 auto;line-height:1.5">Enter a company name or ticker above to begin scraping.</div></div>`;
   else if(!hasData&&act.length>0&&view!=="risk") h+=`<div class="cd" style="padding:48px 40px;text-align:center">${spin("#2563EB",20)}<div style="font-size:14px;font-weight:600;margin-top:14px">Scraping in progress…</div></div>`;
 
   // ── DATA VIEWS ──
@@ -875,7 +887,7 @@ function doAdd(){
   addCompany(v);
 }
 async function init(){
-  await loadResultsFromServer();
+  await autoLoadInitialResults();
   await loadCompaniesCatalog();
   render();
   document.addEventListener("mousedown",onDocMouseDown,true);

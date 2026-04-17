@@ -80,7 +80,8 @@
     {
       "signature": "investment-company-ebit-no-standard-line",
       "tickers": ["LATO-B.ST"],
-      "reason": "Investment companies (companyType=investment_company) skip EBIT extraction by design — operating profit includes unrealised portfolio revaluations not comparable to industrial EBIT. CEO set via manualHeadlineFields; EBIT remains null until a manual numeric override is added."
+      "reason": "Investment companies (companyType=investment_company) skip EBIT extraction by design — operating profit includes unrealised portfolio revaluations not comparable to industrial EBIT. CEO set via manualHeadlineFields; EBIT remains null until a manual numeric override is added.",
+      "nextAction": "ticker.json override OR accept permanent partial"
     }
   ]
 }

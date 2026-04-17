@@ -34,16 +34,27 @@ function tryRescaleEbitVersusRevenue(
   if (ebit <= revenue) return null;
 
   if (companyType === 'bank') {
+    // NII / fee income mapped to revenue_msek is often orders of magnitude below
+    // consolidated operating profit — do not ÷1000 EBIT to "fit" that proxy.
+    if (revenue < 10_000) return null;
     const ratio = ebit / revenue;
     const absDelta = ebit - revenue;
     if (ratio <= 1.3 && absDelta <= 15_000) return null;
   } else if (companyType === 'real_estate') {
     if (ebit / revenue < 1.5) return null;
   } else {
-    if (ebit / revenue < 1.5) return null;
+    const ratio = ebit / revenue;
+    const absDelta = ebit - revenue;
+    // Industrial reports sometimes lose one decimal in parsed operating result
+    // (e.g. 1,258.2 -> 12,582). Allow moderate over-revenue cases into rescale.
+    if (ratio < 1.15 || absDelta < 1_000) return null;
   }
 
-  for (const divisor of [1000, 100, 10]) {
+  const ratio = ebit / revenue;
+  const divisors =
+    companyType === 'industrial' && ratio < 2.2 ? [10, 100, 1000] : [1000, 100, 10];
+
+  for (const divisor of divisors) {
     const adj = Math.round(ebit / divisor);
     if (Math.abs(adj) > Math.abs(revenue) * 1.02 + 1) continue;
     if (revenue >= 5000 && Math.abs(adj) > 0 && Math.abs(adj) < 50) continue;

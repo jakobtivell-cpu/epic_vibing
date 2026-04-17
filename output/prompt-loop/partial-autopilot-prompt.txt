@@ -1,0 +1,419 @@
+Autonomous loop prompt — "Partial -> complete" (no human steps)
+
+Role:
+You are an autonomous coding agent in the Epic_vibing repo. Your mission is to drive the count of partial rows in output/results.json to zero by shipping small, test-backed code changes (and only using data/ticker.json overrides when a fix cannot be generalized). You run repeated iterations until the stop conditions fire. Do not ask the user questions. If blocked, follow the Blocker path and still leave the repo in a clean state (build passes, state file updated).
+
+Hard rules:
+1) Source of truth: output/results.json (envelope or array — normalize to results[]). If output/run_summary.json disagrees, ignore it for counts and note the mismatch once in the progress file.
+2) Definition — "partial row": row.status === "partial".
+3) Definition — "resolved partial": same company row later reads status === "complete" and headline fields are non-null per your project's stricter definition in iterative-fix-round.md (revenue, EBIT, employees, CEO, fiscal year). If you cannot upgrade to complete without a human policy call, mark blocked (see Blocker).
+4) No duplicate work: You must maintain and read output/prompt-loop/partial-autopilot.json (create if missing). This file is how the next iteration knows what was already tried.
+5) Every iteration ends with: npx tsc --noEmit green, at least one meaningful commit unless you are in a Blocker-only iteration (then commit can be docs: or chore: updating only the progress file — but prefer a real fix: whenever possible).
+6) Prefer mechanism fixes: no if (ticker === ...) in core logic; use data/ticker.json for one-off IR/PDF hints.
+
+File: output/prompt-loop/partial-autopilot.json (schema you maintain)
+Use this shape (extend fields if needed, do not delete history arrays):
+{
+  "schemaVersion": 1,
+  "startedAt": "ISO-8601",
+  "lastIterationAt": "ISO-8601",
+  "iteration": 0,
+  "baseline": { "partial": 0, "resultsSha256": "optional" },
+  "history": [
+    {
+      "iteration": 1,
+      "gitHead": "abc1234",
+      "partialBefore": 14,
+      "partialAfter": null,
+      "clustersChosen": ["signature-1", "signature-2"],
+      "tickersTouched": ["..."],
+      "commits": ["fix(...): ..."],
+      "notes": "short"
+    }
+  ],
+  "clusterCooldown": 3,
+  "clusterLastTouched": { "signature-1": 7 },
+  "clusterOutcomes": { "signature-1": "fixed|regressed|unknown" },
+  "stagnationRounds": 0,
+  "blocked": null
+}
+
+Cluster signature:
+2-4 lowercase bullets, no company names, describing the failure mechanism (e.g. missing income statement signals in short pdf text, ceo extracted as board list, ebit null with ksek megascale). Same underlying issue -> same signature.
+
+Cooldown rule:
+Do not select a cluster whose signature appears in the last clusterCooldown iterations' clustersChosen unless results.json proves the same signature still affects >=2 partial rows after that work — then you may revisit with a different fix approach (document why in history.notes).
+
+Iteration algorithm (run top-to-bottom every time)
+
+A) Measure
+- Load results[] from output/results.json.
+- partialRows = results.filter(r => r.status === "partial").
+- If partialRows.length === 0 -> STOP SUCCESS (commit nothing unless you have uncommitted progress-file noise; ensure partial-autopilot.json records completion).
+
+B) Diagnose (grouping must change over time)
+- Run npm run analyze:quality (or node scripts/analyze-results-quality.cjs output/results.json) and capture nullHeadlineFields, discardReasons, and any useful row-level hints.
+- For each partial row, derive:
+  - missingFields = which headline fields are null.
+  - noteTokens = join extractionNotes + relevant URLs; strip tickers/names when forming signatures.
+- Cluster partial rows by signature (mechanism), not ticker. Attach affectedTickers internally for targeting, but rank clusters by:
+  - score = (# partial rows in cluster) * confidence a generic fix exists
+- Deprioritize clusters on cooldown unless the exception rule fires.
+
+C) Select (anti-repeat)
+- Load partial-autopilot.json. If missing, initialize it with iteration: 0, empty history, clusterCooldown: 3.
+- Build the ranked cluster list, then drop clusters on cooldown (except allowed revisits).
+- Pick 1-3 clusters for this iteration (never pick the same single cluster more than 2 consecutive iterations unless every other cluster is blocked or at zero partial count).
+
+D) Plan (short, actionable)
+- For each chosen cluster, write a 5-10 line plan with:
+  - suspected root module(s) under src/ (discovery vs PDF vs extraction vs validation),
+  - test idea (new/extended test in tests/ using a fixture or existing pattern — no network in CI),
+  - acceptance check: which signatures should lose rows on the next scrape.
+
+E) Implement
+- Implement fixes + tests.
+- npx tsc --noEmit and run the smallest relevant unit tests you touched (npx jest path/to/test.ts).
+
+F) Validate (automated, bounded time)
+- If you can prove progress without network: rely on tests.
+- If you need runtime proof: run a targeted scrape only for affectedTickers (batch file or existing script pattern in repo), with a reasonable timeout, then merge into output/results.json per project conventions.
+- If a full scrape is too expensive, do not block the loop — ship the fix, record partialAfter: null with reason no_rescrape_this_iteration, and let the outer orchestrator rerun later.
+
+G) Bookkeeping (mandatory)
+- Increment iteration.
+- Append a history record with partialBefore, partialAfter (after rescrape if run), clustersChosen, commits, gitHead.
+- Update clusterLastTouched for each chosen signature to iteration.
+- Stagnation: If partialAfter is not strictly less than partialBefore for 3 consecutive iterations where rescrape was attempted -> increment stagnationRounds. If stagnation hits 3 full cycles, pivot policy: forcibly pick the largest remaining cluster that has never been fixed in clusterOutcomes, even if on cooldown, and widen scope (add logging behind existing debug flags if present; otherwise add minimal temporary diagnostics guarded and removed next iteration).
+
+H) Git
+- Commit with fix(scope): ... per mechanism (squash only if your environment requires one commit per iteration).
+- Never leave the working tree dirty at iteration end.
+
+Blocker protocol (still zero human chat)
+If you cannot legally/technically convert a partial to complete (paywalled PDF, captcha-only site, missing annual report online):
+- Set partial-autopilot.json.blocked to { "signature": "...", "tickers": ["..."], "reason": "...", "nextAction": "ticker.json manual headline override OR accept permanent partial" }.
+- If policy allows manualHeadlineFields or similar in ticker.json, implement that data change and tests; otherwise mark those rows as explicitly excluded in the progress file and move on — the loop continues on remaining partials.
+
+Outer "run forever" harness (human sets once)
+Wrap the agent in a shell loop that restarts the same prompt until exit code 0 / STOP SUCCESS string / max hours:
+- Stop when partialRows.length === 0.
+- Optional cap: MAX_ITERATIONS=50 or wall clock 8h to avoid infinite spend.
+
+Current autopilot state JSON:
+```json
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-04-17T06:33:05.292Z",
+  "lastIterationAt": "2026-04-17T06:33:05.297Z",
+  "iteration": 0,
+  "baseline": {
+    "partial": 14
+  },
+  "history": [],
+  "clusterCooldown": 3,
+  "clusterLastTouched": {},
+  "clusterOutcomes": {},
+  "stagnationRounds": 0,
+  "blocked": null
+}
+```
+
+Current results snapshot:
+```json
+{
+  "results_path": "C:\\Users\\jakob\\Desktop\\Coding\\Epic_vibing\\output\\results.json",
+  "total_rows": 136,
+  "partial_rows": 14,
+  "status_counts": {
+    "complete": 98,
+    "failed": 13,
+    "timeout": 11,
+    "partial": 14
+  },
+  "sample_partial_rows": [
+    {
+      "company": "AQ Group AB (publ)",
+      "ticker": "AQ.ST",
+      "status": "partial",
+      "extractionNotes": [
+        "ENTITY_PROFILE: searchAnchor=\"AQ Group AB (publ)\" ambiguity=low reportingHint=unspecified org=none",
+        "Entity verified (legal:full:AQ Group AB (publ))",
+        "EBIT not found for AQ Group AB (publ)",
+        "Employee count not found for AQ Group AB (publ)",
+        "Revenue not found for AQ Group AB (publ)",
+        "override: multi-PDF merit tournament — selected best candidate (merit=4); no single PDF yielded all four headline fields"
+      ],
+      "extractedData": {
+        "revenue_msek": null,
+        "ebit_msek": null,
+        "employees": null,
+        "ceo": "Christina Hegg - Finan",
+        "fiscal_year": 2025
+      }
+    },
+    {
+      "company": "Beijer Ref AB (publ)",
+      "ticker": "BEIJ-B.ST",
+      "status": "partial",
+      "extractionNotes": [
+        "ENTITY_PROFILE: searchAnchor=\"Beijer Ref AB (publ)\" ambiguity=low reportingHint=unspecified org=none",
+        "REPORT_CORPUS: 0 publication hub(s) quick-probed (single-page scan only) on https://www.beijerref.com",
+        "Download failed for cheerio candidate #1: https://www.beijerref.com/annual-general-meeting/annual-general-meeting-2026",
+        "Download failed for cheerio candidate #2: https://www.beijerref.com/annual/2025",
+        "Download failed for cheerio candidate #3: https://www.beijerref.com/annual/2024",
+        "cheerio: 3 failures on beijerref.com — skipping remaining candidates on this host"
+      ],
+      "extractedData": {
+        "revenue_msek": null,
+        "ebit_msek": 567,
+        "employees": 2506,
+        "ceo": "Per Bertland",
+        "fiscal_year": null
+      }
+    },
+    {
+      "company": "Camurus AB (publ)",
+      "ticker": "CAMX.ST",
+      "status": "partial",
+      "extractionNotes": [
+        "ENTITY_PROFILE: searchAnchor=\"Camurus AB (publ)\" ambiguity=low reportingHint=pharma org=none",
+        "REPORT_CORPUS: 0 publication hub(s) quick-probed (single-page scan only) on https://investor.camurus.com",
+        "Stage budget exhausted for discoverIrPage:https://investor.camurus.com (90000ms)",
+        "REPORT_CORPUS: 2 publication hub(s) quick-probed (single-page scan only) on https://www.camurus.com",
+        "Entity verified (legal:stripped-suffix:Camurus)",
+        "Employee count not found for Camurus AB (publ)"
+      ],
+      "extractedData": {
+        "revenue_msek": 558,
+        "ebit_msek": 79,
+        "employees": null,
+        "ceo": "Fredrik Tiberg",
+        "fiscal_year": 2024
+      }
+    },
+    {
+      "company": "Getinge AB (publ)",
+      "ticker": "GETI-B.ST",
+      "status": "partial",
+      "extractionNotes": [
+        "ENTITY_PROFILE: searchAnchor=\"Getinge AB (publ)\" ambiguity=low reportingHint=unspecified org=none",
+        "Entity verified (legal:full:Getinge AB (publ))",
+        "SCHEMA_MAP[revenue_msek] basis=exact native=\"omsättning\" — Industrial: revenue aligned with net sales / nettoomsättning family",
+        "SCHEMA_MAP[ebit_msek] basis=exact native=\"ebit\" — Industrial: operating profit / rörelseresultat family",
+        "Warning override candidate #1 — low revenue 104 MSEK for non-bank; accepted but requires manual verification",
+        "Tier 0 override accepted"
+      ],
+      "extractedData": {
+        "revenue_msek": null,
+        "ebit_msek": 3,
+        "employees": 115,
+        "ceo": "Mattias Perjos",
+        "fiscal_year": 2025
+      }
+    },
+    {
+      "company": "Hacksaw AB (publ)",
+      "ticker": "HACK.ST",
+      "status": "partial",
+      "extractionNotes": [
+        "ENTITY_PROFILE: searchAnchor=\"Hacksaw AB (publ)\" ambiguity=low reportingHint=unspecified org=none",
+        "Stage budget exhausted for search-ir-report:https://www.bing.com/ck/a?!&&p=e4ce908c2d50df2e20548348dae133e278c4da8c3f8cfd27a437558b05a3dd13JmltdHM9MTc3NjI5NzYwMA&ptn=3&ver=2&hsh=4&fclid=0b94a0cf-bba7-62b7-3796-b7f2ba5f63a2&u=a1aHR0cHM6Ly93d3cuaGFja3Nhd2dyb3VwLmNvbS9lbi9pbnZlc3Rvci1yZWxhdGlvbnMvZmluYW5jaWFsLXJlcG9ydC1hbmQtcHJlc2VudGF0aW9ucy8&ntb=1 (90000ms)",
+        "Stage budget exhausted for search-ir-report:https://www.bing.com/ck/a?!&&p=b7a9cbc9bba61d7bb9c40afc81c7b1b654dfd06563a1a90f61701f0b2193bc42JmltdHM9MTc3NjI5NzYwMA&ptn=3&ver=2&hsh=4&fclid=0b94a0cf-bba7-62b7-3796-b7f2ba5f63a2&u=a1aHR0cHM6Ly93d3cuYWNjZXNzbmV3c3dpcmUuY29tL25ld3Nyb29tL2VuL2NvbXB1dGVycy10ZWNobm9sb2d5LWFuZC1pbnRlcm5ldC9oYWNrc2F3LXB1Ymxpc2hlcy1hbm51YWwtcmVwb3J0LTIwMjUtMTE1MjM2OA&ntb=1 (90000ms)",
+        "Entity verified (derived:short-name:HACK)",
+        "Employee count 985000 adjusted to 985 — likely OCR-concatenated multi-year employee columns (985000)",
+        "Alternate-label employee 439453 rejected — >100× labeled value (985); retaining labeled value"
+      ],
+      "extractedData": {
+        "revenue_msek": 313855,
+        "ebit_msek": 44588,
+        "employees": 985,
+        "ceo": null,
+        "fiscal_year": 2025
+      }
+    },
+    {
+      "company": "Investment AB Latour (publ)",
+      "ticker": "LATO-B.ST",
+      "status": "partial",
+      "extractionNotes": [
+        "ENTITY_PROFILE: searchAnchor=\"Investment AB Latour (publ)\" ambiguity=high reportingHint=investment_company org=none",
+        "REPORT_CORPUS: 1 publication hub(s) quick-probed (single-page scan only) on https://www.latour.se",
+        "Download failed for cheerio candidate #1: https://www.latour.se/en/corporate-governance/annual-general-meeting/general-meeting-2026",
+        "REPORT_CORPUS: 1 publication hub(s) quick-probed (single-page scan only) on https://www.latour.se",
+        "Entity verified (entity:brand-token:latour)",
+        "No income statement / resultaträkning found in PDF"
+      ],
+      "extractedData": {
+        "revenue_msek": 1882,
+        "ebit_msek": null,
+        "employees": 7284,
+        "ceo": null,
+        "fiscal_year": 2025
+      }
+    },
+    {
+      "company": "Lundin Mining Corporation",
+      "ticker": "LUMI.ST",
+      "status": "partial",
+      "extractionNotes": [
+        "ENTITY_PROFILE: searchAnchor=\"Lundin Mining Corporation\" ambiguity=high reportingHint=unspecified org=none",
+        "REPORT_CORPUS: 2 publication hub(s) quick-probed (single-page scan only) on https://lundinmining.com",
+        "Rejected cheerio candidate #1 \"https://lundinmining.com/_resources/financials/2025-q4.pdf?v=041604\" — quarterly report",
+        "Rejected cheerio candidate #2 \"https://lundinmining.com/_resources/financials/2025-q2-lun-fs.pdf?v=041604\" — quarterly report",
+        "Rejected cheerio candidate #3 \"https://lundinmining.com/_resources/financials/2025-q3.pdf?v=041604\" — quarterly report",
+        "Rejected cheerio candidate #4 \"https://lundinmining.com/_resources/financials/lundin-mining-2025-q1_website.pdf?v=041604\" — quarterly report"
+      ],
+      "extractedData": {
+        "revenue_msek": 21870,
+        "ebit_msek": null,
+        "employees": null,
+        "ceo": "Jack Lundin",
+        "fiscal_year": 2025
+      }
+    },
+    {
+      "company": "Sandvik AB (publ)",
+      "ticker": "SAND.ST",
+      "status": "partial",
+      "extractionNotes": [
+        "ENTITY_PROFILE: searchAnchor=\"Sandvik AB (publ)\" ambiguity=low reportingHint=unspecified org=556098-4739",
+        "Rejected override candidate #1 \"https://mb.cision.com/Main/208/4318236/3973881.pdf\" — quarterly report",
+        "override: rejection summary (quality-gate=1)",
+        "Tier 0 override exhausted",
+        "REPORT_CORPUS: 1 publication hub(s) quick-probed (single-page scan only) on https://www.home.sandvik",
+        "Rejected cheerio candidate #1 \"https://www.home.sandvik/siteassets/investors/financial-data/financial-data-2025-q4-2.xlsx\" — quarterly report"
+      ],
+      "extractedData": {
+        "revenue_msek": null,
+        "ebit_msek": null,
+        "employees": 600,
+        "ceo": "comments on the",
+        "fiscal_year": null
+      }
+    },
+    {
+      "company": "Svenska Handelsbanken AB (publ)",
+      "ticker": "SHB-A.ST",
+      "status": "partial",
+      "extractionNotes": [
+        "ENTITY_PROFILE: searchAnchor=\"Svenska Handelsbanken AB (publ)\" ambiguity=high reportingHint=bank org=none",
+        "aggregator: no trusted PDF candidates found",
+        "REPORT_CORPUS: 0 publication hub(s) quick-probed (single-page scan only) on https://www.handelsbanken.com",
+        "REPORT_CORPUS: 0 publication hub(s) quick-probed (single-page scan only) on https://www.handelsbanken.com",
+        "Entity verified (entity:brand-token:handelsbanken)",
+        "Bank — 'intäkter' mapped to revenue_msek"
+      ],
+      "extractedData": {
+        "revenue_msek": 1275,
+        "ebit_msek": null,
+        "employees": null,
+        "ceo": null,
+        "fiscal_year": 2025
+      }
+    },
+    {
+      "company": "Sinch AB (publ)",
+      "ticker": "SINCH.ST",
+      "status": "partial",
+      "extractionNotes": [
+        "ENTITY_PROFILE: searchAnchor=\"Sinch AB (publ)\" ambiguity=low reportingHint=unspecified org=none",
+        "REPORT_CORPUS: 0 publication hub(s) quick-probed (single-page scan only) on https://investors.sinch.com",
+        "Entity verified (legal:stripped-suffix:Sinch)",
+        "No income statement / resultaträkning found in PDF",
+        "No balance sheet / balansräkning found in PDF",
+        "EBIT not found for Sinch AB (publ)"
+      ],
+      "extractedData": {
+        "revenue_msek": null,
+        "ebit_msek": null,
+        "employees": null,
+        "ceo": "Family Quest",
+        "fiscal_year": 2025
+      }
+    },
+    {
+      "company": "Swedbank AB (publ)",
+      "ticker": "SWED-A.ST",
+      "status": "partial",
+      "extractionNotes": [
+        "ENTITY_PROFILE: searchAnchor=\"Swedbank AB (publ)\" ambiguity=low reportingHint=bank org=none",
+        "aggregator: no trusted PDF candidates found",
+        "REPORT_CORPUS: 1 publication hub(s) quick-probed (single-page scan only) on https://www.swedbank.com",
+        "Download failed for cheerio candidate #1: https://www.swedbank.com/newsroom/press-releases.details.swedbank-robur-funds-recognized-in-the-lipper-fund-awards-2026.4601529ED5BF52A2.html",
+        "Download failed for cheerio candidate #2: https://www.swedbank.com/newsroom/press-releases.details.invitation-%E2%80%93-swedbank%E2%80%99s-interim-report-for-the-first-quarter-2026.2827C14F3C444E7C.html",
+        "Entity verified (legal:stripped-suffix:Swedbank)"
+      ],
+      "extractedData": {
+        "revenue_msek": null,
+        "ebit_msek": null,
+        "employees": null,
+        "ceo": "Jens Henriksson",
+        "fiscal_year": 2025
+      }
+    },
+    {
+      "company": "Systemair AB (publ)",
+      "ticker": "SYSR.ST",
+      "status": "partial",
+      "extractionNotes": [
+        "ENTITY_PROFILE: searchAnchor=\"Systemair AB (publ)\" ambiguity=low reportingHint=unspecified org=none",
+        "REPORT_CORPUS: 1 publication hub(s) quick-probed (single-page scan only) on https://group.systemair.com",
+        "Entity verified (legal:full:Systemair AB (publ))",
+        "EBIT not found for Systemair AB (publ)",
+        "Employee count not found for Systemair AB (publ)",
+        "SCHEMA_MAP[revenue_msek] basis=mapped native=\"sales\" — Industrial: revenue from label outside primary list — treated as approximate"
+      ],
+      "extractedData": {
+        "revenue_msek": 1966,
+        "ebit_msek": null,
+        "employees": null,
+        "ceo": "Roland Kasper",
+        "fiscal_year": 2025
+      }
+    },
+    {
+      "company": "Volvo Car AB (publ.)",
+      "ticker": "VOLCAR-B.ST",
+      "status": "partial",
+      "extractionNotes": [
+        "ENTITY_PROFILE: searchAnchor=\"Volvo Car AB (publ.)\" ambiguity=low reportingHint=unspecified org=none",
+        "Download failed for override candidate #1: https://investors.volvocars.com/~/media/Files/V/Volvo-Cars-IR-V2/AGM%202026%20ENG/VCG_AR_2025_ENG_260305.pdf",
+        "Tier 0 override exhausted",
+        "aggregator: no trusted PDF candidates found",
+        "REPORT_CORPUS: 0 publication hub(s) quick-probed (single-page scan only) on https://investors.volvocars.com",
+        "Download failed for cheerio candidate #1: https://vp272.alertir.com/en/reports/volvo-car-ab-%28publ-%29-publishes-annual-and-sustainability-report-2025-2432113"
+      ],
+      "extractedData": {
+        "revenue_msek": null,
+        "ebit_msek": null,
+        "employees": null,
+        "ceo": "Swedish Compa",
+        "fiscal_year": null
+      }
+    },
+    {
+      "company": "Wallenstam AB (publ)",
+      "ticker": "WALL-B.ST",
+      "status": "partial",
+      "extractionNotes": [
+        "ENTITY_PROFILE: searchAnchor=\"Wallenstam AB (publ)\" ambiguity=low reportingHint=real_estate org=none",
+        "REPORT_CORPUS: 0 publication hub(s) quick-probed (single-page scan only) on https://wallenstam.se",
+        "Rejected playwright candidate #1 \"https://wallenstam.se/globalassets/dokument/wallenstam/hallbarhetsredovisning/uppforandepolicy-code-of-conduct-2024.pdf\" — no income statement signals",
+        "Entity verified (legal:stripped-suffix:Wallenstam)",
+        "EBIT estimated from förvaltningsresultat — real estate reporting, excludes fair value changes and is the primary operating metric for this company type.",
+        "Employee count not found for Wallenstam AB (publ)"
+      ],
+      "extractedData": {
+        "revenue_msek": 249,
+        "ebit_msek": 62,
+        "employees": null,
+        "ceo": "Hans Wallenstam",
+        "fiscal_year": 2025
+      }
+    }
+  ]
+}
+```
+
+Return plain text actions and perform the work in-repo.

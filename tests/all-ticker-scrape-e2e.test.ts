@@ -54,7 +54,7 @@ describeE2e('E2E: scrape every ticker (3 min cap per company)', () => {
   beforeAll(async () => {
     const companies = buildCompanyProfilesForEveryTickerEntry();
     // Upper bound for hook: all companies × 3 min + headroom (Jest hook timeout).
-    jest.setTimeout(companies.length * SCRAPE_TIMEOUT_PER_COMPANY_MS + 600_000);
+    // jest.setTimeout(companies.length * SCRAPE_TIMEOUT_PER_COMPANY_MS + 600_000);
 
     results = await runCompaniesWithOptionalChildTimeout(
       companies,

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-04-17T06:33:05.292Z",
+  "lastIterationAt": "2026-04-17T06:33:05.297Z",
+  "iteration": 0,
+  "baseline": {
+    "partial": 14
+  },
+  "history": [],
+  "clusterCooldown": 3,
+  "clusterLastTouched": {},
+  "clusterOutcomes": {},
+  "stagnationRounds": 0,
+  "blocked": null
+}

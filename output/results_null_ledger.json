@@ -1,0 +1,109 @@
+{
+  "generatedAt": "2026-04-15T12:21:19.048Z",
+  "sourceRowCount": 10,
+  "perRow": [
+    {
+      "company": "AB Volvo (publ)",
+      "ticker": "VOLV-B.ST",
+      "status": "complete",
+      "ebit_msek": null,
+      "employees": null,
+      "revenue_msek": null,
+      "ceo": null
+    },
+    {
+      "company": "Telefonaktiebolaget LM Ericsson (publ)",
+      "ticker": "ERIC-B.ST",
+      "status": "complete",
+      "ebit_msek": null,
+      "employees": null,
+      "revenue_msek": null,
+      "ceo": null
+    },
+    {
+      "company": "H & M Hennes & Mauritz AB (publ)",
+      "ticker": "HM-B.ST",
+      "status": "complete",
+      "ebit_msek": null,
+      "employees": null,
+      "revenue_msek": null,
+      "ceo": null
+    },
+    {
+      "company": "Atlas Copco AB (publ)",
+      "ticker": "ATCO-B.ST",
+      "status": "complete",
+      "ebit_msek": null,
+      "employees": null,
+      "revenue_msek": null,
+      "ceo": null
+    },
+    {
+      "company": "Sandvik AB (publ)",
+      "ticker": "SAND.ST",
+      "status": "partial",
+      "ebit_msek": "not_found",
+      "employees": "not_found",
+      "revenue_msek": "not_found",
+      "ceo": null
+    },
+    {
+      "company": "Skandinaviska Enskilda Banken AB (publ)",
+      "ticker": "SEB-A.ST",
+      "status": "complete",
+      "ebit_msek": null,
+      "employees": null,
+      "revenue_msek": null,
+      "ceo": null
+    },
+    {
+      "company": "Investor AB (publ)",
+      "ticker": "INVE-B.ST",
+      "status": "partial",
+      "ebit_msek": "not_found",
+      "employees": "not_found",
+      "revenue_msek": null,
+      "ceo": null
+    },
+    {
+      "company": "Hexagon AB (publ)",
+      "ticker": "HEXA-B.ST",
+      "status": "complete",
+      "ebit_msek": null,
+      "employees": null,
+      "revenue_msek": null,
+      "ceo": null
+    },
+    {
+      "company": "Essity AB (publ)",
+      "ticker": "ESSITY-B.ST",
+      "status": "partial",
+      "ebit_msek": null,
+      "employees": null,
+      "revenue_msek": "not_found",
+      "ceo": null
+    },
+    {
+      "company": "Alfa Laval AB (publ)",
+      "ticker": "ALFA.ST",
+      "status": "complete",
+      "ebit_msek": null,
+      "employees": null,
+      "revenue_msek": null,
+      "ceo": null
+    }
+  ],
+  "tallies": {
+    "ebit_msek": {
+      "not_found": 2
+    },
+    "employees": {
+      "not_found": 2
+    },
+    "revenue_msek": {
+      "not_found": 2
+    },
+    "ceo": {}
+  },
+  "source": "C:\\Users\\jakob\\Desktop\\Coding\\Epic_vibing\\output\\results.json"
+}

@@ -6,7 +6,9 @@ NON-NEGOTIABLE CONSTRAINTS:
 - Use pdf-parse for PDF text extraction.
 - Script must run with: npx ts-node scrape.ts
 - Output must be a structured results.json.
-- The system accepts ANY 10 Swedish Large Cap companies as input — it is NOT hardcoded to a specific list. Company selection is a runtime parameter.
+- The system accepts ANY Swedish Large Cap company as input — it is NOT
+  hardcoded. Company selection is a runtime parameter via data/ticker.json.
+- The default registry ships with ~138 companies.
 - Different companies have different site structures. Discovery and extraction must be dynamic and heuristic-driven, not site-specific templates.
 - Add robust logging, timeout handling, retry limits, missing-PDF handling, and parsing-failure handling.
 - Prefer stable architecture over cleverness.
@@ -30,7 +32,7 @@ WORKING STYLE:
 
 COMPANY INPUT MODEL:
 - A "company profile" is a runtime object with: name, ticker, website URL, optional IR path hints, optional candidateDomains, companyType, orgNumber, and knownAliases.
-- A default registry of 10 companies ships with the project, but the architecture must support swapping in any other Swedish Large Cap company by editing a single config file or passing CLI arguments.
+- The default registry ships with ~138 companies, but the architecture must support swapping in any other Swedish Large Cap company by editing a single config file or passing CLI arguments.
 - Company-specific logic is confined to the profile config — the pipeline code itself is company-agnostic.
 
 PLAYWRIGHT FALLBACK POLICY:
@@ -44,6 +46,7 @@ DISCOVERY PHILOSOPHY:
 - The goal is to find every listed Large Cap company's annual report. A "failed" status for a company that publishes an annual report is a bug, not an acceptable outcome.
 - Discovery should work even when the company website cannot be resolved. Direct PDF search via Bing, multi-domain resolution, allabolag org-number lookup, and external financial data sources are all valid fallback paths.
 - When orgNumber is available in the company profile, always try the allabolag direct URL (https://www.allabolag.se/{orgNumberWithoutHyphen}) — do not rely on name search.
+
 DOMAIN RESOLUTION:
 - The pipeline must resolve any Swedish Large Cap company to its correct website from just a name or ticker. It must NOT depend on pre-configured domains to function.
 - ticker.json candidateDomains are a performance cache, not a dependency. The pipeline must work without them.
@@ -62,3 +65,19 @@ NON-REGRESSION (maintainer / CI hygiene):
 - The data/ticker.json file is a data asset — never overwrite it programmatically without a backup step.
 - All new discovery logic must have a corresponding test in tests/.
 - tsc --noEmit must pass before any commit.
+
+TERMINAL EXECUTION (NON-NEGOTIABLE):
+Never run node, npx, or python commands directly in the terminal.
+ALL long-running commands MUST go through the wrapper:
+
+  node scripts/run-wrapped.cjs "node scripts/test-all-companies.cjs"
+  node scripts/run-wrapped.cjs "node scripts/test-all-companies.cjs --company Volvo"
+  node scripts/run-wrapped.cjs "npx tsc --noEmit"
+  node scripts/run-wrapped.cjs "node -c src/extraction/field-extractor.ts"
+
+This is not optional. Bare node/npx commands trigger a Cursor blocking
+prompt that halts the overnight queue. The wrapper captures output and
+returns it immediately, preventing the "waiting for command" dialog.
+
+Short commands like cat, grep, ls, head, find, git status, git checkout,
+git add, git commit can run directly — they complete instantly.

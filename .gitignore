@@ -6,3 +6,4 @@ output/results.json
 output/run_summary.json
 *.log
 .env
+_tmp*.ts

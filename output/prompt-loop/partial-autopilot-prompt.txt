@@ -1,104 +1,205 @@
-Autonomous loop prompt — "Partial -> complete" (no human steps)
+Autonomous Loop Prompt — "Partial -> Complete" v2
 
-Role:
-You are an autonomous coding agent in the Epic_vibing repo. Your mission is to drive the count of partial rows in output/results.json to zero by shipping small, test-backed code changes (and only using data/ticker.json overrides when a fix cannot be generalized). You run repeated iterations until the stop conditions fire. Do not ask the user questions. If blocked, follow the Blocker path and still leave the repo in a clean state (build passes, state file updated).
+For: Cursor background agent (or any autonomous coding agent)
+Repo: epic_vibing
+Goal: Drive partial rows in output/results.json to zero via iterative code fixes.
+Key change from v1: This prompt is designed to be run repeatedly. Each run MUST resume from prior state — never start fresh.
 
-Hard rules:
-1) Source of truth: output/results.json (envelope or array — normalize to results[]). If output/run_summary.json disagrees, ignore it for counts and note the mismatch once in the progress file.
-2) Definition — "partial row": row.status === "partial".
-3) Definition — "resolved partial": same company row later reads status === "complete" and headline fields are non-null per your project's stricter definition in iterative-fix-round.md (revenue, EBIT, employees, CEO, fiscal year). If you cannot upgrade to complete without a human policy call, mark blocked (see Blocker).
-4) No duplicate work: You must maintain and read output/prompt-loop/partial-autopilot.json (create if missing). This file is how the next iteration knows what was already tried.
-5) Every iteration ends with: npx tsc --noEmit green, at least one meaningful commit unless you are in a Blocker-only iteration (then commit can be docs: or chore: updating only the progress file — but prefer a real fix: whenever possible).
-6) Prefer mechanism fixes: no if (ticker === ...) in core logic; use data/ticker.json for one-off IR/PDF hints.
+---
 
-File: output/prompt-loop/partial-autopilot.json (schema you maintain)
-Use this shape (extend fields if needed, do not delete history arrays):
+## STEP 0 — RESUME (mandatory, always first)
+
+Before doing anything else, load your state file:
+
+cat output/prompt-loop/partial-autopilot.json
+
+- If the file exists: you are resuming. Read iteration, history, clusterLastTouched, clusterOutcomes, and blocked. You MUST print a resume summary (see below) before proceeding to Step 1.
+- If the file does not exist: you are on iteration 1. Create it with the schema below, then proceed.
+
+### Mandatory resume summary (print this verbatim pattern):
+
+=== AUTOPILOT RESUME — iteration <N+1> ===
+Prior iterations: <N>
+Last clusters tried: <list from history[-1].clustersChosen>
+Last outcome: <partialBefore> -> <partialAfter> (or "no rescrape")
+Clusters on cooldown: <list with iteration last touched>
+Blocked tickers: <list or "none">
+Stagnation rounds: <count>
+===
+
+If you skip this summary, you are violating the protocol. This is the mechanism that prevents re-doing the same work.
+
+---
+
+## STEP 1 — MEASURE
+
+node scripts/analyze-results-quality.cjs output/results.json
+
+Also load results directly:
+
+// pseudocode — use however your environment reads JSON
+const raw = JSON.parse(fs.readFileSync('output/results.json'));
+const results = Array.isArray(raw) ? raw : raw.results || raw.data || [];
+const partials = results.filter(r => r.status === 'partial');
+
+- If partials.length === 0 -> STOP SUCCESS. Update state file with completion record. Exit.
+- Otherwise: record partialBefore = partials.length and continue.
+
+---
+
+## STEP 2 — DIAGNOSE & CLUSTER
+
+For each partial row, extract:
+- missingFields: which of [revenue_msek, ebit_msek, employees, ceo, fiscal_year] are null
+- mechanism: why it's null — from extractionNotes, PDF URLs, discard reasons
+
+Cluster by mechanism (not by ticker). A cluster signature is 2-4 lowercase phrases describing the failure, e.g.:
+- ebit-discarded-exceeds-revenue
+- pdf-not-found-no-ir-page
+- ceo-extracted-as-board-list
+- timeout-no-data-extracted
+
+Same root cause = same signature, even across different companies.
+
+Rank clusters by: (number of partial rows) * (confidence a generic code fix exists)
+
+---
+
+## STEP 3 — SELECT (anti-repeat rules)
+
+Load cooldown info from state file. Apply these rules strictly:
+
+1. Cooldown: Do NOT pick a cluster that appears in clustersChosen of the last 3 iterations — UNLESS results.json still shows >=2 partial rows with that same signature AND you have a different fix approach (document why in notes).
+2. Consecutive limit: Never pick the same single cluster more than 2 iterations in a row.
+3. Pick 1-3 clusters per iteration. Prefer breadth over depth.
+4. If all clusters are on cooldown or blocked: pick the largest never-fixed cluster (override cooldown). Document this as a "forced pivot" in notes.
+
+---
+
+## STEP 4 — PLAN (keep short)
+
+For each chosen cluster, write a plan (5-10 lines max):
+- Suspected root module(s): src/discovery/, src/pdf/, src/extraction/, src/validation/
+- Test idea: what test to add/extend in tests/ (no network calls in tests)
+- Acceptance: which signatures should lose rows after fix
+
+---
+
+## STEP 5 — IMPLEMENT & TEST
+
+1. Implement fixes. Prefer mechanism fixes — no if (ticker === 'XYZ') in core logic. Use data/ticker.json only for one-off PDF/IR hints.
+2. Run npx tsc --noEmit — must pass.
+3. Run relevant unit tests: npx jest path/to/changed-test.ts
+
+---
+
+## STEP 6 — VALIDATE
+
+Choose one:
+- Tests-only (preferred if fix is testable without network): rely on passing tests.
+- Targeted rescrape (if runtime proof needed): run only affected tickers with timeout. Merge results back into output/results.json.
+- Skip rescrape (if too expensive): record partialAfter: null with reason: "no_rescrape_this_iteration". The next iteration or outer harness will rerun later.
+
+---
+
+## STEP 7 — BOOKKEEPING (mandatory, never skip)
+
+Update output/prompt-loop/partial-autopilot.json:
+
+{
+  "iteration": N+1,
+  "lastIterationAt": "ISO-8601-now",
+  "history": [
+    // ...existing entries...,
+    {
+      "iteration": N+1,
+      "gitHead": "<current HEAD hash>",
+      "partialBefore": <count before>,
+      "partialAfter": <count after rescrape, or null>,
+      "clustersChosen": ["sig-1", "sig-2"],
+      "tickersTouched": ["TICK-A", "TICK-B"],
+      "commits": ["fix(extraction): ..."],
+      "notes": "short description of what was done and why"
+    }
+  ],
+  "clusterLastTouched": {
+    // update touched clusters to current iteration number
+  },
+  "clusterOutcomes": {
+    // "sig-1": "fixed" | "regressed" | "unknown"
+  }
+}
+
+Stagnation check: If partialAfter >= partialBefore for 3 consecutive rescrape iterations -> increment stagnationRounds. At stagnation 3: force-pick the largest never-fixed cluster, even if on cooldown.
+
+---
+
+## STEP 8 — GIT
+
+- Commit with fix(scope): <mechanism description>
+- Never leave the working tree dirty.
+- If this was a blocker-only iteration, use chore: or docs: prefix.
+
+---
+
+## Blocker Protocol
+
+If a partial cannot be converted to complete (paywalled PDF, captcha, no annual report online):
+
+1. Set blocked in state file: { "signature": "...", "tickers": [...], "reason": "...", "nextAction": "ticker.json override OR accept permanent partial" }
+2. If data/ticker.json supports manual headline overrides -> implement that data change.
+3. Otherwise: mark as excluded and move on. The loop continues on remaining partials.
+
+---
+
+## State File Schema
+
 {
   "schemaVersion": 1,
   "startedAt": "ISO-8601",
   "lastIterationAt": "ISO-8601",
   "iteration": 0,
-  "baseline": { "partial": 0, "resultsSha256": "optional" },
-  "history": [
-    {
-      "iteration": 1,
-      "gitHead": "abc1234",
-      "partialBefore": 14,
-      "partialAfter": null,
-      "clustersChosen": ["signature-1", "signature-2"],
-      "tickersTouched": ["..."],
-      "commits": ["fix(...): ..."],
-      "notes": "short"
-    }
-  ],
+  "baseline": { "partial": 14, "resultsSha256": "optional" },
+  "history": [],
   "clusterCooldown": 3,
-  "clusterLastTouched": { "signature-1": 7 },
-  "clusterOutcomes": { "signature-1": "fixed|regressed|unknown" },
+  "clusterLastTouched": {},
+  "clusterOutcomes": {},
   "stagnationRounds": 0,
   "blocked": null
 }
 
-Cluster signature:
-2-4 lowercase bullets, no company names, describing the failure mechanism (e.g. missing income statement signals in short pdf text, ceo extracted as board list, ebit null with ksek megascale). Same underlying issue -> same signature.
+---
 
-Cooldown rule:
-Do not select a cluster whose signature appears in the last clusterCooldown iterations' clustersChosen unless results.json proves the same signature still affects >=2 partial rows after that work — then you may revisit with a different fix approach (document why in history.notes).
+## Hard Rules Summary
 
-Iteration algorithm (run top-to-bottom every time)
+| Rule | Detail |
+|------|--------|
+| Source of truth | output/results.json (envelope-aware) |
+| Partial = | row.status === "partial" |
+| Complete = | status complete + all 5 headline fields non-null |
+| No ticker-specific core logic | Use data/ticker.json for one-offs |
+| State file | output/prompt-loop/partial-autopilot.json — read AND write every iteration |
+| TypeScript | npx tsc --noEmit must pass before commit |
+| Git | Clean tree at iteration end, conventional commits |
 
-A) Measure
-- Load results[] from output/results.json.
-- partialRows = results.filter(r => r.status === "partial").
-- If partialRows.length === 0 -> STOP SUCCESS (commit nothing unless you have uncommitted progress-file noise; ensure partial-autopilot.json records completion).
+---
 
-B) Diagnose (grouping must change over time)
-- Run npm run analyze:quality (or node scripts/analyze-results-quality.cjs output/results.json) and capture nullHeadlineFields, discardReasons, and any useful row-level hints.
-- For each partial row, derive:
-  - missingFields = which headline fields are null.
-  - noteTokens = join extractionNotes + relevant URLs; strip tickers/names when forming signatures.
-- Cluster partial rows by signature (mechanism), not ticker. Attach affectedTickers internally for targeting, but rank clusters by:
-  - score = (# partial rows in cluster) * confidence a generic fix exists
-- Deprioritize clusters on cooldown unless the exception rule fires.
+## Stop Conditions
 
-C) Select (anti-repeat)
-- Load partial-autopilot.json. If missing, initialize it with iteration: 0, empty history, clusterCooldown: 3.
-- Build the ranked cluster list, then drop clusters on cooldown (except allowed revisits).
-- Pick 1-3 clusters for this iteration (never pick the same single cluster more than 2 consecutive iterations unless every other cluster is blocked or at zero partial count).
+- partials.length === 0 -> STOP SUCCESS
+- iteration >= 50 -> stop (configurable cap)
+- Wall clock > 8h -> stop
+- All remaining partials are in blocked -> STOP BLOCKED
 
-D) Plan (short, actionable)
-- For each chosen cluster, write a 5-10 line plan with:
-  - suspected root module(s) under src/ (discovery vs PDF vs extraction vs validation),
-  - test idea (new/extended test in tests/ using a fixture or existing pattern — no network in CI),
-  - acceptance check: which signatures should lose rows on the next scrape.
+---
 
-E) Implement
-- Implement fixes + tests.
-- npx tsc --noEmit and run the smallest relevant unit tests you touched (npx jest path/to/test.ts).
+## What Changed from v1
 
-F) Validate (automated, bounded time)
-- If you can prove progress without network: rely on tests.
-- If you need runtime proof: run a targeted scrape only for affectedTickers (batch file or existing script pattern in repo), with a reasonable timeout, then merge into output/results.json per project conventions.
-- If a full scrape is too expensive, do not block the loop — ship the fix, record partialAfter: null with reason no_rescrape_this_iteration, and let the outer orchestrator rerun later.
-
-G) Bookkeeping (mandatory)
-- Increment iteration.
-- Append a history record with partialBefore, partialAfter (after rescrape if run), clustersChosen, commits, gitHead.
-- Update clusterLastTouched for each chosen signature to iteration.
-- Stagnation: If partialAfter is not strictly less than partialBefore for 3 consecutive iterations where rescrape was attempted -> increment stagnationRounds. If stagnation hits 3 full cycles, pivot policy: forcibly pick the largest remaining cluster that has never been fixed in clusterOutcomes, even if on cooldown, and widen scope (add logging behind existing debug flags if present; otherwise add minimal temporary diagnostics guarded and removed next iteration).
-
-H) Git
-- Commit with fix(scope): ... per mechanism (squash only if your environment requires one commit per iteration).
-- Never leave the working tree dirty at iteration end.
-
-Blocker protocol (still zero human chat)
-If you cannot legally/technically convert a partial to complete (paywalled PDF, captcha-only site, missing annual report online):
-- Set partial-autopilot.json.blocked to { "signature": "...", "tickers": ["..."], "reason": "...", "nextAction": "ticker.json manual headline override OR accept permanent partial" }.
-- If policy allows manualHeadlineFields or similar in ticker.json, implement that data change and tests; otherwise mark those rows as explicitly excluded in the progress file and move on — the loop continues on remaining partials.
-
-Outer "run forever" harness (human sets once)
-Wrap the agent in a shell loop that restarts the same prompt until exit code 0 / STOP SUCCESS string / max hours:
-- Stop when partialRows.length === 0.
-- Optional cap: MAX_ITERATIONS=50 or wall clock 8h to avoid infinite spend.
+1. Step 0 (Resume) is now mandatory and first — v1 buried state-loading in step C, causing agents to skip prior work.
+2. Mandatory resume summary printout — forces the agent to acknowledge what was already tried before planning new work.
+3. 40% shorter — removed prose repetition, used tables and code blocks for scannability.
+4. Anti-repeat rules are explicit numbered rules — not embedded in paragraph prose.
+5. "You are resuming" framing — the default assumption is continuation, not a fresh start.
 
 Current autopilot state JSON:
 ```json

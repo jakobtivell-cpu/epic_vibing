@@ -676,6 +676,26 @@ function findNarrativeEmployeeHit(text: string): NarrativeEmployeeHit | null {
       re: /\bworkforce\s+of\s+(\d{2,3}(?:,\d{3})*|\d{2,6})\b/gi,
       label: 'workforce of N',
     },
+    // Swedish narrative: "N medarbetare" / "N anställda" (number before label — common in Nordic reports)
+    // Handles both comma-separated (1,254) and Swedish space-separated (1 254) thousands
+    {
+      re: /\b(\d{1,3}(?:[ \u00A0]\d{3})+|\d{2,3}(?:,\d{3})*|\d{2,6})\s+medarbetare\b/gi,
+      label: 'N medarbetare',
+    },
+    {
+      re: /\b(\d{1,3}(?:[ \u00A0]\d{3})+|\d{2,3}(?:,\d{3})*|\d{2,6})\s+anst[äa]llda\b/gi,
+      label: 'N anställda',
+    },
+    // Swedish: "hade/har N anställda/medarbetare"
+    {
+      re: /\b(?:hade|har)\s+(\d{1,3}(?:[ \u00A0]\d{3})+|\d{2,3}(?:,\d{3})*|\d{2,6})\s+(?:anst[äa]llda|medarbetare)\b/gi,
+      label: 'hade N anställda',
+    },
+    // English: "employs / employed N people/employees"
+    {
+      re: /\b(?:employs|employed)\s+(\d{1,3}(?:[ \u00A0]\d{3})+|\d{2,3}(?:,\d{3})*|\d{2,6})\s+(?:people|persons?|employees?|staff)\b/gi,
+      label: 'employs N people',
+    },
   ];
 
   let best: NarrativeEmployeeHit | null = null;
@@ -684,7 +704,7 @@ function findNarrativeEmployeeHit(text: string): NarrativeEmployeeHit | null {
     re.lastIndex = 0;
     let match;
     while ((match = re.exec(text)) !== null) {
-      const raw = match[1].replace(/,/g, '');
+      const raw = match[1].replace(/[,\s\u00A0]/g, '');
       const val = parseInt(raw, 10);
       if (!isPlausibleNarrativeEmployees(val)) continue;
       if (best === null || val > best.employees) {
@@ -939,6 +959,9 @@ const INCOME_STATEMENT_PATTERNS: RegExp[] = [
   // North American (Canadian/US) format — common in mining, energy, tech issuers
   /consolidated\s+statements?\s+of\s+operations/i,
   /statements?\s+of\s+operations\s+and\s+(?:comprehensive\s+)?(?:income|loss)/i,
+  // Swedish IFRS "rapport över totalresultat" — used instead of "resultaträkning" by modern IFRS reporters
+  /rapport\s+(?:över|over)\s+totalresultat/i,
+  /rapport\s+(?:över|over)\s+(?:det\s+samlade\s+resultatet|helhetsresultatet)/i,
 ];
 
 /** Patterns that indicate a section boundary (end of income statement section). */

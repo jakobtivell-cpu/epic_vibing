@@ -245,7 +245,11 @@
         "irEmail": "ir@handelsbanken.se",
         "aggregatorUrls": [
             "https://www.handelsbanken.com/en/investor-relations/reports-and-presentations"
-        ]
+        ],
+        "annualReportPdfUrls": [
+            "https://mb.cision.com/Main/3555/4111826/3288310.pdf"
+        ],
+        "overrideFiscalYear": 2024
     },
     "SHB-B.ST": {
         "name": "Svenska Handelsbanken AB (publ)",
@@ -395,7 +399,12 @@
         "irPage": "https://www.latour.se/investors/",
         "candidateDomains": [
             "https://www.latour.se"
-        ]
+        ],
+        "manualHeadlineFields": {
+            "ceo": "Johan Hjertonsson",
+            "source": "latour.se investor relations 2025",
+            "reviewedAt": "2026-04-17"
+        }
     },
     "LIFCO-B.ST": {
         "name": "Lifco AB (publ)",
@@ -655,9 +664,9 @@
             "https://www.getinge.com"
         ],
         "annualReportPdfUrls": [
-            "https://www.getinge.com/dam/corporate/documents/investors/annual-reports/swedish/getinge__rsredovisning_2025-115629-sv.pdf"
+            "https://www.getinge.com/dam/corporate/documents/investors/annual-reports/english/getinge-annual-report-2024-en-global.pdf"
         ],
-        "overrideFiscalYear": 2025
+        "overrideFiscalYear": 2024
     },
     "HOLM-A.ST": {
         "name": "Holmen AB (publ)",
@@ -916,7 +925,18 @@
             "https://www.oem.se"
         ]
     },
-    "HACK.ST": "Hacksaw AB (publ)",
+    "HACK.ST": {
+        "name": "Hacksaw AB (publ)",
+        "irPage": "https://www.hacksawgroup.com/en/investor-relations/financial-report-and-presentations/",
+        "candidateDomains": [
+            "https://www.hacksawgroup.com",
+            "https://storage.mfn.se"
+        ],
+        "annualReportPdfUrls": [
+            "https://storage.mfn.se/6a3007ff-d6c3-48ad-8bc5-ee59deeeb113/annual-report-2025.pdf"
+        ],
+        "overrideFiscalYear": 2025
+    },
     "INTEA-B.ST": "Intea Fastigheter AB (publ)",
     "INTEA-D.ST": "Intea Fastigheter AB (publ)",
     "AQ.ST": {
@@ -1015,7 +1035,11 @@
         "candidateDomains": [
             "https://group.systemair.com",
             "https://www.systemair.com"
-        ]
+        ],
+        "annualReportPdfUrls": [
+            "https://group.systemair.com/files/Main/22134/4210425/systemair_annual_and_sustainability_report_2024_25.pdf"
+        ],
+        "overrideFiscalYear": 2025
     },
     "BWEO.ST": "BW Energy Limited",
     "EPRO-B.ST": "Electrolux Professional AB (publ)",

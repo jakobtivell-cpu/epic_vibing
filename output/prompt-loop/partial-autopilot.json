@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "startedAt": "2026-04-17T06:33:05.292Z",
-  "lastIterationAt": "2026-04-17T09:00:00.000Z",
-  "iteration": 1,
+  "lastIterationAt": "2026-04-17T10:00:00.000Z",
+  "iteration": 2,
   "baseline": {
     "partial": 14
   },
@@ -30,19 +30,57 @@
       ],
       "notes": "Two-pronged fix: (1) data/ticker.json — replaced the quarterly SAND.ST override URL with the 2024 annual report; added direct Cision/CDN PDF URLs for LUMI, SWED-A, BEIJ-B, VOLCAR-B (media-downloads), and expanded SINCH from bare string to full object with PDF URL. (2) src/extraction/field-extractor.ts — added 'consolidated statements? of operations' and 'statements? of operations and comprehensive income' to INCOME_STATEMENT_PATTERNS, enabling EBIT extraction from North-American-format annual reports (Lundin Mining pattern). All 87 tests pass; no rescrape this iteration (rescrape needed to measure partialAfter).",
       "rescrapeReason": "no_rescrape_this_iteration"
+    },
+    {
+      "iteration": 2,
+      "gitHead": "0c81857",
+      "partialBefore": 14,
+      "partialAfter": null,
+      "clustersChosen": [
+        "income-statement-swedish-ifrs-totalresultat",
+        "employee-label-missing-variants",
+        "download-failures-new-tickers",
+        "investment-company-ebit-blocker"
+      ],
+      "tickersTouched": [
+        "GETI-B.ST",
+        "SHB-A.ST",
+        "HACK.ST",
+        "SYSR.ST",
+        "LATO-B.ST"
+      ],
+      "commits": [
+        "fix(extraction): Swedish IFRS income patterns, narrative employee labels + annual URL overrides iter2"
+      ],
+      "notes": "Four-cluster fix: (1) field-extractor.ts INCOME_STATEMENT_PATTERNS — added 'rapport over totalresultat' and 'rapport over det samlade resultatet' for Swedish IFRS format (different from iter1 English statement-of-operations fix); (2) field-extractor.ts findNarrativeEmployeeHit — added N medarbetare, N anställda, hade N anställda, employs N people patterns; added Swedish space-thousands separator support (1 254 -> 1254); also fixed the number-parser to strip spaces/NBSP; (3) post-download-checks.ts hasIncomeStatement — added statements-of-operations and rapport-over-totalresultat; (4) data/ticker.json — GETI-B English FY2024 annual report URL (replacing failing Swedish FY2025); SHB-A FY2024 annual report; HACK expanded from string to object with FY2025 annual report; SYSR FY2024/25 annual report; LATO-B manualHeadlineFields.ceo='Johan Hjertonsson'. All 42 test suites / 200 tests pass.",
+      "rescrapeReason": "no_rescrape_this_iteration"
     }
   ],
   "clusterCooldown": 3,
   "clusterLastTouched": {
     "pdf-wrong-doc-all-quarterly": 1,
     "download-failures-no-pdf-retrieved": 1,
-    "no-income-statement-section-detected": 1
+    "no-income-statement-section-detected": 1,
+    "income-statement-swedish-ifrs-totalresultat": 2,
+    "employee-label-missing-variants": 2,
+    "download-failures-new-tickers": 2,
+    "investment-company-ebit-blocker": 2
   },
   "clusterOutcomes": {
     "pdf-wrong-doc-all-quarterly": "unknown",
     "download-failures-no-pdf-retrieved": "unknown",
-    "no-income-statement-section-detected": "unknown"
+    "no-income-statement-section-detected": "unknown",
+    "income-statement-swedish-ifrs-totalresultat": "unknown",
+    "employee-label-missing-variants": "unknown",
+    "download-failures-new-tickers": "unknown",
+    "investment-company-ebit-blocker": "partial"
   },
   "stagnationRounds": 0,
-  "blocked": null
+  "blocked": [
+    {
+      "signature": "investment-company-ebit-no-standard-line",
+      "tickers": ["LATO-B.ST"],
+      "reason": "Investment companies (companyType=investment_company) skip EBIT extraction by design — operating profit includes unrealised portfolio revaluations not comparable to industrial EBIT. CEO set via manualHeadlineFields; EBIT remains null until a manual numeric override is added."
+    }
+  ]
 }

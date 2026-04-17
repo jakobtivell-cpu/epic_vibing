@@ -297,6 +297,8 @@ export function verifyAnnualReportContent(text: string): ContentCheckResult {
     /resultaträkning/i.test(lower) ||
     /income\s+statement/i.test(lower) ||
     /statement\s+of\s+(income|profit|loss|comprehensive\s+income)/i.test(lower) ||
+    /statements?\s+of\s+operations/i.test(lower) ||
+    /rapport\s+(?:över|over)\s+totalresultat/i.test(lower) ||
     /\bprofit\s+before\s+tax\b/i.test(lower) ||
     /\bresult\s+before\s+tax\b/i.test(lower) ||
     /\bnet\s+interest\s+income\b/i.test(lower) ||

@@ -6,6 +6,7 @@ This runbook implements the prompt loop against this repository's existing scrip
 
 - Latest dataset: `latest_batch`
 - Main results file: `output/results.json`
+- After an overnight scrape (or any full run), use the **single copy-paste iterative prompt** in [iterative-fix-round.md](./iterative-fix-round.md) to triage from `run_summary.json` + `results.json` without mixing stale JSON and new `main`.
 - Quality summary command: `node scripts/analyze-results-quality.cjs output/results.json`
 - Null ledger command: `node scripts/analyze-results-quality.cjs --write-ledger output/results.json`
 - Full scraper test command: `node scripts/test-all-companies.cjs`
@@ -23,6 +24,15 @@ Use the runner to reduce copy/paste errors across loop steps:
   - `node scripts/prompt-loop-runner.cjs apply --step 1 --response output/prompt-loop/step-1-response.json`
 - Check progress:
   - `node scripts/prompt-loop-runner.cjs status`
+
+For partial-only autonomous improvement mode:
+
+- Initialize autopilot state:
+  - `node scripts/prompt-loop-runner.cjs autopilot-init`
+- Generate autonomous prompt with embedded state and current partial snapshot:
+  - `node scripts/prompt-loop-runner.cjs autopilot-prompt`
+- Check autopilot progress:
+  - `node scripts/prompt-loop-runner.cjs autopilot-status`
 
 The `apply` command prints the next step command automatically.
 

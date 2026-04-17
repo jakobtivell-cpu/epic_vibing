@@ -18,7 +18,14 @@ const PROMPTS_MD_PATH = path.resolve(
   'scraper-prompt-loop',
   'prompt-templates.md',
 );
+const AUTOPILOT_PROMPT_MD_PATH = path.resolve(
+  ROOT,
+  'docs',
+  'scraper-prompt-loop',
+  'partial-autopilot-prompt.md',
+);
 const DEFAULT_RESULTS_PATH = path.resolve(ROOT, 'output', 'results.json');
+const DEFAULT_AUTOPILOT_STATE = path.resolve(ROOT, 'output', 'prompt-loop', 'partial-autopilot.json');
 
 function usage() {
   console.log(
@@ -28,10 +35,14 @@ function usage() {
       '  node scripts/prompt-loop-runner.cjs prompt --step <1-8> [--handoff <path>] [--out <path>]',
       '  node scripts/prompt-loop-runner.cjs apply --step <1-8> --response <path> [--handoff <path>]',
       '  node scripts/prompt-loop-runner.cjs status [--handoff <path>]',
+      '  node scripts/prompt-loop-runner.cjs autopilot-init [--state <path>]',
+      '  node scripts/prompt-loop-runner.cjs autopilot-prompt [--state <path>] [--out <path>]',
+      '  node scripts/prompt-loop-runner.cjs autopilot-status [--state <path>]',
       '',
       'Tips:',
       '  - `prompt` emits a copy/paste-ready prompt with current handoff JSON attached.',
       '  - `apply` stores the model JSON response as the new handoff and prints the next step.',
+      '  - `autopilot-prompt` emits a single long-running autonomous prompt.',
       '  - strict mode is enabled by default; disable with --no-strict.',
     ].join('\n'),
   );
@@ -64,6 +75,11 @@ function argValue(name, fallback = undefined) {
 
 function resolveHandoffPath() {
   const raw = argValue('--handoff', DEFAULT_HANDOFF);
+  return path.resolve(ROOT, raw);
+}
+
+function resolveAutopilotStatePath() {
+  const raw = argValue('--state', DEFAULT_AUTOPILOT_STATE);
   return path.resolve(ROOT, raw);
 }
 
@@ -106,6 +122,35 @@ function loadPromptSections() {
   }
 
   return { globalEnvelope, steps };
+}
+
+function normalizeAutopilotState(state) {
+  const out = state && typeof state === 'object' ? state : {};
+  if (!Number.isInteger(out.schemaVersion)) out.schemaVersion = 1;
+  if (typeof out.startedAt !== 'string' || !out.startedAt) out.startedAt = nowIso();
+  if (typeof out.lastIterationAt !== 'string' || !out.lastIterationAt) out.lastIterationAt = nowIso();
+  if (!Number.isInteger(out.iteration)) out.iteration = 0;
+  if (!out.baseline || typeof out.baseline !== 'object') out.baseline = {};
+  if (!Number.isInteger(out.baseline.partial)) out.baseline.partial = 0;
+  if (!Array.isArray(out.history)) out.history = [];
+  if (!Number.isInteger(out.clusterCooldown)) out.clusterCooldown = 3;
+  if (!out.clusterLastTouched || typeof out.clusterLastTouched !== 'object') out.clusterLastTouched = {};
+  if (!out.clusterOutcomes || typeof out.clusterOutcomes !== 'object') out.clusterOutcomes = {};
+  if (!Number.isInteger(out.stagnationRounds)) out.stagnationRounds = 0;
+  if (!Object.prototype.hasOwnProperty.call(out, 'blocked')) out.blocked = null;
+  return out;
+}
+
+function loadAutopilotPromptText() {
+  if (!fs.existsSync(AUTOPILOT_PROMPT_MD_PATH)) {
+    fail(`Autopilot prompt markdown not found: ${AUTOPILOT_PROMPT_MD_PATH}`);
+  }
+  const text = fs.readFileSync(AUTOPILOT_PROMPT_MD_PATH, 'utf8');
+  const match = text.match(/## Prompt \(copy-paste\)\s+```text\s*([\s\S]*?)```/m);
+  if (!match) {
+    fail(`Could not parse "## Prompt (copy-paste)" text block in ${AUTOPILOT_PROMPT_MD_PATH}`);
+  }
+  return match[1].trim();
 }
 
 function validateTopLevelShape(candidate, template) {
@@ -293,6 +338,24 @@ function commandInit() {
   console.log(`Initialized handoff: ${handoffPath}`);
 }
 
+function commandAutopilotInit() {
+  const statePath = resolveAutopilotStatePath();
+  let state = {};
+  if (fs.existsSync(statePath)) {
+    state = readJson(statePath);
+  }
+  state = normalizeAutopilotState(state);
+
+  const rows = loadResultsRows();
+  state.baseline = state.baseline || {};
+  state.baseline.partial = rows.filter((r) => r && r.status === 'partial').length;
+  state.lastIterationAt = nowIso();
+  if (!state.startedAt) state.startedAt = state.lastIterationAt;
+
+  writeJson(statePath, state);
+  console.log(`Initialized autopilot state: ${statePath}`);
+}
+
 function commandPrompt() {
   const stepRaw = argValue('--step');
   if (!stepRaw) fail('Missing --step <1-8>');
@@ -335,6 +398,60 @@ function commandPrompt() {
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, finalPrompt, 'utf8');
   console.log(`Wrote prompt: ${outPath}`);
+}
+
+function commandAutopilotPrompt() {
+  const statePath = resolveAutopilotStatePath();
+  if (!fs.existsSync(statePath)) {
+    fail(`Autopilot state file not found: ${statePath}. Run autopilot-init first.`);
+  }
+  const state = normalizeAutopilotState(readJson(statePath));
+  const rows = loadResultsRows();
+  const partialRows = rows.filter((r) => r && r.status === 'partial');
+  const byStatus = rows.reduce((acc, row) => {
+    const k = row && typeof row.status === 'string' ? row.status : 'unknown';
+    acc[k] = (acc[k] || 0) + 1;
+    return acc;
+  }, {});
+  const promptBody = loadAutopilotPromptText();
+  const finalPrompt = [
+    promptBody,
+    '',
+    'Current autopilot state JSON:',
+    '```json',
+    JSON.stringify(state, null, 2),
+    '```',
+    '',
+    'Current results snapshot:',
+    '```json',
+    JSON.stringify(
+      {
+        results_path: DEFAULT_RESULTS_PATH,
+        total_rows: rows.length,
+        partial_rows: partialRows.length,
+        status_counts: byStatus,
+        sample_partial_rows: partialRows.slice(0, 20).map((r) => ({
+          company: r.company,
+          ticker: r.ticker ?? null,
+          status: r.status,
+          extractionNotes: Array.isArray(r.extractionNotes) ? r.extractionNotes.slice(0, 6) : [],
+          extractedData: r.extractedData ?? null,
+        })),
+      },
+      null,
+      2,
+    ),
+    '```',
+    '',
+    'Return plain text actions and perform the work in-repo.',
+  ].join('\n');
+  const outPath = argValue(
+    '--out',
+    path.resolve(ROOT, 'output', 'prompt-loop', 'partial-autopilot-prompt.txt'),
+  );
+  fs.mkdirSync(path.dirname(outPath), { recursive: true });
+  fs.writeFileSync(outPath, finalPrompt, 'utf8');
+  console.log(`Wrote autopilot prompt: ${outPath}`);
 }
 
 function commandApply() {
@@ -439,6 +556,25 @@ function commandStatus() {
   console.log(`completeness_rate: ${Number(rate).toFixed(4)}`);
 }
 
+function commandAutopilotStatus() {
+  const statePath = resolveAutopilotStatePath();
+  if (!fs.existsSync(statePath)) {
+    fail(`Autopilot state file not found: ${statePath}. Run autopilot-init first.`);
+  }
+  const state = normalizeAutopilotState(readJson(statePath));
+  const rows = loadResultsRows();
+  const partial = rows.filter((r) => r && r.status === 'partial').length;
+  console.log(`autopilot_state: ${statePath}`);
+  console.log(`started_at: ${state.startedAt}`);
+  console.log(`last_iteration_at: ${state.lastIterationAt}`);
+  console.log(`iteration: ${state.iteration}`);
+  console.log(`baseline_partial: ${state?.baseline?.partial ?? 0}`);
+  console.log(`current_partial: ${partial}`);
+  console.log(`stagnation_rounds: ${state.stagnationRounds}`);
+  console.log(`history_entries: ${Array.isArray(state.history) ? state.history.length : 0}`);
+  console.log(`blocked: ${state.blocked ? 'yes' : 'no'}`);
+}
+
 function main() {
   const cmd = process.argv[2];
   if (!cmd || cmd === '--help' || cmd === '-h') {
@@ -450,6 +586,9 @@ function main() {
   if (cmd === 'prompt') return commandPrompt();
   if (cmd === 'apply') return commandApply();
   if (cmd === 'status') return commandStatus();
+  if (cmd === 'autopilot-init') return commandAutopilotInit();
+  if (cmd === 'autopilot-prompt') return commandAutopilotPrompt();
+  if (cmd === 'autopilot-status') return commandAutopilotStatus();
 
   fail(`Unknown command: ${cmd}`);
 }

@@ -26,6 +26,7 @@
     "gate:canary-diff": "node scripts/check-canary-diff.cjs",
     "gate:promotion": "node scripts/gate-promotion.cjs",
     "prompt:loop": "node scripts/prompt-loop-runner.cjs",
+    "seed:results": "node scripts/seed-results.cjs",
     "postinstall": "npx playwright install chromium"
   },
   "dependencies": {

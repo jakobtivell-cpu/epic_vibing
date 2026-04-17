@@ -26,11 +26,12 @@ Belopp i MSEK
 Koncernens resultaträkning
 
 2025    2024
-Summa rörelseintäkter  70 234  68 100
+Summa intäkter         70 234  68 100
 Räntenetto             40 000  39 000
 Rörelseresultat        32 100  31 200
 Övrigt                 100     100
 Rad fem                1       1
+Medelantalet anställda 12 450  12 100
 `;
 
 describe('bank field extraction', () => {
@@ -53,6 +54,7 @@ describe('bank field extraction', () => {
     const r = extractFields(SV_BANK_INCOME, 'SEB', 2025, 'bank');
     expect(r.data.revenue_msek).toBe(70_234);
     expect(r.data.ebit_msek).toBe(32_100);
+    expect(r.data.employees).toBe(12_100);
   });
 
   it('uses profit before impairments as bank EBIT proxy', () => {
